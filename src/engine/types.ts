@@ -81,6 +81,7 @@ export type EventType =
   | 'happening-resolved'
   | 'turn-complete'
   | 'affinity-changed'
+  | 'minigame-complete'
   | 'state-loaded';
 
 export interface GameEvent {

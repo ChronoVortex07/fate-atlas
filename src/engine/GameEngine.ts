@@ -1,4 +1,4 @@
-import type { GameState, QuestionType, AffinityId, SlotResult, RunRecord } from './types';
+import type { GameState, QuestionType, AffinityId, SlotResult, RunRecord, PendingEffect, InteractionEvent } from './types';
 import { EventBus } from './EventBus';
 import { TagSystem } from './TagSystem';
 import { AffinityEngine } from './AffinityEngine';
@@ -8,6 +8,7 @@ import { SynthesisEngine } from './SynthesisEngine';
 import { CHAOS_AFFINITY, ORDER_AFFINITY } from '../data/affinities';
 import { INTERACTION_RULES } from '../data/interactions';
 import { selectHappening } from '../data/happenings';
+import { loadScenario, SCENARIO_PRESETS } from './scenarios';
 
 const STORAGE_KEY = 'fate-atlas-save';
 
@@ -20,6 +21,7 @@ export class GameEngine {
   private synthesisEngine: SynthesisEngine;
 
   private state: GameState;
+  private cachedSnapshot: GameState;
   private listeners = new Set<(state: GameState) => void>();
   private usedHappeningIds = new Set<string>();
 
@@ -31,18 +33,22 @@ export class GameEngine {
     this.interactionResolver = new InteractionResolver(this.tagSystem, this.bus);
     this.synthesisEngine = new SynthesisEngine();
     this.state = this.defaultState();
+    this.cachedSnapshot = JSON.parse(JSON.stringify(this.state)) as GameState;
   }
 
-  // ── Private helpers ──
+  // ---------- Private helpers ----------
 
   private defaultState(): GameState {
     return {
       screen: 'title',
       affinities: { chaos: 0.5, order: 0.5 },
       questionType: null,
-      pool: [],
-      slots: [],
-      revealedCount: 0,
+      availableMethods: [],
+      selectedMethod: null,
+      turnResult: null,
+      minigameState: null,
+      pendingEffects: [],
+      activeInteraction: null,
       interactions: [],
       synthesis: null,
       happening: null,
@@ -57,100 +63,131 @@ export class GameEngine {
   private notify(): void {
     this.state.affinities = this.affinityEngine.getState();
     this.state.eventLog = this.bus.getHistory();
-    const snapshot = JSON.parse(JSON.stringify(this.state)) as GameState;
-    this.listeners.forEach((fn) => fn(snapshot));
+    this.cachedSnapshot = JSON.parse(JSON.stringify(this.state)) as GameState;
+    this.listeners.forEach((fn) => fn(this.cachedSnapshot));
   }
 
-  // ── Turn lifecycle ──
+  // ---------- Turn lifecycle ----------
 
   startTurn(question: QuestionType): void {
     const affinities = this.affinityEngine.getState();
-    const pool = this.orchestrator.generatePool(question, affinities);
+    const availableMethods = this.orchestrator.generatePool(question, affinities);
 
-    this.state.screen = 'draw';
+    // Decrement turnsRemaining on all pending effects; remove expired
+    this.state.pendingEffects = this.state.pendingEffects
+      .map((e) => ({ ...e, turnsRemaining: e.turnsRemaining - 1 }))
+      .filter((e) => e.turnsRemaining > 0);
+
+    this.state.screen = 'method-select';
     this.state.questionType = question;
-    this.state.pool = pool;
-    this.state.slots = this.orchestrator.getSlots();
-    this.state.revealedCount = 0;
+    this.state.availableMethods = availableMethods;
+    this.state.selectedMethod = null;
+    this.state.turnResult = null;
+    this.state.minigameState = null;
+    this.state.activeInteraction = null;
     this.state.interactions = [];
     this.state.synthesis = null;
     this.state.happening = null;
     this.state.selectedHappeningChoice = null;
     this.state.chainDepth = 0;
 
-    this.bus.emit('turn-started', { question, pool });
+    this.bus.emit('turn-started', { question, availableMethods });
     this.notify();
   }
 
-  drawSlot(index: number): void {
-    const affinities = this.affinityEngine.getState();
-    this.orchestrator.drawSlot(index, affinities);
-    this.state.slots = this.orchestrator.getSlots();
+  selectMethod(index: number): void {
+    const methodType = this.state.availableMethods[index];
+    if (!methodType) {
+      throw new Error(`Method index ${index} out of bounds`);
+    }
+
+    this.state.selectedMethod = methodType;
+
+    // Happening gate check
+    const chaos = this.affinityEngine.getState().chaos;
+    if (methodType === 'happening') {
+      // Always trigger happening if happening was drawn and selected
+      this.triggerHappening();
+      return;
+    }
+
+    if (chaos >= 0.7 && Math.random() < 0.3) {
+      // Chaos override — replace with happening
+      this.triggerHappening();
+      return;
+    }
+
+    this.state.screen = 'minigame';
     this.notify();
   }
 
-  revealSlot(index: number): void {
-    this.orchestrator.revealSlot(index);
+  completeMinigame(result: SlotResult): void {
+    this.state.turnResult = result;
 
-    const slots = this.orchestrator.getSlots();
-    const revealed = slots[index];
-    if (!revealed) {
-      throw new Error(`Slot ${index} is empty — cannot reveal`);
+    // Apply affinities from result
+    if (result.type !== 'happening') {
+      this.affinityEngine.apply([result]);
     }
 
-    // Accumulate affinities from non-happening results
-    if (revealed.type !== 'happening') {
-      this.affinityEngine.apply([revealed]);
-    }
-
-    // Resolve interactions triggered by this reveal
-    const affinities = this.affinityEngine.getState();
-    const interactions = this.interactionResolver.checkAndResolve(
-      slots, index, affinities, INTERACTION_RULES, this.state.chainDepth,
+    // Check pending effects against this result
+    const { matched, remaining } = this.interactionResolver.checkPendingEffects(
+      this.state.pendingEffects,
+      result,
     );
+    this.state.pendingEffects = remaining;
 
-    this.state.slots = slots;
-    this.state.interactions = [...this.state.interactions, ...interactions];
-    this.state.revealedCount++;
-    this.state.affinities = this.affinityEngine.getState();
-    this.notify();
-  }
+    // Build interaction events from matched pending effects
+    const interactionEvents: InteractionEvent[] = matched.map((effect) => ({
+      ruleId: effect.id,
+      sourceSlotIndex: effect.sourceSlotIndex,
+      targetSlotIndex: 0,
+      effect: effect.action,
+      description: effect.description,
+    }));
+    this.state.interactions = [...this.state.interactions, ...interactionEvents];
 
-  resolveAllInteractions(): void {
-    const slots = this.orchestrator.getSlots();
-    const affinities = this.affinityEngine.getState();
-    const allEntries: import('./types').InteractionEvent[] = [];
+    // Create new pending effects from this result's tags
+    const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const newEffects = this.interactionResolver.createPendingEffects(
+      result,
+      runId,
+      INTERACTION_RULES,
+    );
+    this.state.pendingEffects = [...this.state.pendingEffects, ...newEffects];
 
-    for (let i = 0; i < slots.length; i++) {
-      if (slots[i]) {
-        const events = this.interactionResolver.checkAndResolve(
-          slots, i, affinities, INTERACTION_RULES, 0,
-        );
-        allEntries.push(...events);
-      }
+    // If any matched effects, set activeInteraction for the InteractionLayer
+    if (interactionEvents.length > 0) {
+      this.state.activeInteraction = interactionEvents[0];
     }
 
-    this.state.slots = slots;
-    this.state.interactions = allEntries;
+    // Synthesize
+    this.synthesize();
+
+    this.bus.emit('minigame-complete', { result, interactions: interactionEvents });
     this.notify();
   }
 
-  synthesize(): void {
-    const slots = this.orchestrator.getSlots()
-      .filter((s): s is SlotResult => s !== null && s.type !== 'happening');
+  clearActiveInteraction(): void {
+    this.state.activeInteraction = null;
+    this.state.screen = 'result';
+    this.notify();
+  }
+
+  private synthesize(): void {
+    const result = this.state.turnResult;
+    if (!result || result.type === 'happening') return;
+
     const affinities = this.affinityEngine.getState();
-    const result = this.synthesisEngine.synthesize(
-      slots,
+    const synthesisResult = this.synthesisEngine.synthesize(
+      [result],
       this.state.questionType!,
       this.state.interactions,
       affinities,
     );
 
-    this.state.synthesis = result;
-    this.state.screen = 'interpretation';
+    this.state.synthesis = synthesisResult;
 
-    this.bus.emit('synthesis-complete', { result });
-    this.notify();
+    this.bus.emit('synthesis-complete', { result: synthesisResult });
   }
 
   triggerHappening(): void {
@@ -194,34 +231,39 @@ export class GameEngine {
     this.affinityEngine.setState(current);
 
     this.state.selectedHappeningChoice = choiceIndex;
+
+    // If we came from selectMethod gate, we still need to synthesize
+    // Use the happening itself as the "result" for the reading
+    if (!this.state.synthesis) {
+      this.synthesize();
+    }
+
     this.state.screen = 'result';
     this.state.affinities = this.affinityEngine.getState();
 
-    // Build run record and add to history
-    const slots = this.orchestrator.getSlots()
-      .filter((s): s is SlotResult => s !== null && s.type !== 'happening');
+    // Build run record
     const run: RunRecord = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       timestamp: Date.now(),
       question: this.state.questionType!,
-      slots,
+      turnResult: this.state.turnResult ?? this.state.happening,
       interactions: this.state.interactions,
       synthesis: this.state.synthesis!,
       happening: this.state.happening,
       happeningChoice: choiceIndex,
     };
-    this.state.history = [...this.state.history, run];
+    this.state.history = [...this.state.history, run].slice(-10);
 
     this.bus.emit('happening-resolved', { choiceIndex });
+
+    this.saveToStorage();
     this.notify();
   }
 
-  // ── State access ──
+  // ---------- State access ----------
 
   getState(): GameState {
-    this.state.affinities = this.affinityEngine.getState();
-    this.state.eventLog = this.bus.getHistory();
-    return JSON.parse(JSON.stringify(this.state)) as GameState;
+    return this.cachedSnapshot;
   }
 
   loadState(json: Partial<GameState>): void {
@@ -233,21 +275,44 @@ export class GameEngine {
     this.notify();
   }
 
-  // ── Persistence ──
+  // ---------- Debug ----------
+
+  injectPendingEffect(effect: PendingEffect): void {
+    this.state.pendingEffects = [...this.state.pendingEffects, effect];
+    this.notify();
+  }
+
+  loadScenarioById(presetId: string): boolean {
+    const success = loadScenario(presetId, this.state);
+    if (success) {
+      this.notify();
+    }
+    return success;
+  }
+
+  getScenarioPresets() {
+    return SCENARIO_PRESETS.map((p) => ({ id: p.id, label: p.label }));
+  }
+
+  // ---------- Persistence ----------
 
   saveToStorage(): void {
-    const data = {
-      affinities: this.affinityEngine.serialize(),
-      history: this.state.history,
-      usedHappeningIds: Array.from(this.usedHappeningIds),
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    try {
+      const data = {
+        affinities: this.affinityEngine.serialize(),
+        history: this.state.history,
+        usedHappeningIds: Array.from(this.usedHappeningIds),
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch {
+      // Storage unavailable or full — silently ignore
+    }
   }
 
   loadFromStorage(): boolean {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return false;
     try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
       const data = JSON.parse(raw);
       if (data.affinities) this.affinityEngine.loadFrom(data.affinities);
       if (data.history) this.state.history = data.history;
@@ -260,20 +325,20 @@ export class GameEngine {
     }
   }
 
-  // ── LLM Prompt ──
+  // ---------- LLM Prompt ----------
 
   generateLLMPrompt(): string {
-    const slots = this.orchestrator.getSlots()
-      .filter((s): s is SlotResult => s !== null && s.type !== 'happening');
+    const result = this.state.turnResult;
+    if (!result || result.type === 'happening') return '';
     return this.synthesisEngine.generateLLMPrompt({
       question: this.state.questionType!,
-      slots,
+      slots: [result],
       interactions: this.state.interactions,
       affinities: this.affinityEngine.getState(),
     });
   }
 
-  // ── Subscription ──
+  // ---------- Subscription ----------
 
   subscribe(fn: (state: GameState) => void): () => void {
     this.listeners.add(fn);
@@ -282,15 +347,64 @@ export class GameEngine {
     };
   }
 
-  // ── Reset ──
+  // ---------- Navigation helpers ----------
+
+  returnToQuestionSelect(): void {
+    this.state.screen = 'question';
+    this.state.questionType = null;
+    this.state.availableMethods = [];
+    this.state.selectedMethod = null;
+    this.state.turnResult = null;
+    this.state.minigameState = null;
+    this.state.activeInteraction = null;
+    this.state.interactions = [];
+    this.state.synthesis = null;
+    this.state.happening = null;
+    this.state.selectedHappeningChoice = null;
+    this.state.chainDepth = 0;
+    this.notify();
+  }
+
+  returnToTitle(): void {
+    const saved = {
+      affinities: this.affinityEngine.getState(),
+      history: this.state.history,
+      usedHappeningIds: Array.from(this.usedHappeningIds),
+    };
+    this.state = this.defaultState();
+    this.affinityEngine.setState(saved.affinities);
+    this.state.affinities = this.affinityEngine.getState();
+    this.state.history = saved.history;
+    this.usedHappeningIds = new Set(saved.usedHappeningIds);
+    this.bus.clear();
+    this.notify();
+  }
 
   reset(): void {
     const affinities = this.affinityEngine.getState();
+    const history = this.state.history;
+    const usedIds = Array.from(this.usedHappeningIds);
     this.state = this.defaultState();
     this.affinityEngine.setState(affinities);
     this.state.affinities = this.affinityEngine.getState();
-    this.usedHappeningIds.clear();
+    this.state.history = history;
+    this.usedHappeningIds = new Set(usedIds);
     this.bus.clear();
+    this.notify();
+  }
+
+  clearHistory(): void {
+    const defaultAffinities = { chaos: 0.5, order: 0.5 };
+    this.affinityEngine.setState(defaultAffinities);
+    this.state = this.defaultState();
+    this.state.affinities = this.affinityEngine.getState();
+    this.usedHappeningIds = new Set();
+    this.bus.clear();
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // silently ignore
+    }
     this.notify();
   }
 }
