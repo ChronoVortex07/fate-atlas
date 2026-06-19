@@ -124,7 +124,7 @@ export interface RunRecord {
   id: string;
   timestamp: number;
   question: QuestionType;
-  slots: SlotResult[];
+  turnResult: SlotResult | null;
   interactions: InteractionEvent[];
   synthesis: SynthesisResult;
   happening?: HappeningResult;
@@ -139,13 +139,50 @@ export interface InteractionEvent {
   description: string;
 }
 
+export interface PendingEffect {
+  id: string;
+  sourceRunId: string;
+  sourceCard: string;
+  sourceSlotIndex: number;
+  triggerTags: string[];
+  action: 'reroll' | 'flip' | 'add-choice' | 'mirror' | 'second-result';
+  description: string;
+  expiresAfter: number;
+  turnsRemaining: number;
+}
+
+export interface TarotMinigameState {
+  method: 'tarot';
+  faceDownCards: TarotResult[];
+  chosenIndex: number | null;
+  reversed: boolean;
+  revealed: boolean;
+}
+
+export interface DiceMinigameState {
+  method: 'd20';
+  result: DiceResult;
+  thrown: boolean;
+}
+
+export interface IChingMinigameState {
+  method: 'iching';
+  lines: number[];
+  castCount: number;
+  result: IChingResult | null;
+}
+
+export type MinigameState =
+  | TarotMinigameState
+  | DiceMinigameState
+  | IChingMinigameState;
+
 // ── Engine State ──
 export type Screen =
   | 'title'
   | 'question'
-  | 'draw'
-  | 'interaction'
-  | 'interpretation'
+  | 'method-select'
+  | 'minigame'
   | 'happening'
   | 'result';
 
@@ -153,9 +190,12 @@ export interface GameState {
   screen: Screen;
   affinities: Record<AffinityId, number>;
   questionType: QuestionType | null;
-  pool: DivinationType[];
-  slots: (SlotResult | null)[];
-  revealedCount: number;
+  availableMethods: DivinationType[];
+  selectedMethod: DivinationType | null;
+  turnResult: SlotResult | null;
+  minigameState: MinigameState | null;
+  pendingEffects: PendingEffect[];
+  activeInteraction: InteractionEvent | null;
   interactions: InteractionEvent[];
   synthesis: SynthesisResult | null;
   happening: HappeningResult | null;
