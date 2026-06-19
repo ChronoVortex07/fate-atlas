@@ -27,7 +27,7 @@ Title → Question Select → Method Select → [Happening Gate] → Minigame �
 
 ```
 App
-├── StarField                    (unchanged)
+├── StarField                    (REWRITTEN — SVG-based celestial field)
 ├── GameTable                    (NEW — persistent hub, replaces screen router)
 │   ├── HistoryTiles             (NEW — past readings as small tiles, always visible at top)
 │   ├── [Center Content]         (AnimatePresence transitions)
@@ -369,6 +369,7 @@ When an interaction fires, the source tile (where the pending effect came from) 
 | `src/components/overlays/InteractionAnimations/FoolsRerollAnimation.tsx` | Full Fool's Reroll animation |
 | `src/components/overlays/InteractionAnimations/StubAnimations.tsx` | Stub animations for other 4 interactions |
 | `src/components/overlays/HistoryTiles.tsx` | Horizontal scrollable past-reading tiles |
+| `src/data/constellations.ts` | Constellation definitions (positions, stars, shapes) |
 | `src/engine/scenarios.ts` | Debug scenario presets |
 
 ### Modified Files
@@ -378,6 +379,7 @@ When an interaction fires, the source tile (where the pending effect came from) 
 | `src/engine/types.ts` | Updated `Screen`, `GameState`, new `PendingEffect`, `MinigameState` types |
 | `src/engine/TurnOrchestrator.ts` | Rename pool→availableMethods, happening gate logic |
 | `src/engine/InteractionResolver.ts` | `checkPendingEffects()`, `createPendingEffects()` methods |
+| `src/components/overlays/StarField.tsx` | Rewrite — SVG-based celestial field with constellations |
 | `src/App.tsx` | Replace ScreenRouter with GameTable |
 | `src/components/screens/HappeningScene.tsx` | Refactor as center content (remove full-screen styling) |
 | `src/components/debug/DebugPanel.tsx` | Scenario presets dropdown, force-trigger button |
@@ -414,6 +416,75 @@ When an interaction fires, the source tile (where the pending effect came from) 
 ---
 
 ## 11. README Debug URL Fix
+
+## 12. StarField Revamp
+
+The current StarField (100 random circles with twinkle animation) is replaced with a richer celestial treatment.
+
+### Design Language
+
+| Type | Shape | Color | Size | Density |
+|------|-------|-------|------|---------|
+| Dust | Circle only | #7b9ec7 | 0.5–0.8px | ~50 scattered evenly |
+| Medium | Circle + faint aura | #c8d8f0 | 1.0–1.5px | ~12 field |
+| Constellation stars | Tight two-layer blur glow + bright core | #e8f0ff (white) or #f0d878 (gold) | 2px core, ~16px total glow | 4–8 per constellation |
+| Sparkle | Tiny circle, occasional brief brighten | #c8d8f0 | 1px | ~8 scattered |
+| Shooting stars | Gradient line with head dot | Gold or white | 30–60px line | 1 every 15–45s, CSS animation |
+
+### Star Glow Technique (Constellations)
+
+Each constellation star uses two-layer gaussian blur for a defined but soft glow:
+
+```
+Layer 1 (outer halo): circle r=6, fill #c8d8f0 opacity 0.1, feGaussianBlur stdDeviation=2.5
+Layer 2 (inner glow): circle r=2.5, fill #e8f0ff opacity 0.3, feGaussianBlur stdDeviation=1.0
+Core:                circle r=0.8, fill #e8f0ff opacity 1.0
+```
+
+This avoids the "mushy low-res" look of radial gradients while staying organic — no hard geometric edges.
+
+### Constellation Lines
+
+Two-layer approach matching the stars:
+- **Glow layer:** 2px-wide line, opacity 0.05, blurred at 1.0px — sits underneath
+- **Core line:** 0.35px-wide line, opacity 0.25–0.3 — crisp and readable
+
+### Constellations (6 total, pre-defined positions)
+
+| Name | Shape | Star Count | Color | Theme |
+|------|-------|------------|-------|-------|
+| The Eye | Diamond with crossing center line | 4 | White | Divine sight, awareness |
+| The Serpent | Winding zigzag | 8 | White | Chaos, transformation |
+| The Crown | Small arc | 5 | Gold | Order, authority |
+| The Gate | Two pillars + lintel | 4 | White | Threshold, choice |
+| The Scales | Balance beam with pans | 5 | White | Judgment, balance |
+| The Spindle | Three stars in tight row | 3 | White | The Fates' thread |
+
+### Other Elements
+
+- **Nebula washes:** 2–3 radial gradients at 12–20% opacity in deep purple (#2a1545), teal (#0f1f3d), and dark rose (#1a0a1e). Off-center positioning.
+- **Slow rotation:** The entire starfield container rotates at ~0.5°/minute via CSS `transform: rotate()` animated over a long duration, simulating the night sky.
+- **Shooting stars:** CSS `@keyframes` animation on a thin gradient line, triggered on random intervals (15–45s). Silver or gold.
+- **Seeded positions:** All star positions determined by a seeded hash (not `Math.random()`), so the sky is consistent between renders and sessions.
+
+### Implementation
+
+- `StarField.tsx` rewritten to render an inline SVG (full viewport) with `<defs>` for the glow filters and star templates
+- Constellation data defined in `src/data/constellations.ts`
+- Dust and medium stars generated via seeded pseudo-random from constellation name hashes
+- Shooting stars use CSS animations appended to the SVG via `<style>`
+- Rotation via a CSS custom property animated over the session lifetime
+
+### File Changes
+
+| File | Change |
+|------|--------|
+| `src/components/overlays/StarField.tsx` | Rewrite — SVG-based celestial field |
+| `src/data/constellations.ts` | **New** — constellation definitions |
+
+---
+
+## 13. README Debug URL Fix
 
 The Vite config has `base: '/fate-atlas/'`. The correct debug URL is:
 
