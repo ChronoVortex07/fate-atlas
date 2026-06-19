@@ -1,9 +1,10 @@
 import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
+import RunicBand from '../shared/RunicBand';
+import OrnamentalBorder from '../shared/OrnamentalBorder';
+import MysticButton from '../shared/MysticButton';
 import type { SlotResult } from '../../engine/types';
-
-const RUNES = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ';
 
 export default function Interpretation() {
   const { state, engine } = useGameEngine();
@@ -42,12 +43,12 @@ export default function Interpretation() {
         <div style={contentStyle}>
           {/* Runic band */}
           <motion.div
-            style={runicBandStyle}
             initial={{ opacity: 0 }}
-            animate={{ opacity: 0.4 }}
+            animate={{ opacity: 1 }}
             transition={{ duration: 0.8, delay: 0.1 }}
+            style={{ textAlign: 'center', width: '100%' }}
           >
-            {RUNES}
+            <RunicBand opacity={0.3} />
           </motion.div>
 
           {/* Headline */}
@@ -60,7 +61,7 @@ export default function Interpretation() {
             {synthesis.headline}
           </motion.h1>
 
-          <div style={goldRuleStyle} />
+          <OrnamentalBorder margin="0.25rem 0" />
 
           {/* Paragraphs */}
           <div style={paragraphsStyle}>
@@ -114,12 +115,12 @@ export default function Interpretation() {
 
           {/* Bottom runic band */}
           <motion.div
-            style={{ ...runicBandStyle, marginTop: '0.5rem' }}
             initial={{ opacity: 0 }}
-            animate={{ opacity: 0.2 }}
+            animate={{ opacity: 1 }}
             transition={{ duration: 0.8, delay: 0.8 }}
+            style={{ marginTop: '0.5rem', textAlign: 'center', width: '100%' }}
           >
-            {RUNES}
+            <RunicBand opacity={0.2} />
           </motion.div>
 
           {/* Action buttons */}
@@ -129,31 +130,19 @@ export default function Interpretation() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.8 }}
           >
-            <button
-              style={copyButtonStyle}
+            <MysticButton
+              variant="secondary"
               onClick={handleCopy}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 0 20px rgba(212, 168, 84, 0.3)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = 'none';
-              }}
             >
               {copied ? 'Copied!' : 'Copy LLM Prompt'}
-            </button>
+            </MysticButton>
 
-            <button
-              style={continueButtonStyle}
+            <MysticButton
+              variant="primary"
               onClick={handleContinue}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 0 30px rgba(212, 168, 84, 0.5)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = 'none';
-              }}
             >
               CONTINUE
-            </button>
+            </MysticButton>
           </motion.div>
         </div>
       </div>
@@ -354,18 +343,6 @@ const contentStyle: React.CSSProperties = {
   width: '100%',
 };
 
-const runicBandStyle: React.CSSProperties = {
-  color: '#7b9ec7',
-  fontSize: 'clamp(0.6rem, 1.2vw, 0.85rem)',
-  letterSpacing: '0.5em',
-  opacity: 0.3,
-  fontFamily: "'Cormorant Garamond', serif",
-  wordBreak: 'break-all',
-  lineHeight: 1.4,
-  userSelect: 'none',
-  textAlign: 'center',
-};
-
 const headlineStyle: React.CSSProperties = {
   fontFamily: "'Cormorant Garamond', serif",
   fontWeight: 700,
@@ -375,13 +352,6 @@ const headlineStyle: React.CSSProperties = {
   margin: 0,
   textAlign: 'center',
   lineHeight: 1.3,
-};
-
-const goldRuleStyle: React.CSSProperties = {
-  width: '60px',
-  height: '2px',
-  background: 'linear-gradient(90deg, transparent, #d4a854, transparent)',
-  margin: '0.25rem 0',
 };
 
 const paragraphsStyle: React.CSSProperties = {
@@ -544,30 +514,3 @@ const actionsStyle: React.CSSProperties = {
   marginTop: '0.5rem',
 };
 
-const copyButtonStyle: React.CSSProperties = {
-  fontFamily: "'Inter', sans-serif",
-  fontWeight: 300,
-  fontSize: 'clamp(0.75rem, 1.5vw, 0.85rem)',
-  letterSpacing: '0.1em',
-  color: '#7b9ec7',
-  background: 'transparent',
-  border: '1px solid #1a2440',
-  padding: '0.6rem 1.4rem',
-  cursor: 'pointer',
-  transition: 'box-shadow 0.3s ease',
-  outline: 'none',
-};
-
-const continueButtonStyle: React.CSSProperties = {
-  fontFamily: "'Cormorant Garamond', serif",
-  fontWeight: 600,
-  fontSize: 'clamp(0.9rem, 2vw, 1rem)',
-  letterSpacing: '0.25em',
-  color: '#d4a854',
-  background: 'transparent',
-  border: '1px solid #d4a854',
-  padding: '0.7rem 2.2rem',
-  cursor: 'pointer',
-  transition: 'box-shadow 0.3s ease',
-  outline: 'none',
-};

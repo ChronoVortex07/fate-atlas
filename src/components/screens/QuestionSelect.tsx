@@ -1,5 +1,7 @@
 import { motion } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
+import RunicBand from '../shared/RunicBand';
+import OrnamentalBorder from '../shared/OrnamentalBorder';
 import type { QuestionType } from '../../engine/types';
 
 const RUNES = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ';
@@ -54,9 +56,9 @@ export default function QuestionSelect() {
     >
       <div style={contentStyle}>
         <div style={headingSectionStyle}>
-          <div style={runicBandStyle}>{RUNES}</div>
+          <RunicBand opacity={0.4} fontSize="clamp(0.6rem, 1.2vw, 0.85rem)" />
           <h1 style={headingStyle}>What do you seek?</h1>
-          <div style={goldRuleStyle} />
+          <OrnamentalBorder />
         </div>
 
         <motion.div
@@ -119,14 +121,6 @@ const headingSectionStyle: React.CSSProperties = {
   gap: '0.75rem',
 };
 
-const runicBandStyle: React.CSSProperties = {
-  color: '#7b9ec7',
-  fontSize: 'clamp(0.6rem, 1.2vw, 0.85rem)',
-  letterSpacing: '0.5em',
-  opacity: 0.4,
-  userSelect: 'none',
-};
-
 const headingStyle: React.CSSProperties = {
   fontFamily: "'Cormorant Garamond', serif",
   fontWeight: 700,
@@ -135,13 +129,6 @@ const headingStyle: React.CSSProperties = {
   letterSpacing: '0.15em',
   margin: 0,
   textAlign: 'center',
-};
-
-const goldRuleStyle: React.CSSProperties = {
-  width: '60px',
-  height: '2px',
-  background: 'linear-gradient(90deg, transparent, #d4a854, transparent)',
-  marginTop: '0.25rem',
 };
 
 const gridStyle: React.CSSProperties = {

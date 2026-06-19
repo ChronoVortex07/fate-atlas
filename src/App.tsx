@@ -9,6 +9,8 @@ import Interpretation from './components/screens/Interpretation';
 import HappeningScene from './components/screens/HappeningScene';
 import ResultScreen from './components/screens/ResultScreen';
 import HistoryBar from './components/overlays/HistoryBar';
+import StarField from './components/overlays/StarField';
+import DebugPanel from './components/debug/DebugPanel';
 
 function ScreenRouter() {
   const { state } = useGameEngine();
@@ -29,8 +31,10 @@ function ScreenRouter() {
 function App() {
   return (
     <EngineProvider>
+      <StarField />
       <HistoryBar />
       <ScreenRouter />
+      <DebugPanel />
     </EngineProvider>
   );
 }

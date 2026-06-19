@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
-
-const RUNES = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ';
+import RunicBand from '../shared/RunicBand';
 
 const STAR_POINTS = [
   'radial-gradient(1px 1px at 10% 15%, rgba(255,255,255,0.8), transparent)',
@@ -55,12 +54,14 @@ export default function TitleScreen() {
           transition={{ duration: 1.2, ease: 'easeOut' }}
           style={titleSectionStyle}
         >
-          <div style={runicBandStyle}>{RUNES}</div>
+          <RunicBand opacity={0.5} fontSize="clamp(0.7rem, 1.5vw, 1rem)" />
           <h1 style={titleStyle}>ATLAS OF FATE</h1>
           <div style={{
             ...runicBandStyle,
             transform: 'scaleX(-1)',
-          }}>{RUNES}</div>
+          }}>
+            <RunicBand opacity={0.5} fontSize="clamp(0.7rem, 1.5vw, 1rem)" />
+          </div>
         </motion.div>
 
         <motion.p

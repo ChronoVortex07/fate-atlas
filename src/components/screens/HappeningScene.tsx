@@ -1,8 +1,7 @@
 import { useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
-
-const RUNES = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ';
+import RunicBand from '../shared/RunicBand';
 
 const STAR_POINTS = [
   'radial-gradient(1px 1px at 10% 15%, rgba(255,255,255,0.8), transparent)',
@@ -65,12 +64,12 @@ export default function HappeningScene() {
         <div style={contentStyle}>
           {/* Top runic band */}
           <motion.div
-            style={runicBandStyle}
             initial={{ opacity: 0 }}
-            animate={{ opacity: 0.4 }}
+            animate={{ opacity: 1 }}
             transition={{ duration: 0.8, delay: 0.1 }}
+            style={{ textAlign: 'center', width: '100%' }}
           >
-            {RUNES}
+            <RunicBand opacity={0.3} />
           </motion.div>
 
           {/* Scene text */}
@@ -85,12 +84,12 @@ export default function HappeningScene() {
 
           {/* Bottom runic band */}
           <motion.div
-            style={{ ...runicBandStyle, marginTop: '0.25rem' }}
             initial={{ opacity: 0 }}
-            animate={{ opacity: 0.2 }}
+            animate={{ opacity: 1 }}
             transition={{ duration: 0.8, delay: 0.4 }}
+            style={{ marginTop: '0.25rem', textAlign: 'center', width: '100%' }}
           >
-            {RUNES}
+            <RunicBand opacity={0.2} />
           </motion.div>
 
           {/* Choice cards */}
@@ -162,18 +161,6 @@ const contentStyle: React.CSSProperties = {
   padding: '3rem 2rem',
   maxWidth: '680px',
   width: '100%',
-};
-
-const runicBandStyle: React.CSSProperties = {
-  color: '#7b9ec7',
-  fontSize: 'clamp(0.6rem, 1.2vw, 0.85rem)',
-  letterSpacing: '0.5em',
-  opacity: 0.3,
-  fontFamily: "'Cormorant Garamond', serif",
-  wordBreak: 'break-all',
-  lineHeight: 1.4,
-  userSelect: 'none',
-  textAlign: 'center',
 };
 
 const sceneStyle: React.CSSProperties = {
