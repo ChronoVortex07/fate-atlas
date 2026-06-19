@@ -1,10 +1,14 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { TurnOrchestrator } from '../TurnOrchestrator';
 import { EventBus } from '../EventBus';
 
 describe('TurnOrchestrator', () => {
-  const bus = new EventBus();
+  let bus: EventBus;
   const affinities = { chaos: 0.5, order: 0.5 };
+
+  beforeEach(() => {
+    bus = new EventBus();
+  });
 
   it('generates a pool of 3+ divination types', () => {
     const orchestrator = new TurnOrchestrator(bus);
@@ -23,31 +27,32 @@ describe('TurnOrchestrator', () => {
     expect(d20Count).toBeGreaterThan(50); // d20 should appear most of the time
   });
 
-  it('draws 3 slots from the pool', () => {
+  it('draws a result for each available method', () => {
     const orchestrator = new TurnOrchestrator(bus);
     orchestrator.generatePool('self', affinities);
-    for (let i = 0; i < 3; i++) {
-      orchestrator.drawSlot(i, affinities);
+    const methods = orchestrator.getAvailableMethods().filter((m) => m !== 'happening');
+    expect(methods.length).toBeGreaterThanOrEqual(1);
+    for (const method of methods) {
+      const result = orchestrator.drawSingleResult(method, affinities);
+      expect(result).not.toBeNull();
+      expect(result.type).toBe(method);
     }
-    const slots = orchestrator.getSlots();
-    expect(slots).toHaveLength(3);
-    expect(slots.every((s) => s !== null)).toBe(true);
   });
 
-  it('revealSlot marks a slot as revealed', () => {
+  it('drawSingleResult emits slot-drawn event', () => {
     const orchestrator = new TurnOrchestrator(bus);
     orchestrator.generatePool('self', affinities);
-    orchestrator.drawSlot(0, affinities);
-    orchestrator.revealSlot(0);
-    // Reveal should have emitted a slot-revealed event
+    const method = orchestrator.getAvailableMethods().find((m) => m !== 'happening')!;
+    orchestrator.drawSingleResult(method, affinities);
     const history = bus.getHistory();
-    const revealEvents = history.filter((e) => e.type === 'slot-revealed');
-    expect(revealEvents.length).toBe(1);
+    const drawnEvents = history.filter((e) => e.type === 'slot-drawn');
+    expect(drawnEvents.length).toBe(1);
   });
 
-  it('throws if drawing beyond pool size', () => {
+  it('throws for happening method in drawSingleResult', () => {
     const orchestrator = new TurnOrchestrator(bus);
-    orchestrator.generatePool('self', affinities);
-    expect(() => orchestrator.drawSlot(5, affinities)).toThrow();
+    expect(() => orchestrator.drawSingleResult('happening', affinities)).toThrow(
+      'Happening has no drawSingleResult',
+    );
   });
 });
