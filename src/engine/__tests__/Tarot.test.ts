@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { drawTarotCard, MAJOR_ARCANA } from '../../data/tarot';
-import type { TarotResult } from '../types';
 
 describe('tarot data', () => {
   it('has 22 Major Arcana cards', () => {
