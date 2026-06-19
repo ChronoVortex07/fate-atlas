@@ -6,6 +6,8 @@ import QuestionSelect from './components/screens/QuestionSelect';
 import DrawPhase from './components/screens/DrawPhase';
 import InteractionOverlay from './components/screens/InteractionOverlay';
 import Interpretation from './components/screens/Interpretation';
+import HappeningScene from './components/screens/HappeningScene';
+import ResultScreen from './components/screens/ResultScreen';
 import HistoryBar from './components/overlays/HistoryBar';
 
 function ScreenRouter() {
@@ -18,8 +20,8 @@ function ScreenRouter() {
       {state.screen === 'draw' && <DrawPhase key="draw" />}
       {state.screen === 'interaction' && <InteractionOverlay key="interaction" />}
       {state.screen === 'interpretation' && <Interpretation key="interpretation" />}
-      {state.screen === 'happening' && <div key="happening">Happening</div>}
-      {state.screen === 'result' && <div key="result">Result</div>}
+      {state.screen === 'happening' && <HappeningScene key="happening" />}
+      {state.screen === 'result' && <ResultScreen key="result" />}
     </AnimatePresence>
   );
 }
