@@ -14,8 +14,7 @@ const QUESTION_WEIGHTS: Record<QuestionType, Partial<Record<DivinationType, numb
 };
 
 export class TurnOrchestrator {
-  private pool: DivinationType[] = [];
-  private slots: (SlotResult | null)[] = [];
+  private availableMethods: DivinationType[] = [];
 
   constructor(
     private bus: EventBus,
@@ -25,11 +24,9 @@ export class TurnOrchestrator {
     question: QuestionType,
     affinities: Record<string, number>,
   ): DivinationType[] {
-    this.pool = [];
-    this.slots = [];
+    this.availableMethods = [];
     const weights = QUESTION_WEIGHTS[question];
 
-    // Build weighted list
     const entries: { type: DivinationType; weight: number }[] = [
       { type: 'tarot', weight: weights.tarot ?? 1 },
       { type: 'd20', weight: weights.d20 ?? 1 },
@@ -42,13 +39,13 @@ export class TurnOrchestrator {
       entries.find((e) => e.type === 'happening')!.weight += 2;
     }
 
-    while (this.pool.length < POOL_SIZE) {
+    while (this.availableMethods.length < POOL_SIZE) {
       const totalWeight = entries.reduce((s, e) => s + e.weight, 0);
       let roll = Math.random() * totalWeight;
       for (const entry of entries) {
         roll -= entry.weight;
         if (roll <= 0) {
-          this.pool.push(entry.type);
+          this.availableMethods.push(entry.type);
           break;
         }
       }
@@ -56,20 +53,19 @@ export class TurnOrchestrator {
 
     this.bus.emit('pool-generated', {
       question,
-      pool: [...this.pool],
+      pool: [...this.availableMethods],
     });
 
-    return [...this.pool];
+    return [...this.availableMethods];
   }
 
-  drawSlot(index: number, affinities: Record<string, number>): SlotResult {
-    if (index >= this.pool.length) {
-      throw new Error(`Slot ${index} out of bounds (pool size ${this.pool.length})`);
-    }
-    const type = this.pool[index];
+  drawSingleResult(
+    method: DivinationType,
+    affinities: Record<string, number>,
+  ): SlotResult {
     let result: SlotResult;
 
-    switch (type) {
+    switch (method) {
       case 'tarot':
         result = drawTarotCard(affinities);
         break;
@@ -80,45 +76,16 @@ export class TurnOrchestrator {
         result = castHexagram(affinities);
         break;
       case 'happening':
-        // Happenings are drawn during the happenings phase, not during draw phase
-        // Return null-like placeholder that gets resolved later
-        result = {
-          type: 'happening',
-          id: 'pending',
-          scene: '',
-          choices: [],
-          tags: ['event', 'pending', 'happening', 'choice', 'affinity-shift'],
-        } as SlotResult; // Will be replaced during happening phase
-        break;
+        throw new Error('Happening has no drawSingleResult — use triggerHappening instead');
       default:
-        throw new Error(`Unknown divination type: ${type}`);
+        throw new Error(`Unknown divination type: ${method}`);
     }
 
-    this.slots[index] = result;
-    this.bus.emit('slot-drawn', { index, type: result.type });
-
+    this.bus.emit('slot-drawn', { type: method, result });
     return result;
   }
 
-  revealSlot(index: number): SlotResult {
-    const result = this.slots[index];
-    if (!result) {
-      throw new Error(`Slot ${index} not yet drawn`);
-    }
-    this.bus.emit('slot-revealed', {
-      index,
-      type: result.type,
-      tags: (result as { tags?: string[] }).tags ?? [],
-      result,
-    });
-    return result;
-  }
-
-  getSlots(): (SlotResult | null)[] {
-    return [...this.slots];
-  }
-
-  getPool(): DivinationType[] {
-    return [...this.pool];
+  getAvailableMethods(): DivinationType[] {
+    return [...this.availableMethods];
   }
 }
