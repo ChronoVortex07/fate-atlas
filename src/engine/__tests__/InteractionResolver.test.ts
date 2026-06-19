@@ -3,7 +3,11 @@ import { InteractionResolver } from '../InteractionResolver';
 import { TagSystem } from '../TagSystem';
 import { EventBus } from '../EventBus';
 import { INTERACTION_RULES } from '../../data/interactions';
-import type { SlotResult } from '../types';
+import type { PendingEffect, SlotResult, InteractionRule } from '../types';
+
+function makeResolver() {
+  return new InteractionResolver(new TagSystem(), new EventBus());
+}
 
 const foolCard: SlotResult = {
   type: 'tarot', id: 'the-fool', name: 'The Fool', number: 0,
@@ -76,5 +80,124 @@ describe('InteractionResolver', () => {
 
     const events = resolver.checkAndResolve(slots, 0, { chaos: 0.3, order: 0.5 }, INTERACTION_RULES);
     expect(events).toHaveLength(0);
+  });
+});
+
+describe('InteractionResolver — pending effects', () => {
+  const tarotResult: SlotResult = {
+    type: 'tarot',
+    id: 'the-fool',
+    name: 'The Fool',
+    number: 0,
+    orientation: 'upright',
+    symbol: 'X',
+    meaningUpright: 'New beginnings',
+    meaningReversed: 'Recklessness',
+    tags: ['major-arcana', 'fool-archetype', 'reversible'],
+  };
+
+  const diceResult: SlotResult = {
+    type: 'd20',
+    result: 3,
+    threshold: 'critical-low',
+    interpretation: 'Dire outcome',
+    tags: ['roll', 'numeric', 'threshold', 'critical-low'],
+  };
+
+  it('checkPendingEffects: matches tags and returns matched + remaining', () => {
+    const resolver = makeResolver();
+    const pending: PendingEffect[] = [
+      {
+        id: 'eff-1',
+        sourceRunId: 'run-1',
+        sourceCard: 'The Fool',
+        sourceSlotIndex: 0,
+        triggerTags: ['roll', 'numeric'],
+        action: 'reroll',
+        description: "The Fool's Reroll",
+        expiresAfter: 3,
+        turnsRemaining: 2,
+      },
+      {
+        id: 'eff-2',
+        sourceRunId: 'run-1',
+        sourceCard: 'The Hermit',
+        sourceSlotIndex: 0,
+        triggerTags: ['iching', 'changing-lines'],
+        action: 'add-choice',
+        description: 'I Ching boost',
+        expiresAfter: 3,
+        turnsRemaining: 2,
+      },
+    ];
+
+    const { matched, remaining } = resolver.checkPendingEffects(pending, diceResult);
+
+    expect(matched).toHaveLength(1);
+    expect(matched[0].id).toBe('eff-1');
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].id).toBe('eff-2');
+  });
+
+  it('checkPendingEffects: no match returns empty matched, all remaining', () => {
+    const resolver = makeResolver();
+    const pending: PendingEffect[] = [
+      {
+        id: 'eff-1',
+        sourceRunId: 'run-1',
+        sourceCard: 'The Fool',
+        sourceSlotIndex: 0,
+        triggerTags: ['iching'],
+        action: 'reroll',
+        description: 'Test',
+        expiresAfter: 3,
+        turnsRemaining: 2,
+      },
+    ];
+
+    const { matched, remaining } = resolver.checkPendingEffects(pending, diceResult);
+
+    expect(matched).toHaveLength(0);
+    expect(remaining).toHaveLength(1);
+  });
+
+  it('createPendingEffects: creates effects from interaction-eligible result', () => {
+    const resolver = makeResolver();
+    const rules: InteractionRule[] = [
+      {
+        id: 'fool-reroll',
+        trigger: { on: 'slot-revealed', sourceTags: ['major-arcana', 'fool-archetype'] },
+        target: { tags: ['roll', 'pending'], action: 'reroll' },
+        display: { flashSource: true, flashTarget: true, description: 'Test reroll' },
+      },
+    ];
+
+    const effects = resolver.createPendingEffects(tarotResult, 'run-1', rules);
+
+    expect(effects).toHaveLength(1);
+    expect(effects[0].action).toBe('reroll');
+    expect(effects[0].sourceCard).toBe('The Fool');
+    expect(effects[0].triggerTags).toEqual(['roll', 'pending']);
+    expect(effects[0].turnsRemaining).toBe(3);
+  });
+
+  it('createPendingEffects: result with no matching rules returns empty', () => {
+    const resolver = makeResolver();
+    const nonTriggering: SlotResult = {
+      ...tarotResult,
+      tags: ['nothing-relevant'],
+    };
+
+    const rules: InteractionRule[] = [
+      {
+        id: 'fool-reroll',
+        trigger: { on: 'slot-revealed', sourceTags: ['major-arcana', 'fool-archetype'] },
+        target: { tags: ['roll', 'pending'], action: 'reroll' },
+        display: { flashSource: true, flashTarget: true, description: 'Test' },
+      },
+    ];
+
+    const effects = resolver.createPendingEffects(nonTriggering, 'run-1', rules);
+    expect(effects).toHaveLength(0);
   });
 });
