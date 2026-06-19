@@ -260,6 +260,19 @@ export class GameEngine {
     }
   }
 
+  // ── LLM Prompt ──
+
+  generateLLMPrompt(): string {
+    const slots = this.orchestrator.getSlots()
+      .filter((s): s is SlotResult => s !== null && s.type !== 'happening');
+    return this.synthesisEngine.generateLLMPrompt({
+      question: this.state.questionType!,
+      slots,
+      interactions: this.state.interactions,
+      affinities: this.affinityEngine.getState(),
+    });
+  }
+
   // ── Subscription ──
 
   subscribe(fn: (state: GameState) => void): () => void {
