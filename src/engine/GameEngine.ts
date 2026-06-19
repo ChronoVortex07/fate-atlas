@@ -27,7 +27,7 @@ export class GameEngine {
     this.bus = new EventBus();
     this.tagSystem = new TagSystem();
     this.affinityEngine = new AffinityEngine([CHAOS_AFFINITY, ORDER_AFFINITY]);
-    this.orchestrator = new TurnOrchestrator(this.tagSystem, this.bus);
+    this.orchestrator = new TurnOrchestrator(this.bus);
     this.interactionResolver = new InteractionResolver(this.tagSystem, this.bus);
     this.synthesisEngine = new SynthesisEngine();
     this.state = this.defaultState();

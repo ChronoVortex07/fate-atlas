@@ -4,7 +4,7 @@ export class SynthesisEngine {
   synthesize(
     slots: SlotResult[],
     question: QuestionType,
-    interactions: InteractionEvent[],
+    _interactions: unknown[],
     affinities: Record<string, number>,
   ): SynthesisResult {
     const paragraphs: string[] = [];

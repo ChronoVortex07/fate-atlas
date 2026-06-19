@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { SynthesisEngine } from '../SynthesisEngine';
-import type { SlotResult, InteractionEvent, QuestionType } from '../types';
+import type { SlotResult, QuestionType } from '../types';
 
 const foolCard: SlotResult = {
   type: 'tarot', id: 'the-fool', name: 'The Fool', number: 0,

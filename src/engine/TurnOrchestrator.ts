@@ -1,5 +1,4 @@
 import type { DivinationType, QuestionType, SlotResult } from './types';
-import type { TagSystem } from './TagSystem';
 import type { EventBus } from './EventBus';
 import { drawTarotCard } from '../data/tarot';
 import { rollD20 } from '../data/dice';
@@ -19,7 +18,6 @@ export class TurnOrchestrator {
   private slots: (SlotResult | null)[] = [];
 
   constructor(
-    private tagSystem: TagSystem,
     private bus: EventBus,
   ) {}
 

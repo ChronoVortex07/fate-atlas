@@ -1,15 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { TurnOrchestrator } from '../TurnOrchestrator';
-import { TagSystem } from '../TagSystem';
 import { EventBus } from '../EventBus';
 
 describe('TurnOrchestrator', () => {
-  const tagSystem = new TagSystem();
   const bus = new EventBus();
   const affinities = { chaos: 0.5, order: 0.5 };
 
   it('generates a pool of 3+ divination types', () => {
-    const orchestrator = new TurnOrchestrator(tagSystem, bus);
+    const orchestrator = new TurnOrchestrator(bus);
     const pool = orchestrator.generatePool('decision', affinities);
     expect(pool.length).toBeGreaterThanOrEqual(3);
     expect(pool.every((t) => ['tarot', 'd20', 'iching', 'happening'].includes(t))).toBe(true);
@@ -18,7 +16,7 @@ describe('TurnOrchestrator', () => {
   it('decision question favors d20', () => {
     let d20Count = 0;
     for (let i = 0; i < 100; i++) {
-      const orchestrator = new TurnOrchestrator(tagSystem, bus);
+      const orchestrator = new TurnOrchestrator(bus);
       const pool = orchestrator.generatePool('decision', affinities);
       if (pool.includes('d20')) d20Count++;
     }
@@ -26,7 +24,7 @@ describe('TurnOrchestrator', () => {
   });
 
   it('draws 3 slots from the pool', () => {
-    const orchestrator = new TurnOrchestrator(tagSystem, bus);
+    const orchestrator = new TurnOrchestrator(bus);
     orchestrator.generatePool('self', affinities);
     for (let i = 0; i < 3; i++) {
       orchestrator.drawSlot(i, affinities);
@@ -37,7 +35,7 @@ describe('TurnOrchestrator', () => {
   });
 
   it('revealSlot marks a slot as revealed', () => {
-    const orchestrator = new TurnOrchestrator(tagSystem, bus);
+    const orchestrator = new TurnOrchestrator(bus);
     orchestrator.generatePool('self', affinities);
     orchestrator.drawSlot(0, affinities);
     orchestrator.revealSlot(0);
@@ -48,7 +46,7 @@ describe('TurnOrchestrator', () => {
   });
 
   it('throws if drawing beyond pool size', () => {
-    const orchestrator = new TurnOrchestrator(tagSystem, bus);
+    const orchestrator = new TurnOrchestrator(bus);
     orchestrator.generatePool('self', affinities);
     expect(() => orchestrator.drawSlot(5, affinities)).toThrow();
   });
