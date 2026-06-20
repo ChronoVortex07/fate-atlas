@@ -137,7 +137,7 @@ export interface InteractionEvent {
   ruleId: string;
   sourceSlotIndex: number;
   targetSlotIndex: number;
-  effect: string;
+  effect: 'reroll' | 'flip' | 'add-choice' | 'mirror' | 'second-result';
   description: string;
 }
 

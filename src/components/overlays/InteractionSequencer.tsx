@@ -2,6 +2,11 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
 import type { InteractionEvent } from '../../engine/types';
+import RerollAnimation from './InteractionAnimations/RerollAnimation';
+import FlipAnimation from './InteractionAnimations/FlipAnimation';
+import MirrorAnimation from './InteractionAnimations/MirrorAnimation';
+import AddChoiceAnimation from './InteractionAnimations/AddChoiceAnimation';
+import SecondResultAnimation from './InteractionAnimations/SecondResultAnimation';
 
 interface AnimationDescriptor {
   effect: 'reroll' | 'flip' | 'mirror' | 'add-choice' | 'second-result';
@@ -154,6 +159,27 @@ export default function InteractionSequencer({ onActiveSlotsChange, onAnimationC
           >
             Tap to continue
           </motion.div>
+        )}
+
+        {/* Per-effect animation — only show when not in 'done' phase */}
+        {phase !== 'done' && (
+          <>
+            {currentDescriptor.effect === 'reroll' && (
+              <RerollAnimation descriptor={currentDescriptor} phase={phase} />
+            )}
+            {currentDescriptor.effect === 'flip' && (
+              <FlipAnimation descriptor={currentDescriptor} phase={phase} />
+            )}
+            {currentDescriptor.effect === 'mirror' && (
+              <MirrorAnimation descriptor={currentDescriptor} phase={phase} />
+            )}
+            {currentDescriptor.effect === 'add-choice' && (
+              <AddChoiceAnimation descriptor={currentDescriptor} phase={phase} />
+            )}
+            {currentDescriptor.effect === 'second-result' && (
+              <SecondResultAnimation descriptor={currentDescriptor} phase={phase} />
+            )}
+          </>
         )}
       </motion.div>
     </AnimatePresence>

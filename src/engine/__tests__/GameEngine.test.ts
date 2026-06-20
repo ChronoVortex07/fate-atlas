@@ -371,4 +371,95 @@ describe('GameEngine — new lifecycle', () => {
     engine.startTurn('self');
     expect(engine.getState().interactionQueue).toHaveLength(0);
   });
+
+  it('executeEffect mirror toggles both source and target tarot orientations', () => {
+    engine.startTurn('self');
+    engine.loadState({
+      turnResults: [
+        {
+          type: 'tarot', id: 'fool', name: 'The Fool', number: 0,
+          orientation: 'upright', symbol: '♆',
+          meaningUpright: 'New beginnings', meaningReversed: 'Recklessness',
+          tags: ['major-arcana', 'fool-archetype'],
+        },
+        {
+          type: 'tarot', id: 'magician', name: 'The Magician', number: 1,
+          orientation: 'reversed', symbol: '☿',
+          meaningUpright: 'Willpower', meaningReversed: 'Manipulation',
+          tags: ['major-arcana'],
+        },
+      ],
+      interactionQueue: [
+        {
+          ruleId: 'test-mirror', sourceSlotIndex: 0, targetSlotIndex: 1,
+          effect: 'mirror', description: 'Test mirror',
+        },
+      ],
+      minigamesCompleted: 2,
+    });
+
+    engine.advanceInteractionQueue();
+
+    const r0 = engine.getState().turnResults[0] as { orientation: string };
+    const r1 = engine.getState().turnResults[1] as { orientation: string };
+    expect(r0.orientation).toBe('reversed');  // was upright, now reversed
+    expect(r1.orientation).toBe('upright');   // was reversed, now upright
+    expect(engine.getState().interactionQueue).toHaveLength(0);
+  });
+
+  it('executeEffect add-choice adds bonus choice to happening', () => {
+    engine.startTurn('self');
+    engine.loadState({
+      happening: {
+        type: 'happening', id: 'test-happening',
+        scene: 'A test scene',
+        choices: [
+          { text: 'Original choice', affinityChanges: {} },
+        ],
+        tags: [],
+      },
+      turnResults: [
+        { type: 'd20', result: 10, threshold: 'neutral', interpretation: 'Steady', tags: ['roll'] },
+      ],
+      interactionQueue: [
+        {
+          ruleId: 'test-add-choice', sourceSlotIndex: 0, targetSlotIndex: 0,
+          effect: 'add-choice', description: 'Test add-choice',
+        },
+      ],
+      minigamesCompleted: 1,
+    });
+
+    const choicesBefore = engine.getState().happening!.choices.length;
+    engine.advanceInteractionQueue();
+    const choicesAfter = engine.getState().happening!.choices.length;
+
+    expect(choicesAfter).toBe(choicesBefore + 1);
+    expect(engine.getState().happening!.choices[choicesAfter - 1].text)
+      .toContain('hidden path');
+    expect(engine.getState().interactionQueue).toHaveLength(0);
+  });
+
+  it('executeEffect second-result appends new result to turnResults', () => {
+    engine.startTurn('self');
+    engine.loadState({
+      turnResults: [
+        { type: 'd20', result: 15, threshold: 'high', interpretation: 'High roll', tags: ['roll', 'high'] },
+      ],
+      interactionQueue: [
+        {
+          ruleId: 'test-second-result', sourceSlotIndex: 0, targetSlotIndex: 0,
+          effect: 'second-result', description: 'Test second-result',
+        },
+      ],
+      minigamesCompleted: 1,
+    });
+
+    const resultsBefore = engine.getState().turnResults.length;
+    engine.advanceInteractionQueue();
+    const resultsAfter = engine.getState().turnResults.length;
+
+    expect(resultsAfter).toBe(resultsBefore + 1);
+    expect(engine.getState().interactionQueue).toHaveLength(0);
+  });
 });

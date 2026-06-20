@@ -308,6 +308,9 @@ export class GameEngine {
         }
         break;
       }
+      default:
+        // Unknown effect type — should not happen with proper typing
+        break;
     }
   }
 

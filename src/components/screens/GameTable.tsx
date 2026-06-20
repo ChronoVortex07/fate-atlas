@@ -33,6 +33,11 @@ export default function GameTable() {
     [],
   );
 
+  const handleAnimationComplete = useCallback(
+    () => setActiveSlots({ sourceIndex: null, targetIndex: null }),
+    [],
+  );
+
   const renderCenter = () => {
     switch (state.screen) {
       case 'title':
@@ -88,7 +93,7 @@ export default function GameTable() {
       {state.interactionQueue.length > 0 && (
         <InteractionSequencer
           onActiveSlotsChange={handleActiveSlotsChange}
-          onAnimationComplete={() => setActiveSlots({ sourceIndex: null, targetIndex: null })}
+          onAnimationComplete={handleAnimationComplete}
         />
       )}
     </div>
