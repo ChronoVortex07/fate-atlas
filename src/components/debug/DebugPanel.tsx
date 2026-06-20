@@ -11,12 +11,32 @@ const TABS: Tab[] = ['State', 'Inject', 'Steps', 'Events'];
 export default function DebugPanel() {
   const { state, engine } = useGameEngine();
   const [activeTab, setActiveTab] = useState<Tab>('State');
-
-  if (!state.debug) return null;
+  const [scenarioId, setScenarioId] = useState('');
+  const presets = engine.getScenarioPresets();
 
   const handleClose = useCallback(() => {
     engine.loadState({ debug: false });
   }, [engine]);
+
+  const handleLoadScenario = useCallback(() => {
+    if (scenarioId) engine.loadScenarioById(scenarioId);
+  }, [scenarioId, engine]);
+
+  const handleForceFoolsReroll = useCallback(() => {
+    engine.injectPendingEffect({
+      id: 'debug-fools-reroll-' + Date.now(),
+      sourceRunId: 'debug',
+      sourceCard: 'The Fool',
+      sourceSlotIndex: 0,
+      triggerTags: ['roll', 'numeric'],
+      action: 'reroll',
+      description: "The Fool's wild energy ripples through fate — the dice must be cast again.",
+      expiresAfter: 3,
+      turnsRemaining: 3,
+    });
+  }, [engine]);
+
+  if (!state.debug) return null;
 
   return (
     <div style={panelStyle}>
@@ -50,6 +70,31 @@ export default function DebugPanel() {
         {activeTab === 'Inject' && <JsonInjector />}
         {activeTab === 'Steps' && <StepControls />}
         {activeTab === 'Events' && <EventsTab />}
+      </div>
+
+      {/* Scenario controls */}
+      <div style={scenarioSectionStyle}>
+        <label style={labelStyle}>Scenario Preset</label>
+        <div style={scenarioRowStyle}>
+          <select
+            value={scenarioId}
+            onChange={(e) => setScenarioId(e.target.value)}
+            style={selectStyle}
+          >
+            <option value="">-- Select --</option>
+            {presets.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+          <button onClick={handleLoadScenario} style={btnStyle}>
+            Load
+          </button>
+        </div>
+        <button onClick={handleForceFoolsReroll} style={{ ...btnStyle, marginTop: '8px' }}>
+          Force Fool's Reroll
+        </button>
       </div>
     </div>
   );
@@ -195,4 +240,53 @@ const eventTimeStyle: React.CSSProperties = {
   fontSize: '0.55rem',
   color: '#7b9ec7',
   whiteSpace: 'nowrap',
+};
+
+// ── Scenario controls ──
+
+const scenarioSectionStyle: React.CSSProperties = {
+  padding: '0.5rem 0.75rem',
+  borderTop: '1px solid #1a2440',
+  flexShrink: 0,
+};
+
+const scenarioRowStyle: React.CSSProperties = {
+  display: 'flex',
+  gap: '0.4rem',
+  alignItems: 'center',
+};
+
+const labelStyle: React.CSSProperties = {
+  fontFamily: "'Inter', sans-serif",
+  fontWeight: 500,
+  fontSize: '0.65rem',
+  color: '#7b9ec7',
+  display: 'block',
+  marginBottom: '4px',
+};
+
+const selectStyle: React.CSSProperties = {
+  flex: 1,
+  fontFamily: "'Inter', sans-serif",
+  fontSize: '0.65rem',
+  color: '#c8d8f0',
+  background: 'rgba(26, 36, 64, 0.6)',
+  border: '1px solid #1a2440',
+  borderRadius: '3px',
+  padding: '0.25rem 0.3rem',
+  outline: 'none',
+};
+
+const btnStyle: React.CSSProperties = {
+  fontFamily: "'Inter', sans-serif",
+  fontWeight: 600,
+  fontSize: '0.65rem',
+  color: '#d4a854',
+  background: 'rgba(26, 36, 64, 0.6)',
+  border: '1px solid #d4a854',
+  borderRadius: '3px',
+  padding: '0.25rem 0.5rem',
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+  outline: 'none',
 };
