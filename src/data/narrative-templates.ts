@@ -139,7 +139,7 @@ export const NARRATIVE_TEMPLATES: NarrativeTemplates = {
 
   // ── Tension patterns: key = "themeA_themeB" or "high_variance" ──
   tensionPatterns: {
-    upheaval_harmony: [
+    harmony_upheaval: [
       'These forces do not speak with one voice. Upheaval pulls against harmony — the path is not simple, and the contradiction itself is the message.',
     ],
     renewal_stagnation: [
