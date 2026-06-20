@@ -14,7 +14,7 @@ describe('TurnOrchestrator', () => {
     const orchestrator = new TurnOrchestrator(bus);
     const pool = orchestrator.generatePool('decision', affinities);
     expect(pool.length).toBeGreaterThanOrEqual(3);
-    expect(pool.every((t) => ['tarot', 'd20', 'iching', 'happening'].includes(t))).toBe(true);
+    expect(pool.every((t) => ['tarot', 'd20', 'iching'].includes(t))).toBe(true);
   });
 
   it('decision question favors d20', () => {
@@ -47,6 +47,27 @@ describe('TurnOrchestrator', () => {
     const history = bus.getHistory();
     const drawnEvents = history.filter((e) => e.type === 'slot-drawn');
     expect(drawnEvents.length).toBe(1);
+  });
+
+  it('refillPool with bias does not throw and returns valid pool', () => {
+    const orchestrator = new TurnOrchestrator(bus);
+    orchestrator.generatePool('decision', affinities);
+    // refillPool with strong bias
+    const pool = orchestrator.refillPool('decision', affinities, {
+      tarot: 3,
+      d20: -1,
+      iching: 0,
+    });
+    expect(pool.length).toBeGreaterThanOrEqual(3);
+    expect(pool.every((t) => ['tarot', 'd20', 'iching'].includes(t))).toBe(true);
+  });
+
+  it('refillPool with no bias uses base weights', () => {
+    const orchestrator = new TurnOrchestrator(bus);
+    orchestrator.generatePool('decision', affinities);
+    orchestrator.removeUsedMethod('tarot');
+    const pool = orchestrator.refillPool('decision', affinities);
+    expect(pool.length).toBe(3);
   });
 
   it('throws for happening method in drawSingleResult', () => {

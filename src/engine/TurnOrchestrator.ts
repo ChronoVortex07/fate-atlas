@@ -7,10 +7,10 @@ import { castHexagram } from '../data/iching';
 const POOL_SIZE = 3;
 
 const QUESTION_WEIGHTS: Record<QuestionType, Partial<Record<DivinationType, number>>> = {
-  decision: { d20: 3, tarot: 1, iching: 1, happening: 1 },
-  relationship: { tarot: 3, d20: 1, iching: 1, happening: 1 },
-  future: { iching: 3, tarot: 1, d20: 1, happening: 1 },
-  self: { tarot: 2, iching: 2, d20: 1, happening: 1 },
+  decision: { d20: 3, tarot: 1, iching: 1 },
+  relationship: { tarot: 3, d20: 1, iching: 1 },
+  future: { iching: 3, tarot: 1, d20: 1 },
+  self: { tarot: 2, iching: 2, d20: 1 },
 };
 
 export class TurnOrchestrator {
@@ -22,7 +22,7 @@ export class TurnOrchestrator {
 
   generatePool(
     question: QuestionType,
-    affinities: Record<string, number>,
+    _affinities: Record<string, number>,
   ): DivinationType[] {
     this.availableMethods = [];
     this.usedThisTurn = [];
@@ -32,13 +32,7 @@ export class TurnOrchestrator {
       { type: 'tarot', weight: weights.tarot ?? 1 },
       { type: 'd20', weight: weights.d20 ?? 1 },
       { type: 'iching', weight: weights.iching ?? 1 },
-      { type: 'happening', weight: weights.happening ?? 1 },
     ];
-
-    // High chaos can add extra happening to pool
-    if ((affinities.chaos ?? 0) >= 0.5 && Math.random() < 0.3) {
-      entries.find((e) => e.type === 'happening')!.weight += 2;
-    }
 
     while (this.availableMethods.length < POOL_SIZE) {
       const totalWeight = entries.reduce((s, e) => s + e.weight, 0);
@@ -106,24 +100,35 @@ export class TurnOrchestrator {
 
   refillPool(
     question: QuestionType,
-    affinities: Record<string, number>,
+    _affinities: Record<string, number>,
+    bias: Partial<Record<DivinationType, number>> = {},
   ): DivinationType[] {
     // Keep remaining methods, draw new ones to fill back to POOL_SIZE
-    const weights = QUESTION_WEIGHTS[question];
+    const baseWeights = QUESTION_WEIGHTS[question];
 
     const entries: { type: DivinationType; weight: number }[] = [
-      { type: 'tarot', weight: weights.tarot ?? 1 },
-      { type: 'd20', weight: weights.d20 ?? 1 },
-      { type: 'iching', weight: weights.iching ?? 1 },
-      { type: 'happening', weight: weights.happening ?? 1 },
+      { type: 'tarot', weight: (baseWeights.tarot ?? 1) + (bias.tarot ?? 0) },
+      { type: 'd20', weight: (baseWeights.d20 ?? 1) + (bias.d20 ?? 0) },
+      { type: 'iching', weight: (baseWeights.iching ?? 1) + (bias.iching ?? 0) },
     ];
 
-    if ((affinities.chaos ?? 0) >= 0.5 && Math.random() < 0.3) {
-      entries.find((e) => e.type === 'happening')!.weight += 2;
+    // Clamp individual weights to minimum 0 (never negative probability)
+    for (const entry of entries) {
+      entry.weight = Math.max(0, entry.weight);
     }
 
     while (this.availableMethods.length < POOL_SIZE) {
       const totalWeight = entries.reduce((s, e) => s + e.weight, 0);
+      // If all weights are 0 (shouldn't happen with clamping), fall back to uniform
+      if (totalWeight <= 0) {
+        const remaining = ['tarot', 'd20', 'iching'].filter(
+          (t) => !this.availableMethods.includes(t as DivinationType),
+        );
+        if (remaining.length > 0) {
+          this.availableMethods.push(remaining[0] as DivinationType);
+        }
+        continue;
+      }
       let roll = Math.random() * totalWeight;
       for (const entry of entries) {
         roll -= entry.weight;
