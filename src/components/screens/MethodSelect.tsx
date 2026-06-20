@@ -1,0 +1,148 @@
+import { motion } from 'framer-motion';
+import { useGameEngine } from '../../hooks/useGameEngine';
+import type { DivinationType } from '../../engine/types';
+
+const METHOD_CARDS: Record<DivinationType, { symbol: string; title: string; description: string; color: string }> = {
+  tarot: { symbol: 'XXI', title: 'Tarot', description: 'Draw from the Major Arcana — the ancient cards reveal hidden truths.', color: '#9b6bb0' },
+  d20: { symbol: String.fromCodePoint(0x2685), title: 'Dice', description: 'Cast the twenty-sided die — fate speaks through numbers.', color: '#c75b4a' },
+  iching: { symbol: String.fromCodePoint(0x4DC0), title: 'I Ching', description: 'Consult the Book of Changes — the hexagram illuminates your path.', color: '#5b8c5a' },
+  happening: { symbol: String.fromCodePoint(0x2726), title: 'Happening', description: 'Something stirs in the weave — a cryptic event awaits.', color: '#d4a854' },
+};
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.12, delayChildren: 0.1 } },
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } },
+};
+
+export default function MethodSelect() {
+  const { state, engine } = useGameEngine();
+
+  const handleSelect = (index: number) => {
+    engine.selectMethod(index);
+  };
+
+  return (
+    <motion.div
+      style={containerStyle}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.4 }}
+    >
+      <div style={contentStyle}>
+        <h1 style={headingStyle}>Choose your divination</h1>
+        <p style={subtitleStyle}>The stars have dealt three methods — pick one to reveal your fate</p>
+        <div style={goldRuleStyle} />
+
+        <motion.div style={gridStyle} variants={containerVariants} initial="hidden" animate="visible">
+          {state.availableMethods.map((method, i) => {
+            const card = METHOD_CARDS[method];
+            return (
+              <motion.button
+                key={i}
+                style={{ ...cardStyle, borderColor: card.color + '40' }}
+                variants={cardVariants}
+                whileHover={{ borderColor: card.color, boxShadow: `0 0 20px ${card.color}20`, scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => handleSelect(i)}
+              >
+                <div style={{ ...cardSymbolStyle, color: card.color }}>{card.symbol}</div>
+                <div style={cardTitleStyle}>{card.title}</div>
+                <div style={cardDescStyle}>{card.description}</div>
+              </motion.button>
+            );
+          })}
+        </motion.div>
+      </div>
+    </motion.div>
+  );
+}
+
+const containerStyle: React.CSSProperties = {
+  width: '100%',
+  maxWidth: '660px',
+  padding: '2rem',
+};
+
+const contentStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '1rem',
+};
+
+const headingStyle: React.CSSProperties = {
+  fontFamily: "'Cormorant Garamond', serif",
+  fontWeight: 700,
+  fontSize: 'clamp(1.5rem, 4vw, 2.2rem)',
+  color: '#c8d8f0',
+  letterSpacing: '0.12em',
+  margin: 0,
+  textAlign: 'center',
+};
+
+const subtitleStyle: React.CSSProperties = {
+  fontFamily: "'Inter', sans-serif",
+  fontWeight: 300,
+  fontSize: 'clamp(0.8rem, 1.5vw, 0.95rem)',
+  color: '#7b9ec7',
+  letterSpacing: '0.05em',
+  margin: 0,
+  textAlign: 'center',
+};
+
+const goldRuleStyle: React.CSSProperties = {
+  width: '40px',
+  height: '2px',
+  background: 'linear-gradient(90deg, transparent, #d4a854, transparent)',
+};
+
+const gridStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.75rem',
+  width: '100%',
+  maxWidth: '420px',
+};
+
+const cardStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '0.3rem',
+  padding: '1.25rem 1.5rem',
+  background: '#0d1220',
+  border: '1px solid #1a2440',
+  borderRadius: '6px',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  transition: 'border-color 0.3s ease, box-shadow 0.3s ease',
+  outline: 'none',
+  width: '100%',
+};
+
+const cardSymbolStyle: React.CSSProperties = {
+  fontSize: 'clamp(1.4rem, 3vw, 1.8rem)',
+};
+
+const cardTitleStyle: React.CSSProperties = {
+  fontFamily: "'Cormorant Garamond', serif",
+  fontWeight: 600,
+  fontSize: 'clamp(1rem, 2vw, 1.2rem)',
+  color: '#c8d8f0',
+  letterSpacing: '0.08em',
+};
+
+const cardDescStyle: React.CSSProperties = {
+  fontFamily: "'Inter', sans-serif",
+  fontWeight: 300,
+  fontSize: 'clamp(0.7rem, 1.2vw, 0.8rem)',
+  color: '#7b9ec7',
+  textAlign: 'center',
+  lineHeight: 1.4,
+};
