@@ -51,7 +51,7 @@ export class GameEngine {
       minigamesCompleted: 0,
       minigameState: null,
       pendingEffects: [],
-      activeInteraction: null,
+      interactionQueue: [],
       pendingHappening: false,
       interactions: [],
       synthesis: null,
@@ -89,7 +89,7 @@ export class GameEngine {
     this.state.turnResults = [];
     this.state.minigamesCompleted = 0;
     this.state.minigameState = null;
-    this.state.activeInteraction = null;
+    this.state.interactionQueue = [];
     this.state.pendingHappening = false;
     this.state.interactions = [];
     this.state.synthesis = null;
@@ -164,30 +164,34 @@ export class GameEngine {
     );
     this.state.pendingEffects = [...this.state.pendingEffects, ...newEffects];
 
-    // If any matched effects, show the interaction layer
+    // Push interaction events onto the queue
     if (interactionEvents.length > 0) {
-      this.state.activeInteraction = interactionEvents[0];
+      this.state.interactionQueue = [
+        ...this.state.interactionQueue,
+        ...interactionEvents,
+      ];
     }
 
+    // If queue is non-empty, freeze current screen — sequencer handles advancing
+    if (this.state.interactionQueue.length > 0) {
+      this.bus.emit('minigame-complete', { result, completed, interactions: interactionEvents });
+      this.notify();
+      return;
+    }
+
+    // No interactions queued — proceed with normal screen transition
     if (completed >= this.minigamesPerTurn) {
-      // All minigames done — synthesize and go to result
       this.synthesizeAll();
-      // Build run record
       this.buildRunRecord();
-      // If active interaction, stay on minigame screen briefly then go to result
-      if (this.state.activeInteraction) {
-        // InteractionLayer will clear and we need to go to result
-        // We'll handle this in clearActiveInteraction
-      } else {
-        this.state.screen = 'result';
-      }
+      this.state.screen = 'result';
     } else {
-      // Always remove the used method from the pool (before refill or happening)
       this.orchestrator.removeUsedMethod(result.type as 'tarot' | 'd20' | 'iching');
 
-      // More minigames to go — check for happening chance
-      const goingBackToSelect = () => {
-        // Refill the pool with a new method
+      const chaos = this.affinityEngine.getState().chaos;
+      if (chaos >= 0.4 && Math.random() < chaos * 0.5) {
+        this.state.pendingHappening = true;
+        this.triggerHappening();
+      } else {
         const affinities = this.affinityEngine.getState();
         this.state.availableMethods = this.orchestrator.refillPool(
           this.state.questionType!,
@@ -195,26 +199,6 @@ export class GameEngine {
         );
         this.state.screen = 'method-select';
         this.state.selectedMethod = null;
-        if (!this.state.activeInteraction) {
-          this.notify();
-        }
-      };
-
-      // Happening chance after each minigame (except the last)
-      const chaos = this.affinityEngine.getState().chaos;
-      if (chaos >= 0.4 && Math.random() < chaos * 0.5) {
-        // Trigger a happening between minigames
-        this.state.screen = 'method-select'; // set temporarily so clearActiveInteraction knows where to go
-        if (this.state.activeInteraction) {
-          // Show interaction first, then happening via clearActiveInteraction override
-          // Store that we need to go to happening after interaction clears
-          this.state.pendingHappening = true;
-        } else {
-          this.triggerHappening();
-          return;
-        }
-      } else {
-        goingBackToSelect();
       }
     }
 
@@ -222,12 +206,22 @@ export class GameEngine {
     this.notify();
   }
 
-  clearActiveInteraction(): void {
-    const hadPendingHappening = this.state.pendingHappening;
-    this.state.pendingHappening = false;
-    this.state.activeInteraction = null;
+  advanceInteractionQueue(): void {
+    if (this.state.interactionQueue.length === 0) return;
 
-    if (hadPendingHappening) {
+    const completed = this.state.interactionQueue[0];
+    this.executeEffect(completed);
+    this.state.interactionQueue = this.state.interactionQueue.slice(1);
+
+    if (this.state.interactionQueue.length > 0) {
+      // More interactions waiting — stay frozen, sequencer plays next
+      this.notify();
+      return;
+    }
+
+    // Queue drained — resolve pending screen transition
+    if (this.state.pendingHappening) {
+      this.state.pendingHappening = false;
       this.triggerHappening();
       return;
     }
@@ -235,10 +229,86 @@ export class GameEngine {
     if (this.state.minigamesCompleted >= this.minigamesPerTurn) {
       this.state.screen = 'result';
     } else {
+      const affinities = this.affinityEngine.getState();
+      this.state.availableMethods = this.orchestrator.refillPool(
+        this.state.questionType!,
+        affinities,
+      );
       this.state.screen = 'method-select';
       this.state.selectedMethod = null;
     }
     this.notify();
+  }
+
+  private executeEffect(event: InteractionEvent): void {
+    const targetIndex = event.targetSlotIndex;
+    const target = this.state.turnResults[targetIndex];
+    if (!target) return;
+
+    const affinities = this.affinityEngine.getState();
+
+    switch (event.effect) {
+      case 'reroll': {
+        if (target.type === 'd20') {
+          const newResult = this.orchestrator.drawSingleResult('d20', affinities);
+          this.state.turnResults = [
+            ...this.state.turnResults.slice(0, targetIndex),
+            newResult,
+            ...this.state.turnResults.slice(targetIndex + 1),
+          ];
+        }
+        break;
+      }
+      case 'flip': {
+        if (target.type === 'tarot') {
+          this.state.turnResults = this.state.turnResults.map((r, i) =>
+            i === targetIndex && r.type === 'tarot'
+              ? {
+                  ...r,
+                  orientation: r.orientation === 'upright' ? 'reversed' as const : 'upright' as const,
+                }
+              : r,
+          );
+        }
+        break;
+      }
+      case 'mirror': {
+        const sourceIndex = event.sourceSlotIndex;
+        this.state.turnResults = this.state.turnResults.map((r, i) => {
+          if ((i === targetIndex || i === sourceIndex) && r.type === 'tarot') {
+            return {
+              ...r,
+              orientation: r.orientation === 'upright' ? 'reversed' as const : 'upright' as const,
+            };
+          }
+          return r;
+        });
+        break;
+      }
+      case 'add-choice': {
+        if (this.state.happening && this.state.happening.choices.length > 0) {
+          const bonusChoice = {
+            text: 'A hidden path emerges — ' + this.state.happening.choices[0].text,
+            affinityChanges: { chaos: 0.05 },
+          };
+          this.state.happening = {
+            ...this.state.happening,
+            choices: [...this.state.happening.choices, bonusChoice],
+          };
+        }
+        break;
+      }
+      case 'second-result': {
+        if (target.type !== 'happening') {
+          const secondResult = this.orchestrator.drawSingleResult(
+            target.type as 'tarot' | 'd20' | 'iching',
+            affinities,
+          );
+          this.state.turnResults = [...this.state.turnResults, secondResult];
+        }
+        break;
+      }
+    }
   }
 
   private buildRunRecord(): void {
@@ -435,7 +505,7 @@ export class GameEngine {
     this.state.turnResults = [];
     this.state.minigamesCompleted = 0;
     this.state.minigameState = null;
-    this.state.activeInteraction = null;
+    this.state.interactionQueue = [];
     this.state.pendingHappening = false;
     this.state.interactions = [];
     this.state.synthesis = null;
