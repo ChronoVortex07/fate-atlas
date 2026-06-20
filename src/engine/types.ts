@@ -19,8 +19,80 @@ export type QuestionType = 'decision' | 'relationship' | 'future' | 'self';
 // ── Divination Methods ──
 export type DivinationType = 'tarot' | 'd20' | 'iching' | 'happening';
 
+// ── Thematic Data Layer ──
+
+/** Curated cross-cutting thematic categories. Each result contributes 1-3. */
+export type ThemeTag =
+  | 'upheaval'
+  | 'renewal'
+  | 'stagnation'
+  | 'illumination'
+  | 'harmony'
+  | 'conflict'
+  | 'transformation'
+  | 'mystery'
+  | 'authority'
+  | 'surrender';
+
+export interface DimensionValues {
+  favorability: number;  // -2.0 to +2.0, 0.5 granularity
+  certainty: number;     // -2.0 to +2.0, 0.5 granularity
+  volatility: number;    // -2.0 to +2.0, 0.5 granularity
+}
+
+export type ModifierRole = 'subject' | 'action' | 'effect';
+
+export interface ThematicData {
+  themes: ThemeTag[];
+  dimensions: DimensionValues;
+  modifierRoles: ModifierRole[];
+}
+
+// ── Divination Profile (for gap-aware pool steering) ──
+
+export interface DivinationProfile {
+  type: DivinationType;
+  themeCoverage: 'all' | 'limited';
+  themePool: ThemeTag[];
+  dimensionStrengths: (keyof DimensionValues)[];
+  modifierStrengths: ModifierRole[];
+}
+
+// ── Reading Planner Types ──
+
+export interface GapReport {
+  themeConfidence: boolean;
+  missingDimensions: (keyof DimensionValues)[];
+  missingModifiers: ModifierRole[];
+}
+
+export interface AggregatedReading {
+  dominantTheme: ThemeTag;
+  secondaryTheme: ThemeTag | null;
+  dimensionProfile: DimensionValues;
+  modifierAssignments: Record<ModifierRole, SlotResult[]>;
+  hasTension: boolean;
+  tensionPair: [ThemeTag, ThemeTag] | null;
+}
+
+// ── Narrative Template Types ──
+
+export interface NarrativeTemplates {
+  openings: Record<string, string[]>;
+  dimensionBands: Record<string, string[]>;
+  modifierFrames: Record<string, string[]>;
+  closings: Record<string, string[]>;
+  tensionPatterns: Record<string, string[]>;
+  headlines: Record<string, string[]>;
+  fallbacks: {
+    noDominantTheme: string[];
+    missingModifier: Record<ModifierRole, string[]>;
+    singleResult: string[];
+  };
+}
+
 // ── Divination Results ──
-export interface TarotResult {
+export interface TarotResult extends ThematicData {
   type: 'tarot';
   id: string;
   name: string;
@@ -32,7 +104,7 @@ export interface TarotResult {
   tags: Tag[];
 }
 
-export interface DiceResult {
+export interface DiceResult extends ThematicData {
   type: 'd20';
   result: number; // 1-20
   threshold: 'critical-low' | 'low' | 'neutral' | 'high' | 'critical-high';
@@ -40,7 +112,7 @@ export interface DiceResult {
   tags: Tag[];
 }
 
-export interface IChingResult {
+export interface IChingResult extends ThematicData {
   type: 'iching';
   hexagramNumber: number; // 1-64
   name: string;
@@ -50,7 +122,7 @@ export interface IChingResult {
   tags: Tag[];
 }
 
-export interface HappeningResult {
+export interface HappeningResult extends ThematicData {
   type: 'happening';
   id: string;
   scene: string; // atmospheric description
