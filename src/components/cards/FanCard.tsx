@@ -10,6 +10,11 @@ interface FanCardProps {
   isExpanded: boolean;
   fanAngle: number;       // rotation angle in degrees for radial fan position
   isTopCard: boolean;     // true when this card is the visible top of the collapsed stack
+  // New — desktop responsive
+  isDesktop?: boolean;
+  polarX?: number;      // pre-computed x offset in px from center (desktop expanded)
+  polarY?: number;      // pre-computed y offset in px upward from bottom (desktop expanded)
+  polarAngle?: number;  // pre-computed rotation in degrees (desktop expanded)
 }
 
 function getCardDisplay(result: SlotResult): {
@@ -69,24 +74,77 @@ export default function FanCard({
   isExpanded,
   fanAngle,
   isTopCard,
+  isDesktop: isDesktopProp,
+  polarX,
+  polarY,
+  polarAngle,
 }: FanCardProps) {
-  const display = getCardDisplay(result);
-  const runes = RUNE_SETS[index % RUNE_SETS.length];
+  const isDesktop = isDesktopProp ?? false;
 
   const isSource = slotState === 'source' || slotState === 'animating';
   const isTarget = slotState === 'target' || slotState === 'animating';
   const isRerollTarget = slotState === 'reroll-target';
 
-  // Determine card dimensions
-  const width = isRerollTarget ? 52 : 50;
-  const height = isRerollTarget ? 74 : 72;
+  // Desktop sizes vs mobile
+  const width = isDesktop
+    ? (isRerollTarget ? 84 : 80)
+    : (isRerollTarget ? 52 : 50);
+  const height = isDesktop
+    ? (isRerollTarget ? 122 : 116)
+    : (isRerollTarget ? 74 : 72);
+
+  const symbolFontSize = isDesktop
+    ? (isRerollTarget ? '1.5rem' : '1.3rem')
+    : (isRerollTarget ? '1.05rem' : '0.85rem');
+
+  const nameFontSize = isDesktop
+    ? (isRerollTarget ? '0.65rem' : '0.6rem')
+    : (isRerollTarget ? '0.44rem' : '0.4rem');
+
+  const detailFontSize = isDesktop ? '0.45rem' : '0.3rem';
+  const runeFontSize = isDesktop ? '0.45rem' : '0.32rem';
+  const borderRadius = isDesktop
+    ? (isRerollTarget ? '7px' : '6px')
+    : (isRerollTarget ? '5px' : '4px');
+  const nameMaxWidth = isDesktop ? '74px' : '46px';
+
+  const display = getCardDisplay(result);
+  const runes = RUNE_SETS[index % RUNE_SETS.length];
+
+  // --- Animate target ---
+  // Mobile: rotate + vertical stack offset (unchanged)
+  // Desktop collapsed: centered stack with larger vertical offsets
+  // Desktop expanded: polar-coordinate position + tangent rotation
+
+  let animateX: number;
+  let animateY: number;
+  let animateRotate: number;
+
+  if (isDesktop && isExpanded && polarX !== undefined) {
+    // Desktop expanded: use pre-computed polar position
+    animateX = polarX!;
+    animateY = polarY!;
+    animateRotate = polarAngle!;
+  } else if (isDesktop) {
+    // Desktop collapsed: centered stack
+    animateX = 0;
+    animateY = -(index * 14 + 60);
+    animateRotate = 0;
+  } else {
+    // Mobile (unchanged)
+    animateX = 0;
+    animateY = isExpanded ? -(index * 10 + 42) : -(index * 6 + 36);
+    animateRotate = isExpanded ? fanAngle : 0;
+  }
 
   return (
     <motion.div
       style={{
         position: 'absolute',
         bottom: 0,
-        right: 0,
+        left: isDesktop ? '50%' : undefined,
+        right: isDesktop ? undefined : 0,
+        marginLeft: isDesktop ? `${-(width / 2)}px` : undefined,
         width: `${width}px`,
         height: `${height}px`,
         background: 'linear-gradient(180deg, #0d1220 0%, #0a1020 100%)',
@@ -97,7 +155,7 @@ export default function FanCard({
             : isTarget
               ? '1px solid rgba(200, 120, 80, 0.5)'
               : `1px solid ${display.borderColor}`,
-        borderRadius: isRerollTarget ? '5px' : '4px',
+        borderRadius,
         transformOrigin: 'bottom center',
         opacity: isExpanded ? 1 : isTopCard ? 0.85 : 0.4 + (index * 0.05),
         zIndex: isRerollTarget ? 5 : isExpanded ? 1 : index,
@@ -113,8 +171,9 @@ export default function FanCard({
       }}
       initial={false}
       animate={{
-        rotate: fanAngle,
-        y: isExpanded ? -(index * 10 + 42) : -(index * 6 + 36),
+        x: animateX,
+        y: animateY,
+        rotate: animateRotate,
         scale: isRerollTarget ? 1.08 : 1,
       }}
       transition={{ type: 'spring', stiffness: 300, damping: 25 }}
@@ -142,7 +201,7 @@ export default function FanCard({
           left: 0,
           right: 0,
           textAlign: 'center',
-          fontSize: '0.32rem',
+          fontSize: runeFontSize,
           color: display.borderColor,
           letterSpacing: '0.15em',
           opacity: 0.4,
@@ -167,7 +226,7 @@ export default function FanCard({
       >
         <span
           style={{
-            fontSize: isRerollTarget ? '1.05rem' : '0.85rem',
+            fontSize: symbolFontSize,
             color: isRerollTarget || isSource ? '#d4a854' : display.borderColor,
             lineHeight: 1,
             textShadow: isRerollTarget
@@ -185,7 +244,7 @@ export default function FanCard({
           style={{
             fontFamily: "'Cormorant Garamond', serif",
             fontWeight: 600,
-            fontSize: isRerollTarget ? '0.44rem' : '0.4rem',
+            fontSize: nameFontSize,
             color: isRerollTarget ? '#d4a854' : '#c8d8f0',
             letterSpacing: '0.04em',
             textAlign: 'center',
@@ -193,7 +252,7 @@ export default function FanCard({
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            maxWidth: '46px',
+            maxWidth: nameMaxWidth,
           }}
         >
           {display.name}
@@ -203,7 +262,7 @@ export default function FanCard({
             style={{
               fontFamily: "'Inter', sans-serif",
               fontWeight: 300,
-              fontSize: '0.3rem',
+              fontSize: detailFontSize,
               color: isRerollTarget ? '#d4a854' : display.borderColor,
               letterSpacing: '0.06em',
               textAlign: 'center',
@@ -223,7 +282,7 @@ export default function FanCard({
           left: 0,
           right: 0,
           textAlign: 'center',
-          fontSize: '0.32rem',
+          fontSize: runeFontSize,
           color: display.borderColor,
           letterSpacing: '0.15em',
           opacity: 0.4,
