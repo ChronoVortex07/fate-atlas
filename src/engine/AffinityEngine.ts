@@ -1,4 +1,4 @@
-import type { AffinityId, AffinityBand, Taggable } from './types';
+import type { AffinityId, AffinityBand, AffinityAction, Taggable } from './types';
 import type { AffinityDefinition } from '../data/affinities';
 import {
   AFFINITY_IDS,
@@ -15,6 +15,9 @@ import {
   JITTER_MAX,
   RUN_DRIFT,
   FEED_PER_MATCH,
+  FEED_PER_ACTION,
+  SECONDARY_FEED_FACTOR,
+  ACTION_FEEDS,
 } from '../data/affinities';
 
 export class AffinityEngine {
@@ -69,6 +72,16 @@ export class AffinityEngine {
       if (def.feeds.tags.length === 0) continue;
       const matches = def.feeds.tags.filter((t) => result.tags.includes(t)).length;
       if (matches > 0) this.shift(def.id, matches * FEED_PER_MATCH, `result:${def.id}`);
+    }
+  }
+
+  // Player-action feeds → Fate/Will/Light/Shadow (and Chaos as a secondary).
+  applyAction(action: AffinityAction): void {
+    const feed = ACTION_FEEDS[action];
+    if (!feed) return;
+    this.shift(feed.primary, FEED_PER_ACTION, `action:${action}`);
+    if (feed.secondary) {
+      this.shift(feed.secondary, FEED_PER_ACTION * SECONDARY_FEED_FACTOR, `action:${action}`);
     }
   }
 
