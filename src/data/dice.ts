@@ -1,13 +1,45 @@
-import type { DiceResult } from '../engine/types';
+import type { DiceResult, ThemeTag, DimensionValues, ModifierRole } from '../engine/types';
 
 export type Threshold = 'critical-low' | 'low' | 'neutral' | 'high' | 'critical-high';
 
-const THRESHOLD_INTERPRETATIONS: Record<Threshold, string> = {
-  'critical-low': 'The odds are starkly against you — patience is counseled above all.',
-  'low': 'The currents run against favorable winds. Proceed with measured steps.',
-  'neutral': 'The balance holds, neither for nor against. The choice remains truly yours.',
-  'high': 'Fortune inclines toward you. The path ahead bears promise.',
-  'critical-high': 'The stars align decisively in your favor. A rare and potent moment.',
+interface ThresholdData {
+  interpretation: string;
+  themes: ThemeTag[];
+  dimensions: DimensionValues;
+  modifierRoles: ModifierRole[];
+}
+
+const THRESHOLD_DATA: Record<Threshold, ThresholdData> = {
+  'critical-low': {
+    interpretation: 'The odds are starkly against you — patience is counseled above all.',
+    themes: ['upheaval', 'conflict'],
+    dimensions: { favorability: -2.0, certainty: 0.0, volatility: 1.5 },
+    modifierRoles: ['effect'],
+  },
+  'low': {
+    interpretation: 'The currents run against favorable winds. Proceed with measured steps.',
+    themes: ['stagnation'],
+    dimensions: { favorability: -1.0, certainty: 0.0, volatility: 0.5 },
+    modifierRoles: ['effect'],
+  },
+  'neutral': {
+    interpretation: 'The balance holds, neither for nor against. The choice remains truly yours.',
+    themes: ['harmony'],
+    dimensions: { favorability: 0.0, certainty: -1.0, volatility: 0.0 },
+    modifierRoles: ['effect'],
+  },
+  'high': {
+    interpretation: 'Fortune inclines toward you. The path ahead bears promise.',
+    themes: ['harmony'],
+    dimensions: { favorability: 1.0, certainty: 0.0, volatility: 0.5 },
+    modifierRoles: ['effect'],
+  },
+  'critical-high': {
+    interpretation: 'The stars align decisively in your favor. A rare and potent moment.',
+    themes: ['renewal', 'harmony'],
+    dimensions: { favorability: 2.0, certainty: 0.0, volatility: 1.5 },
+    modifierRoles: ['effect'],
+  },
 };
 
 export function getThreshold(value: number): Threshold {
@@ -19,31 +51,31 @@ export function getThreshold(value: number): Threshold {
 }
 
 export function rollD20(affinities: Record<string, number>): DiceResult {
-  // Order affinity pulls result toward the middle (10-11)
-  // Chaos pushes toward extremes
   let roll = Math.floor(Math.random() * 20) + 1;
 
-  const chaosInfluence = (affinities.chaos ?? 0) * 4; // up to ±4
-  const orderInfluence = (affinities.order ?? 0) * 3; // pull toward 10.5
+  const chaosInfluence = (affinities.chaos ?? 0) * 4;
+  const orderInfluence = (affinities.order ?? 0) * 3;
 
   if (chaosInfluence > 0 && Math.random() < chaosInfluence / 10) {
-    // Chaos: push toward extreme
     roll = roll <= 10 ? Math.max(1, roll - Math.ceil(chaosInfluence)) : Math.min(20, roll + Math.ceil(chaosInfluence));
   }
   if (orderInfluence > 0 && Math.random() < orderInfluence / 10) {
-    // Order: pull toward center
     const center = 10.5;
     roll = Math.round(roll + (center - roll) * (orderInfluence / 10));
     roll = Math.max(1, Math.min(20, roll));
   }
 
   const threshold = getThreshold(roll);
+  const data = THRESHOLD_DATA[threshold];
 
   return {
     type: 'd20',
     result: roll,
     threshold,
-    interpretation: THRESHOLD_INTERPRETATIONS[threshold],
+    interpretation: data.interpretation,
     tags: ['roll', 'random', 'numeric', 'threshold', threshold.includes('low') ? 'low' : threshold.includes('high') ? 'high' : 'neutral'],
+    themes: data.themes,
+    dimensions: data.dimensions,
+    modifierRoles: data.modifierRoles,
   };
 }
