@@ -1,8 +1,13 @@
+import type { ThemeTag, DimensionValues, ModifierRole } from '../engine/types';
+
 export interface HappeningData {
   id: string;
   scene: string;
   choices: { text: string; affinityChanges: Partial<Record<string, number>> }[];
   tags: string[];
+  themes: ThemeTag[];
+  dimensions: DimensionValues;
+  modifierRoles: ModifierRole[];
 }
 
 export const HAPPENINGS: HappeningData[] = [
@@ -15,6 +20,9 @@ export const HAPPENINGS: HappeningData[] = [
       { text: 'Sit at the crossroads and wait for a sign.', affinityChanges: { order: 0.04, chaos: 0.04 } },
     ],
     tags: ['event', 'choice', 'affinity-shift'],
+    themes: ['mystery', 'transformation'],
+    dimensions: { favorability: 0.0, certainty: -1.5, volatility: 1.5 },
+    modifierRoles: ['action'],
   },
   {
     id: 'falling-star',
@@ -24,6 +32,9 @@ export const HAPPENINGS: HappeningData[] = [
       { text: 'Observe its trajectory — seek the pattern.', affinityChanges: { order: 0.1 } },
     ],
     tags: ['event', 'choice', 'affinity-shift'],
+    themes: ['upheaval', 'illumination'],
+    dimensions: { favorability: 0.5, certainty: -0.5, volatility: 2.0 },
+    modifierRoles: ['effect'],
   },
   {
     id: 'veiled-moon',
@@ -34,6 +45,9 @@ export const HAPPENINGS: HappeningData[] = [
       { text: 'Draw the shapes in the dust, fixing them in place.', affinityChanges: { order: 0.03, chaos: 0.03 } },
     ],
     tags: ['event', 'choice', 'affinity-shift'],
+    themes: ['mystery', 'surrender'],
+    dimensions: { favorability: 0.0, certainty: -1.0, volatility: 1.0 },
+    modifierRoles: ['subject'],
   },
   {
     id: 'whispering-thread',
@@ -43,6 +57,9 @@ export const HAPPENINGS: HappeningData[] = [
       { text: 'Step back — some knowledge is not meant for you.', affinityChanges: { order: 0.07 } },
     ],
     tags: ['event', 'choice', 'affinity-shift'],
+    themes: ['mystery', 'illumination'],
+    dimensions: { favorability: 0.0, certainty: -2.0, volatility: 1.0 },
+    modifierRoles: ['subject', 'action'],
   },
   {
     id: 'convergence',
@@ -52,6 +69,9 @@ export const HAPPENINGS: HappeningData[] = [
       { text: 'Stand at an angle to it — see what the pattern hides.', affinityChanges: { chaos: 0.09 } },
     ],
     tags: ['event', 'choice', 'affinity-shift'],
+    themes: ['harmony', 'illumination'],
+    dimensions: { favorability: 1.0, certainty: 1.0, volatility: -0.5 },
+    modifierRoles: ['effect'],
   },
   {
     id: 'echo-of-past-reading',
@@ -61,6 +81,9 @@ export const HAPPENINGS: HappeningData[] = [
       { text: 'Acknowledge and release — the past is settled.', affinityChanges: { order: 0.05 } },
     ],
     tags: ['event', 'choice', 'affinity-shift'],
+    themes: ['transformation', 'illumination'],
+    dimensions: { favorability: 0.0, certainty: -0.5, volatility: 1.5 },
+    modifierRoles: ['subject'],
   },
   {
     id: 'dark-constellation',
@@ -70,6 +93,9 @@ export const HAPPENINGS: HappeningData[] = [
       { text: 'Fill the void with your own pattern — create meaning.', affinityChanges: { chaos: 0.06 } },
     ],
     tags: ['event', 'choice', 'affinity-shift'],
+    themes: ['mystery', 'surrender'],
+    dimensions: { favorability: -0.5, certainty: -1.5, volatility: 1.0 },
+    modifierRoles: ['subject', 'action'],
   },
   {
     id: 'many-threads',
@@ -79,6 +105,9 @@ export const HAPPENINGS: HappeningData[] = [
       { text: 'Pluck a thread and see what unravels — test the weave.', affinityChanges: { chaos: 0.07 } },
     ],
     tags: ['event', 'choice', 'affinity-shift'],
+    themes: ['mystery', 'transformation'],
+    dimensions: { favorability: 0.0, certainty: -2.0, volatility: 2.0 },
+    modifierRoles: ['action', 'effect'],
   },
 ];
 
@@ -88,12 +117,10 @@ export function selectHappening(
 ): HappeningData {
   let available = HAPPENINGS.filter((h) => !excludeIds.includes(h.id));
 
-  // If all happenings have been used, reset the pool
   if (available.length === 0) {
     available = [...HAPPENINGS];
   }
 
-  // High chaos slightly weights toward happenings with more choices
   const weighted = available.map((h) => ({
     happening: h,
     weight: 1 + (h.choices.length > 2 ? chaosAffinity : 0),

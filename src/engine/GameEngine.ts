@@ -113,19 +113,6 @@ export class GameEngine {
 
     this.state.selectedMethod = methodType;
 
-    // Happening gate: trigger happening scene directly instead of minigame
-    if (methodType === 'happening') {
-      // Remove happening from the pool so it isn't offered again this turn
-      const happeningIdx = this.state.availableMethods.indexOf('happening');
-      if (happeningIdx !== -1) {
-        this.state.availableMethods = this.state.availableMethods.filter(
-          (_m, i) => i !== happeningIdx,
-        );
-      }
-      this.triggerHappening();
-      return;
-    }
-
     this.state.activeSlotIndex = null;
     this.state.screen = 'minigame';
     this.notify();
@@ -387,6 +374,9 @@ export class GameEngine {
         affinityChanges: c.affinityChanges as Partial<Record<AffinityId, number>>,
       })),
       tags: data.tags,
+      themes: data.themes,
+      dimensions: data.dimensions,
+      modifierRoles: data.modifierRoles,
     };
     this.state.screen = 'happening';
 
