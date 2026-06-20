@@ -177,8 +177,26 @@ describe('InteractionResolver — pending effects', () => {
     expect(effects).toHaveLength(1);
     expect(effects[0].action).toBe('reroll');
     expect(effects[0].sourceCard).toBe('The Fool');
+    expect(effects[0].sourceSlotIndex).toBe(0);
     expect(effects[0].triggerTags).toEqual(['roll', 'pending']);
     expect(effects[0].turnsRemaining).toBe(3);
+  });
+
+  it('createPendingEffects: preserves non-zero sourceSlotIndex', () => {
+    const resolver = makeResolver();
+    const rules: InteractionRule[] = [
+      {
+        id: 'fool-reroll',
+        trigger: { on: 'slot-revealed', sourceTags: ['major-arcana', 'fool-archetype'] },
+        target: { tags: ['roll', 'pending'], action: 'reroll' },
+        display: { flashSource: true, flashTarget: true, description: 'Test reroll' },
+      },
+    ];
+
+    const effects = resolver.createPendingEffects(tarotResult, 'run-1', rules, 2);
+
+    expect(effects).toHaveLength(1);
+    expect(effects[0].sourceSlotIndex).toBe(2);
   });
 
   it('createPendingEffects: result with no matching rules returns empty', () => {
