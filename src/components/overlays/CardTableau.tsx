@@ -61,8 +61,8 @@ export default function CardTableau({ results, activeSlots }: Props) {
         {results.map((result, index) => {
           const slotState = getSlotState(index, activeSlots);
           const display = getSlotDisplay(result);
-          const showPlaceholder =
-            slotState === 'target' && activeSlots.effect === 'reroll';
+          const isRerollTarget = slotState === 'target' && activeSlots.effect === 'reroll';
+
           return (
             <motion.div
               key={index}
@@ -71,34 +71,44 @@ export default function CardTableau({ results, activeSlots }: Props) {
                 ...(slotState === 'source' ? sourceGlowStyle : {}),
                 ...(slotState === 'target' ? targetGlowStyle : {}),
                 ...(slotState === 'animating' ? animatingStyle : {}),
+                ...(isRerollTarget ? rerollTargetStyle : {}),
               }}
               initial={{ opacity: 0, y: 30 }}
               animate={{
                 opacity: 1,
                 y: 0,
-                ...(slotState === 'source' ? { boxShadow: '0 0 16px rgba(212,168,84,0.5)' } : {}),
-                ...(slotState === 'target' ? { boxShadow: '0 0 12px rgba(200,120,80,0.45)' } : {}),
+                scale: isRerollTarget ? 1.15 : 1,
+                boxShadow: slotState === 'source'
+                  ? '0 0 16px rgba(212,168,84,0.5)'
+                  : slotState === 'target'
+                    ? '0 0 14px rgba(200,120,80,0.5)'
+                    : isRerollTarget
+                      ? '0 0 20px rgba(212,168,84,0.6), 0 0 40px rgba(212,168,84,0.2)'
+                      : 'none',
               }}
               exit={{ opacity: 0, y: 20 }}
               transition={{ duration: 0.4, ease: 'easeOut' }}
             >
-              {showPlaceholder ? (
+              {/* Rerolling pulse ring */}
+              {isRerollTarget && (
                 <motion.div
-                  style={placeholderStyle}
-                  animate={{ opacity: [0.3, 1, 0.3] }}
+                  style={pulseRingStyle}
+                  animate={{
+                    opacity: [0.3, 0, 0.3],
+                    scale: [1, 1.3, 1],
+                  }}
                   transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
-                >
-                  <div style={placeholderSymbolStyle}>⟳</div>
-                  <div style={placeholderLabelStyle}>Rerolling...</div>
-                </motion.div>
-              ) : (
-                <>
-                  <div style={cardSymbolStyle}>{display.symbol}</div>
-                  <div style={cardNameStyle}>{display.name}</div>
-                  {display.typeLabel && (
-                    <div style={cardTypeStyle}>{display.typeLabel}</div>
-                  )}
-                </>
+                />
+              )}
+
+              <div style={isRerollTarget ? rerollSymbolStyle : cardSymbolStyle}>
+                {display.symbol}
+              </div>
+              <div style={isRerollTarget ? rerollNameStyle : cardNameStyle}>
+                {display.name}
+              </div>
+              {display.typeLabel && (
+                <div style={cardTypeStyle}>{display.typeLabel}</div>
               )}
             </motion.div>
           );
@@ -119,7 +129,7 @@ const trayStyle: React.CSSProperties = {
   borderTop: '1px solid rgba(212, 168, 84, 0.15)',
   background: 'linear-gradient(180deg, rgba(7,10,18,0.6) 0%, rgba(7,10,18,0.9) 100%)',
   borderRadius: '8px 8px 0 0',
-  zIndex: 5,
+  zIndex: 25,
   pointerEvents: 'none',
 };
 
@@ -135,7 +145,8 @@ const cardStyle: React.CSSProperties = {
   background: '#0d1220',
   border: '1px solid #1a2440',
   borderRadius: '4px',
-  transition: 'border-color 0.3s ease, box-shadow 0.3s ease',
+  position: 'relative',
+  overflow: 'hidden',
 };
 
 const sourceGlowStyle: React.CSSProperties = {
@@ -150,10 +161,34 @@ const animatingStyle: React.CSSProperties = {
   borderColor: 'rgba(212, 168, 84, 0.7)',
 };
 
+const rerollTargetStyle: React.CSSProperties = {
+  borderColor: 'rgba(212, 168, 84, 0.7)',
+  background: '#141a2a',
+};
+
+const pulseRingStyle: React.CSSProperties = {
+  position: 'absolute',
+  inset: '-4px',
+  borderRadius: '8px',
+  border: '2px solid rgba(212, 168, 84, 0.4)',
+  pointerEvents: 'none',
+};
+
 const cardSymbolStyle: React.CSSProperties = {
   fontSize: '1.4rem',
   color: '#c8d8f0',
   lineHeight: 1,
+  position: 'relative',
+  zIndex: 1,
+};
+
+const rerollSymbolStyle: React.CSSProperties = {
+  fontSize: '1.8rem',
+  color: '#d4a854',
+  lineHeight: 1,
+  position: 'relative',
+  zIndex: 1,
+  fontWeight: 700,
 };
 
 const cardNameStyle: React.CSSProperties = {
@@ -167,6 +202,23 @@ const cardNameStyle: React.CSSProperties = {
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   maxWidth: '100px',
+  position: 'relative',
+  zIndex: 1,
+};
+
+const rerollNameStyle: React.CSSProperties = {
+  fontFamily: "'Cormorant Garamond', serif",
+  fontWeight: 600,
+  fontSize: '0.7rem',
+  color: '#c8d8f0',
+  letterSpacing: '0.05em',
+  textAlign: 'center',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  maxWidth: '100px',
+  position: 'relative',
+  zIndex: 1,
 };
 
 const cardTypeStyle: React.CSSProperties = {
@@ -176,26 +228,6 @@ const cardTypeStyle: React.CSSProperties = {
   color: '#5b7290',
   letterSpacing: '0.08em',
   textTransform: 'uppercase',
-};
-
-const placeholderStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: '4px',
-};
-
-const placeholderSymbolStyle: React.CSSProperties = {
-  fontSize: '1.6rem',
-  color: '#d4a854',
-  lineHeight: 1,
-};
-
-const placeholderLabelStyle: React.CSSProperties = {
-  fontFamily: "'Inter', sans-serif",
-  fontWeight: 300,
-  fontSize: '0.5rem',
-  color: '#7b7b5a',
-  letterSpacing: '0.05em',
+  position: 'relative',
+  zIndex: 1,
 };

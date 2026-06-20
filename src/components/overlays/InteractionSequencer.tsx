@@ -49,7 +49,7 @@ function getStepsForEffect(effect: AnimationDescriptor['effect']): AnimationStep
   switch (effect) {
     case 'reroll':
       return [
-        { id: 'desc', autoAdvanceMs: 1200 },
+        { id: 'desc', autoAdvanceMs: 2000 },
         { id: 'source-glint', autoAdvanceMs: 700 },
         { id: 'projectile', autoAdvanceMs: 600 },
         { id: 'rerolling', autoAdvanceMs: 1000 },
@@ -57,28 +57,28 @@ function getStepsForEffect(effect: AnimationDescriptor['effect']): AnimationStep
       ];
     case 'flip':
       return [
-        { id: 'desc', autoAdvanceMs: 1200 },
+        { id: 'desc', autoAdvanceMs: 2000 },
         { id: 'source-glint', autoAdvanceMs: 700 },
         { id: 'wave', autoAdvanceMs: 800 },
         { id: 'reveal', autoAdvanceMs: 0 },
       ];
     case 'mirror':
       return [
-        { id: 'desc', autoAdvanceMs: 1200 },
+        { id: 'desc', autoAdvanceMs: 2000 },
         { id: 'source-glint', autoAdvanceMs: 700 },
         { id: 'reflection', autoAdvanceMs: 900 },
         { id: 'reveal', autoAdvanceMs: 0 },
       ];
     case 'add-choice':
       return [
-        { id: 'desc', autoAdvanceMs: 1200 },
+        { id: 'desc', autoAdvanceMs: 2000 },
         { id: 'source-glint', autoAdvanceMs: 700 },
         { id: 'branching', autoAdvanceMs: 900 },
         { id: 'reveal', autoAdvanceMs: 0 },
       ];
     case 'second-result':
       return [
-        { id: 'desc', autoAdvanceMs: 1200 },
+        { id: 'desc', autoAdvanceMs: 2000 },
         { id: 'source-glint', autoAdvanceMs: 700 },
         { id: 'portal', autoAdvanceMs: 800 },
         { id: 'reveal', autoAdvanceMs: 0 },
@@ -103,7 +103,7 @@ export default function InteractionSequencer({ onActiveSlotsChange, onAnimationC
   const steps = currentDescriptor ? getStepsForEffect(currentDescriptor.effect) : [];
   const currentStep = steps[stepIndex];
   const isLastStep = stepIndex >= steps.length - 1;
-  const totalSteps = steps.length;
+  const isDescriptionStep = currentStep?.id === 'desc';
 
   // When queue changes, start playing the first interaction
   useEffect(() => {
@@ -204,73 +204,85 @@ export default function InteractionSequencer({ onActiveSlotsChange, onAnimationC
 
   const label = EFFECT_LABELS[currentDescriptor.effect] ?? currentDescriptor.effect;
 
+  // Unique key that changes between description & animation phases so
+  // AnimatePresence can animate the transition between popup and animations.
+  const phaseKey = isDescriptionStep
+    ? `desc-${currentDescriptor.effect}-${currentDescriptor.sourceIndex}-${currentDescriptor.targetIndex}`
+    : `anim-${currentDescriptor.effect}-${currentDescriptor.sourceIndex}-${currentDescriptor.targetIndex}-${stepIndex}`;
+
   return (
     <AnimatePresence>
       <motion.div
-        key={currentDescriptor.effect + '-' + currentDescriptor.sourceIndex + '-' + currentDescriptor.targetIndex}
-        style={overlayStyle}
+        key={phaseKey}
+        style={isDescriptionStep ? popupOverlayStyle : animOverlayStyle}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
+        transition={{ duration: 0.25 }}
         onClick={handleTap}
       >
-        {/* Dimming veil */}
-        <motion.div
-          style={veilStyle}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        />
+        {isDescriptionStep ? (
+          <>
+            {/* Dimming veil */}
+            <motion.div
+              style={veilStyle}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            />
 
-        {/* Description banner — always visible */}
-        <motion.div
-          style={bannerStyle}
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <div style={bannerLabelStyle}>{label}</div>
-          <div style={bannerDescStyle}>{currentDescriptor.description}</div>
-          {currentStep && (
-            <div style={stepIndicatorStyle}>
-              Step {stepIndex + 1} of {totalSteps}
-            </div>
-          )}
-        </motion.div>
+            {/* Description popup */}
+            <motion.div
+              style={bannerStyle}
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div style={bannerLabelStyle}>{label}</div>
+              <div style={bannerDescStyle}>{currentDescriptor.description}</div>
+            </motion.div>
 
-        {/* Per-effect animation */}
-        {currentDescriptor.effect === 'reroll' && (
-          <RerollAnimation descriptor={currentDescriptor} step={currentStep?.id ?? 'desc'} />
-        )}
-        {currentDescriptor.effect === 'flip' && (
-          <FlipAnimation descriptor={currentDescriptor} step={currentStep?.id ?? 'desc'} />
-        )}
-        {currentDescriptor.effect === 'mirror' && (
-          <MirrorAnimation descriptor={currentDescriptor} step={currentStep?.id ?? 'desc'} />
-        )}
-        {currentDescriptor.effect === 'add-choice' && (
-          <AddChoiceAnimation descriptor={currentDescriptor} step={currentStep?.id ?? 'desc'} />
-        )}
-        {currentDescriptor.effect === 'second-result' && (
-          <SecondResultAnimation descriptor={currentDescriptor} step={currentStep?.id ?? 'desc'} />
-        )}
+            {/* Tap hint */}
+            <motion.div
+              style={tapHintStyle}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              exit={{ opacity: 0 }}
+              transition={{ delay: 0.5, duration: 0.3 }}
+            >
+              Tap to continue
+            </motion.div>
+          </>
+        ) : (
+          <>
+            {/* Per-effect animation — plays unobstructed after popup dismisses */}
+            {currentDescriptor.effect === 'reroll' && (
+              <RerollAnimation descriptor={currentDescriptor} step={currentStep?.id ?? 'desc'} />
+            )}
+            {currentDescriptor.effect === 'flip' && (
+              <FlipAnimation descriptor={currentDescriptor} step={currentStep?.id ?? 'desc'} />
+            )}
+            {currentDescriptor.effect === 'mirror' && (
+              <MirrorAnimation descriptor={currentDescriptor} step={currentStep?.id ?? 'desc'} />
+            )}
+            {currentDescriptor.effect === 'add-choice' && (
+              <AddChoiceAnimation descriptor={currentDescriptor} step={currentStep?.id ?? 'desc'} />
+            )}
+            {currentDescriptor.effect === 'second-result' && (
+              <SecondResultAnimation descriptor={currentDescriptor} step={currentStep?.id ?? 'desc'} />
+            )}
 
-        {/* Tap hint */}
-        <motion.div
-          style={tapHintStyle}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.5 }}
-          transition={{ delay: 0.5, duration: 0.3 }}
-        >
-          {isLastStep ? 'Tap to complete' : 'Tap to continue'}
-        </motion.div>
+          </>
+        )}
       </motion.div>
     </AnimatePresence>
   );
 }
 
-const overlayStyle: React.CSSProperties = {
+// ── Popup (description) phase styles ──
+
+const popupOverlayStyle: React.CSSProperties = {
   position: 'absolute',
   inset: 0,
   zIndex: 20,
@@ -322,15 +334,6 @@ const bannerDescStyle: React.CSSProperties = {
   lineHeight: 1.5,
 };
 
-const stepIndicatorStyle: React.CSSProperties = {
-  fontFamily: "'Inter', sans-serif",
-  fontWeight: 300,
-  fontSize: '0.6rem',
-  color: '#5b7290',
-  letterSpacing: '0.08em',
-  marginTop: '0.5rem',
-};
-
 const tapHintStyle: React.CSSProperties = {
   position: 'relative',
   zIndex: 1,
@@ -339,4 +342,15 @@ const tapHintStyle: React.CSSProperties = {
   fontSize: '0.65rem',
   color: '#5b7290',
   letterSpacing: '0.05em',
+};
+
+// ── Animation phase styles (no blocking banner) ──
+
+const animOverlayStyle: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  zIndex: 20,
+  pointerEvents: 'auto',
+  cursor: 'pointer',
+  // No background — animations play unobstructed over the game screen
 };

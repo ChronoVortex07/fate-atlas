@@ -7,6 +7,13 @@ export default function HappeningScene() {
   const { state, engine } = useGameEngine();
   const happening = state.happening;
 
+  const handleChoice = useCallback(
+    (index: number) => {
+      engine.resolveHappening(index);
+    },
+    [engine],
+  );
+
   // Auto-transition to result if no happening is set when on this screen
   useEffect(() => {
     if (state.screen === 'happening' && !happening) {
@@ -15,13 +22,6 @@ export default function HappeningScene() {
   }, [state.screen, happening, engine]);
 
   if (!happening) return null;
-
-  const handleChoice = useCallback(
-    (index: number) => {
-      engine.resolveHappening(index);
-    },
-    [engine],
-  );
 
   return (
     <motion.div

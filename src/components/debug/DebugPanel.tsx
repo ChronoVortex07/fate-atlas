@@ -36,9 +36,6 @@ export default function DebugPanel() {
     });
   }, [engine]);
 
-  const handleTriggerSwirl = useCallback(() => {
-    engine.startDebugSwirl();
-  }, [engine]);
 
   if (!state.debug) return null;
 
@@ -98,9 +95,6 @@ export default function DebugPanel() {
         </div>
         <button onClick={handleForceFoolsReroll} style={{ ...btnStyle, marginTop: '8px' }}>
           Force Fool's Reroll
-        </button>
-        <button onClick={handleTriggerSwirl} style={{ ...btnStyle, marginTop: '8px' }}>
-          Trigger Swirl
         </button>
       </div>
     </div>
