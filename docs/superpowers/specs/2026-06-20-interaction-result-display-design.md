@@ -106,23 +106,60 @@ Extract the dice reveal animation into a self-contained `DiceThrowAnimation` com
 Tarot and I Ching get the same treatment to the extent their reveals need replay, but the
 dice component is the one explicitly designed as the physics swap point.
 
-### 4. GameTable
+### 4. Effect application must happen *before* the screen transition
+
+Engine-sourced display is necessary but not sufficient. Today `advanceInteractionQueue`
+([GameEngine.ts](../../../src/engine/GameEngine.ts)) applies the effect **and** transitions
+the screen (`method-select` / `result`) in the same `notify()`. So the new value lands at
+the exact moment the minigame unmounts — the centered view never renders or animates it.
+
+The narrative also requires deferred application: the player must see the *original* roll
+first, then watch it re-roll. So the effect cannot be applied eagerly at `completeMinigame`
+either; it must apply mid-sequence, at the **reveal** step, while the minigame is still
+mounted.
+
+Split the work into two engine methods:
+
+- `applyHeadInteraction(): void` — applies `executeEffect` for the head of the queue (the
+  one currently animating), `notify()`, but does **not** dequeue or transition. Guarded by a
+  new `interactionApplied: boolean` state flag so it runs **once** per head (protects against
+  React re-invocation and effects like `second-result` that would otherwise append twice).
+- `advanceInteractionQueue(): void` — unchanged responsibilities (dequeue head; transition
+  when the queue drains) **except**: if `interactionApplied` is still `false` it applies the
+  effect first (covers a fast tap that skips the reveal beat), then resets
+  `interactionApplied = false` after dequeuing.
+
+`interactionApplied` is added to `GameState` (default `false`), reset in `startTurn` and the
+run-reset paths.
+
+The `InteractionSequencer` calls `engine.applyHeadInteraction()` once when it enters the
+`reveal` step (the existing per-step effect; the `interactionApplied` guard makes repeat
+calls safe). The screen transition still happens later, on the tap that triggers
+`handleComplete → advanceInteractionQueue`.
+
+### 5. GameTable
 
 Unchanged from the current working copy: the minigame stays mounted during interactions
 (`screen` stays `'minigame'`, the sequencer overlays on top). That part of the earlier fix
-was correct; it just needed an engine-backed display behind it.
+was correct; it just needed an engine-backed display behind it and the deferred screen
+transition above.
 
 ## Data flow (Fool's Reroll, after fix)
 
-1. Player throws → `rollD20` → `completeMinigame(result)`.
-2. Engine appends result, sets `activeSlotIndex`, queues the reroll interaction, freezes on
-   the minigame screen.
-3. Result phase renders `DiceThrowAnimation` from `turnResults[activeSlotIndex]` → initial
-   throw animation plays.
-4. Sequencer overlays and runs the reroll steps; at completion `executeEffect` replaces
-   `turnResults[activeSlotIndex]` with a freshly drawn d20.
-5. The new value flows to `DiceThrowAnimation`, which (re-keyed by value) replays the throw
-   to the new number.
+1. Player throws → `rollD20`; `DiceThrowAnimation` plays the initial count-up from local
+   state. After the existing reveal delay, `completeMinigame(result)` commits.
+2. Engine appends the result, sets `activeSlotIndex` and the canonical `targetSlotIndex`,
+   queues the reroll interaction, and stays on the minigame screen
+   (`interactionApplied = false`).
+3. Once committed, the result phase renders `DiceThrowAnimation` from
+   `turnResults[activeSlotIndex]`; the value matches the local roll, so no replay occurs.
+4. Sequencer overlays and runs the reroll steps. On entering `reveal` it calls
+   `applyHeadInteraction()`, which replaces `turnResults[activeSlotIndex]` with a freshly
+   drawn d20 and sets `interactionApplied = true`. Screen stays `minigame`.
+5. The new value flows to `DiceThrowAnimation`, which (re-keyed by value) replays the full
+   throw to the new number, visible on the centered die during the reveal step.
+6. Player taps → `advanceInteractionQueue` dequeues, resets the flag, and (queue empty)
+   transitions to `method-select`. The `CardTableau` retains the rerolled value.
 
 ## Testing
 
@@ -133,6 +170,14 @@ was correct; it just needed an engine-backed display behind it.
     `turnResults[activeSlotIndex]` holds the new value.
   - After a `second-result` append earlier in the turn, the next `completeMinigame` sets
     `activeSlotIndex` and `targetSlotIndex` to the true appended index (not `completed - 1`).
+  - `applyHeadInteraction` applies the head effect, sets `interactionApplied = true`, and
+    does **not** dequeue or change `screen`.
+  - `applyHeadInteraction` called twice for the same head applies the effect only once
+    (guard holds; a `second-result` head appends exactly one slot).
+  - `advanceInteractionQueue` after `applyHeadInteraction` does not re-apply the effect, and
+    transitions the screen only once the queue drains; `interactionApplied` is reset.
+  - `advanceInteractionQueue` without a prior `applyHeadInteraction` still applies the head
+    effect (fast-tap path).
 - **Components:** no component test harness exists (Vitest is engine-only per
   [vitest.config.ts](../../../vitest.config.ts)). The visual behavior is verified manually
   via the debug panel's "Fool's Reroll" scenario.
