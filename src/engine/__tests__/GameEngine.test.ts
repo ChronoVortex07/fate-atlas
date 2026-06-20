@@ -37,9 +37,12 @@ describe('GameEngine — new lifecycle', () => {
     engine.startTurn('self');
     const methods = engine.getState().availableMethods;
     expect(methods.length).toBeGreaterThan(0);
-    engine.selectMethod(0);
+    // Pick a non-happening method — happenings go to their own scene
+    const idx = methods.findIndex((m) => m !== 'happening');
+    if (idx === -1) return; // all happenings, nothing to test
+    engine.selectMethod(idx);
     expect(engine.getState().screen).toBe('minigame');
-    expect(engine.getState().selectedMethod).toBe(methods[0]);
+    expect(engine.getState().selectedMethod).toBe(methods[idx]);
   });
 
   it('synthesizes after 3 complete minigames and goes to result', () => {
@@ -80,7 +83,8 @@ describe('GameEngine — new lifecycle', () => {
     const state = engine.getState();
     expect(state.turnResults.length).toBe(3);
     expect(state.synthesis).toBeTruthy();
-    expect(state.screen).toBe('result');
+    expect(state.swirlActive).toBe(true);
+    expect(state.screen).not.toBe('result');
   });
 
   it('clearActiveInteraction between minigames returns to method-select', () => {
@@ -227,5 +231,74 @@ describe('GameEngine — new lifecycle', () => {
   it('loadScenario returns false for unknown preset', () => {
     const ok = engine.loadScenarioById('nonexistent');
     expect(ok).toBe(false);
+  });
+
+  it('swirlActive defaults to false', () => {
+    expect(engine.getState().swirlActive).toBe(false);
+  });
+
+  it('startDebugSwirl sets swirlActive to true', () => {
+    engine.startDebugSwirl();
+    expect(engine.getState().swirlActive).toBe(true);
+  });
+
+  it('finishSwirl clears swirlActive and goes to result', () => {
+    engine.startDebugSwirl();
+    expect(engine.getState().swirlActive).toBe(true);
+
+    engine.finishSwirl();
+    const state = engine.getState();
+    expect(state.swirlActive).toBe(false);
+    expect(state.screen).toBe('result');
+  });
+
+  it('sets swirlActive instead of going directly to result after 3 minigames', () => {
+    engine.startTurn('self');
+
+    const makeResult = (): SlotResult => ({
+      type: 'd20',
+      result: 10,
+      threshold: 'neutral',
+      interpretation: 'Steady',
+      tags: ['roll', 'numeric'],
+    });
+
+    // Complete 3 minigames
+    for (let i = 0; i < 3; i++) {
+      const methods = engine.getState().availableMethods;
+      const idx = methods.findIndex((m) => m !== 'happening');
+      if (idx === -1) return;
+      engine.selectMethod(idx);
+      if (engine.getState().screen === 'happening') {
+        engine.resolveHappening(0);
+        const m2 = engine.getState().availableMethods;
+        const ix2 = m2.findIndex((m) => m !== 'happening');
+        if (ix2 === -1) return;
+        engine.selectMethod(ix2);
+      }
+      engine.completeMinigame(makeResult());
+      if (engine.getState().activeInteraction) {
+        engine.clearActiveInteraction();
+      }
+    }
+
+    const state = engine.getState();
+    expect(state.turnResults.length).toBe(3);
+    expect(state.synthesis).toBeTruthy();
+    expect(state.swirlActive).toBe(true);
+    expect(state.screen).not.toBe('result');
+
+    // finishSwirl should transition to result
+    engine.finishSwirl();
+    expect(engine.getState().swirlActive).toBe(false);
+    expect(engine.getState().screen).toBe('result');
+  });
+
+  it('swirlActive resets on startTurn', () => {
+    engine.startDebugSwirl();
+    expect(engine.getState().swirlActive).toBe(true);
+
+    engine.startTurn('self');
+    expect(engine.getState().swirlActive).toBe(false);
   });
 });
