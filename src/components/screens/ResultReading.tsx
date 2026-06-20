@@ -57,7 +57,7 @@ export default function ResultReading() {
   const [copied, setCopied] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  const { turnResult, synthesis, happening, selectedHappeningChoice, affinities, questionType } = state;
+  const { turnResult, synthesis, happening, selectedHappeningChoice, questionType } = state;
 
   const handleDrawAgain = useCallback(() => engine.returnToQuestionSelect(), [engine]);
   const handleShare = useCallback(async () => {

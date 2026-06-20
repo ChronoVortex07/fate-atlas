@@ -4,10 +4,6 @@ import { useGameEngine } from '../../hooks/useGameEngine';
 export default function StepControls() {
   const { state, engine } = useGameEngine();
 
-  const handleResolveAll = useCallback(() => {
-    engine.resolveAllInteractions();
-  }, [engine]);
-
   const handleResetTurn = useCallback(() => {
     engine.reset();
   }, [engine]);
@@ -20,9 +16,6 @@ export default function StepControls() {
       </div>
 
       <div style={buttonGroupStyle}>
-        <button style={buttonStyle} onClick={handleResolveAll}>
-          Resolve All
-        </button>
         <button style={buttonStyle} onClick={handleResetTurn}>
           Reset Turn
         </button>
