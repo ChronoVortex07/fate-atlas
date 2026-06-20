@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import FanCard, { type FanCardState } from '../cards/FanCard';
 import type { SlotResult } from '../../engine/types';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 
 interface ActiveSlots {
   sourceIndex: number | null;
@@ -48,6 +49,29 @@ export default function ConstellationFan({ results, activeSlots }: Props) {
       results.length === 1 ? 0 : startAngle + angleStep * i,
     );
   }, [results.length, startAngle, angleStep]);
+
+  const isDesktop = useMediaQuery('(min-width: 768px)');
+
+  // Desktop polar fan positions — non-overlapping arc
+  const desktopPolarPositions = useMemo(() => {
+    if (!isDesktop) return null;
+
+    const degreesPerCard = 26;
+    const arcDeg = Math.min(120, Math.max(40, (results.length - 1) * degreesPerCard));
+    const startAngleDeg = -(arcDeg / 2);
+    const angleStepDeg = results.length > 1 ? arcDeg / (results.length - 1) : 0;
+    const radius = 180; // px from pivot to card bottom-center
+
+    return results.map((_, i) => {
+      const angleDeg = results.length === 1 ? 0 : startAngleDeg + angleStepDeg * i;
+      const angleRad = (angleDeg * Math.PI) / 180;
+      return {
+        x: radius * Math.sin(angleRad),
+        y: -(radius * Math.cos(angleRad)), // negative = upward from bottom
+        angleDeg,
+      };
+    });
+  }, [isDesktop, results.length]);
 
   // Auto-expand when an interaction targets a fan card
   useEffect(() => {
@@ -122,7 +146,7 @@ export default function ConstellationFan({ results, activeSlots }: Props) {
           <motion.div
             style={{
               position: 'absolute',
-              top: '68px',
+              top: isDesktop ? '40px' : '68px',
               left: 0,
               right: 0,
               textAlign: 'center',
@@ -138,7 +162,7 @@ export default function ConstellationFan({ results, activeSlots }: Props) {
               style={{
                 fontFamily: "'Cormorant Garamond', serif",
                 fontWeight: 600,
-                fontSize: '0.8rem',
+                fontSize: isDesktop ? '1rem' : '0.8rem',
                 color: '#d4a854',
                 letterSpacing: '0.08em',
               }}
@@ -155,16 +179,21 @@ export default function ConstellationFan({ results, activeSlots }: Props) {
           style={{
             position: 'absolute',
             bottom: 0,
-            right: 0,
-            width: '280px',
-            height: '220px',
+            right: isDesktop ? undefined : 0,
+            left: isDesktop ? '50%' : undefined,
+            transform: isDesktop ? 'translateX(-50%)' : undefined,
+            width: isDesktop ? '600px' : '280px',
+            height: isDesktop ? '340px' : '220px',
             pointerEvents: 'none',
             zIndex: 15,
             overflow: 'visible',
           }}
         >
           <path
-            d="M 252 206 Q 120 175 50 212"
+            d={isDesktop
+              ? "M 540 326 Q 300 260 60 326"
+              : "M 252 206 Q 120 175 50 212"
+            }
             fill="none"
             stroke="rgba(212,168,84,0.08)"
             strokeWidth="1"
@@ -177,27 +206,36 @@ export default function ConstellationFan({ results, activeSlots }: Props) {
       <div
         style={{
           position: 'absolute',
-          bottom: '56px',
-          right: '14px',
-          width: '220px',
-          height: '220px',
+          bottom: isDesktop ? '76px' : '56px',
+          right: isDesktop ? undefined : '14px',
+          left: isDesktop ? 0 : undefined,
+          width: isDesktop ? '100%' : '220px',
+          height: isDesktop ? '320px' : '220px',
           zIndex: expanded ? 16 : 8,
+          pointerEvents: isDesktop && !expanded ? 'none' : undefined,
         }}
       >
         {results
           .map((result, i) => ({ result, i }))
           .reverse()
-          .map(({ result, i }) => (
-            <FanCard
-              key={`fan-${i}`}
-              result={result}
-              index={i}
-              slotState={getSlotState(i, activeSlots)}
-              isExpanded={expanded}
-              fanAngle={fanAngles[i]}
-              isTopCard={i === results.length - 1}
-            />
-          ))}
+          .map(({ result, i }) => {
+            const polar = desktopPolarPositions?.[i];
+            return (
+              <FanCard
+                key={`fan-${i}`}
+                result={result}
+                index={i}
+                slotState={getSlotState(i, activeSlots)}
+                isExpanded={expanded}
+                fanAngle={fanAngles[i]}
+                isTopCard={i === results.length - 1}
+                isDesktop={isDesktop}
+                polarX={polar?.x}
+                polarY={polar?.y}
+                polarAngle={polar?.angleDeg}
+              />
+            );
+          })}
       </div>
 
       {/* ✧ FAB button */}
@@ -206,9 +244,11 @@ export default function ConstellationFan({ results, activeSlots }: Props) {
         style={{
           position: 'absolute',
           bottom: '14px',
-          right: '14px',
-          width: '42px',
-          height: '42px',
+          left: isDesktop ? '50%' : undefined,
+          right: isDesktop ? undefined : '14px',
+          transform: isDesktop ? 'translateX(-50%)' : undefined,
+          width: isDesktop ? '48px' : '42px',
+          height: isDesktop ? '48px' : '42px',
           background: '#0d1220',
           border: '1.5px solid #d4a854',
           borderRadius: '50%',
@@ -229,7 +269,7 @@ export default function ConstellationFan({ results, activeSlots }: Props) {
       >
         <span
           style={{
-            fontSize: '1rem',
+            fontSize: isDesktop ? '1.15rem' : '1rem',
             color: '#d4a854',
             lineHeight: 1,
           }}
@@ -244,8 +284,8 @@ export default function ConstellationFan({ results, activeSlots }: Props) {
               position: 'absolute',
               top: '-5px',
               right: '-5px',
-              width: '18px',
-              height: '18px',
+              width: isDesktop ? '20px' : '18px',
+              height: isDesktop ? '20px' : '18px',
               background: '#c75b4a',
               borderRadius: '50%',
               display: 'flex',
@@ -258,7 +298,7 @@ export default function ConstellationFan({ results, activeSlots }: Props) {
               style={{
                 fontFamily: "'Inter', sans-serif",
                 fontWeight: 600,
-                fontSize: '0.5rem',
+                fontSize: isDesktop ? '0.55rem' : '0.5rem',
                 color: '#fff',
                 lineHeight: 1,
               }}
