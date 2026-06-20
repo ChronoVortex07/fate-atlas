@@ -169,6 +169,17 @@ export default function InteractionSequencer({ onActiveSlotsChange, onAnimationC
     });
   }, [stepIndex, currentDescriptor]);
 
+  // Apply the head interaction's effect when the reveal step begins, so the
+  // change lands while the minigame is still mounted and can animate it.
+  // The engine guards against double application.
+  useEffect(() => {
+    if (currentStep?.id === 'reveal') {
+      engine.applyHeadInteraction();
+    }
+    // Deps mirror the sibling step-effect above; `currentStep` is derived from
+    // these and read from the closure. The engine guard makes repeats safe.
+  }, [stepIndex, currentDescriptor]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
