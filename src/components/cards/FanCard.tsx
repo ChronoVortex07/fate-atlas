@@ -120,11 +120,11 @@ export default function FanCard({
   let animateY: number;
   let animateRotate: number;
 
-  if (isDesktop && isExpanded && polarX !== undefined) {
+  if (isDesktop && isExpanded && polarX !== undefined && polarY !== undefined && polarAngle !== undefined) {
     // Desktop expanded: use pre-computed polar position
-    animateX = polarX!;
-    animateY = polarY!;
-    animateRotate = polarAngle!;
+    animateX = polarX;
+    animateY = polarY;
+    animateRotate = polarAngle;
   } else if (isDesktop) {
     // Desktop collapsed: centered stack
     animateX = 0;
@@ -134,7 +134,7 @@ export default function FanCard({
     // Mobile (unchanged)
     animateX = 0;
     animateY = isExpanded ? -(index * 10 + 42) : -(index * 6 + 36);
-    animateRotate = isExpanded ? fanAngle : 0;
+    animateRotate = fanAngle;
   }
 
   return (
