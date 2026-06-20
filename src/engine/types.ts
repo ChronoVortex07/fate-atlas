@@ -198,7 +198,7 @@ export interface GameState {
   minigamesCompleted: number;
   minigameState: MinigameState | null;
   pendingEffects: PendingEffect[];
-  activeInteraction: InteractionEvent | null;
+  interactionQueue: InteractionEvent[];
   pendingHappening: boolean; // interaction was shown before a between-minigame happening
   interactions: InteractionEvent[];
   synthesis: SynthesisResult | null;
@@ -208,5 +208,4 @@ export interface GameState {
   eventLog: GameEvent[];
   chainDepth: number;
   debug: boolean;
-  swirlActive: boolean;
 }
