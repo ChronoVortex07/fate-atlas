@@ -6,7 +6,7 @@ import { TurnOrchestrator } from './TurnOrchestrator';
 import { InteractionResolver } from './InteractionResolver';
 import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
-import { CHAOS_AFFINITY, ORDER_AFFINITY } from '../data/affinities';
+import { CHAOS_AFFINITY, ORDER_AFFINITY, defaultAffinityState } from '../data/affinities';
 import { INTERACTION_RULES } from '../data/interactions';
 import { selectHappening } from '../data/happenings';
 import { loadScenario, SCENARIO_PRESETS } from './scenarios';
@@ -46,7 +46,7 @@ export class GameEngine {
   private defaultState(): GameState {
     return {
       screen: 'title',
-      affinities: { chaos: 0.5, order: 0.5 },
+      affinities: defaultAffinityState(),
       questionType: null,
       availableMethods: [],
       selectedMethod: null,
@@ -66,6 +66,7 @@ export class GameEngine {
       eventLog: [],
       chainDepth: 0,
       debug: false,
+      debugForcedEffect: null,
     };
   }
 
@@ -590,8 +591,7 @@ export class GameEngine {
   }
 
   clearHistory(): void {
-    const defaultAffinities = { chaos: 0.5, order: 0.5 };
-    this.affinityEngine.setState(defaultAffinities);
+    this.affinityEngine.setState(defaultAffinityState());
     this.state = this.defaultState();
     this.state.affinities = this.affinityEngine.getState();
     this.usedHappeningIds = new Set();

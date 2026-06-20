@@ -43,7 +43,7 @@ export class AffinityEngine {
     return { ...this.state } as Record<AffinityId, number>;
   }
 
-  setState(values: Record<AffinityId, number>): void {
+  setState(values: Partial<Record<AffinityId, number>>): void {
     for (const [id, val] of Object.entries(values)) {
       this.state[id] = this.clamp(val);
     }
