@@ -186,6 +186,7 @@ export class GameEngine {
       this.synthesizeAll();
       this.buildRunRecord();
       this.state.screen = 'result';
+      this.saveToStorage();
     } else {
       this.orchestrator.removeUsedMethod(result.type as 'tarot' | 'd20' | 'iching');
 
@@ -567,6 +568,7 @@ export class GameEngine {
     this.state.history = saved.history;
     this.usedHappeningIds = new Set(saved.usedHappeningIds);
     this.bus.clear();
+    this.saveToStorage();
     this.notify();
   }
 
@@ -580,6 +582,7 @@ export class GameEngine {
     this.state.history = history;
     this.usedHappeningIds = new Set(usedIds);
     this.bus.clear();
+    this.saveToStorage();
     this.notify();
   }
 
