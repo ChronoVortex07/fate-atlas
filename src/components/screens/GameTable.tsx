@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
 import TitleScreen from './TitleScreen';
@@ -10,11 +10,28 @@ import IChingMinigame from './IChingMinigame';
 import HappeningScene from './HappeningScene';
 import ResultReading from './ResultReading';
 import HistoryModal from '../overlays/HistoryModal';
-import InteractionLayer from '../overlays/InteractionLayer';
+import CardTableau from '../overlays/CardTableau';
+import InteractionSequencer from '../overlays/InteractionSequencer';
+
+interface ActiveSlots {
+  sourceIndex: number | null;
+  targetIndex: number | null;
+}
 
 export default function GameTable() {
   const { state } = useGameEngine();
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [activeSlots, setActiveSlots] = useState<ActiveSlots>({
+    sourceIndex: null,
+    targetIndex: null,
+  });
+
+  const showTableau = state.screen !== 'title' && state.screen !== 'question';
+
+  const handleActiveSlotsChange = useCallback(
+    (slots: ActiveSlots) => setActiveSlots(slots),
+    [],
+  );
 
   const renderCenter = () => {
     switch (state.screen) {
@@ -65,7 +82,15 @@ export default function GameTable() {
           {renderCenter()}
         </AnimatePresence>
       </div>
-      <InteractionLayer />
+      {showTableau && (
+        <CardTableau results={state.turnResults} activeSlots={activeSlots} />
+      )}
+      {state.interactionQueue.length > 0 && (
+        <InteractionSequencer
+          onActiveSlotsChange={handleActiveSlotsChange}
+          onAnimationComplete={() => setActiveSlots({ sourceIndex: null, targetIndex: null })}
+        />
+      )}
     </div>
   );
 }

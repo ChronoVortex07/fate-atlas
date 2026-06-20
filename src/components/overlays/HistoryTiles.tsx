@@ -29,7 +29,7 @@ function getTileLabel(run: RunRecord): string {
 export default function HistoryTiles() {
   const { state } = useGameEngine();
   const history = state.history;
-  const activeInteraction = state.activeInteraction;
+  const firstInteraction = state.interactionQueue[0];
 
   if (history.length === 0) return null;
 
@@ -37,7 +37,7 @@ export default function HistoryTiles() {
     <div style={containerStyle}>
       <div style={scrollStyle}>
         {history.map((run) => {
-          const isSource = activeInteraction && run.id === activeInteraction.ruleId.split('-').slice(1, -1).join('-');
+          const isSource = firstInteraction && run.id === firstInteraction.ruleId.split('-').slice(1, -1).join('-');
           return (
             <motion.div
               key={run.id}
