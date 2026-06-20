@@ -167,7 +167,7 @@ export default function FanCard({
             : isTarget
               ? '0 0 14px rgba(200,120,80,0.5)'
               : 'none',
-        pointerEvents: 'auto',
+        pointerEvents: isExpanded ? 'auto' : 'none',
       }}
       initial={false}
       animate={{
