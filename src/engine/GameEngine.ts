@@ -61,6 +61,7 @@ export class GameEngine {
       eventLog: [],
       chainDepth: 0,
       debug: false,
+      swirlActive: false,
     };
   }
 
@@ -96,6 +97,7 @@ export class GameEngine {
     this.state.happening = null;
     this.state.selectedHappeningChoice = null;
     this.state.chainDepth = 0;
+    this.state.swirlActive = false;
 
     this.bus.emit('turn-started', { question, availableMethods });
     this.notify();
@@ -108,6 +110,20 @@ export class GameEngine {
     }
 
     this.state.selectedMethod = methodType;
+
+    // Happening gate: trigger happening scene directly instead of minigame
+    if (methodType === 'happening') {
+      // Remove happening from the pool so it isn't offered again this turn
+      const happeningIdx = this.state.availableMethods.indexOf('happening');
+      if (happeningIdx !== -1) {
+        this.state.availableMethods = this.state.availableMethods.filter(
+          (_m, i) => i !== happeningIdx,
+        );
+      }
+      this.triggerHappening();
+      return;
+    }
+
     this.state.screen = 'minigame';
     this.notify();
   }
@@ -164,13 +180,15 @@ export class GameEngine {
         // InteractionLayer will clear and we need to go to result
         // We'll handle this in clearActiveInteraction
       } else {
-        this.state.screen = 'result';
+        this.state.swirlActive = true;
       }
     } else {
+      // Always remove the used method from the pool (before refill or happening)
+      this.orchestrator.removeUsedMethod(result.type as 'tarot' | 'd20' | 'iching');
+
       // More minigames to go — check for happening chance
       const goingBackToSelect = () => {
-        // Remove the used method and refill pool
-        this.orchestrator.removeUsedMethod(result.type as 'tarot' | 'd20' | 'iching');
+        // Refill the pool with a new method
         const affinities = this.affinityEngine.getState();
         this.state.availableMethods = this.orchestrator.refillPool(
           this.state.questionType!,
@@ -216,11 +234,22 @@ export class GameEngine {
     }
 
     if (this.state.minigamesCompleted >= this.minigamesPerTurn) {
-      this.state.screen = 'result';
+      this.state.swirlActive = true;
     } else {
       this.state.screen = 'method-select';
       this.state.selectedMethod = null;
     }
+    this.notify();
+  }
+
+  finishSwirl(): void {
+    this.state.swirlActive = false;
+    this.state.screen = 'result';
+    this.notify();
+  }
+
+  startDebugSwirl(): void {
+    this.state.swirlActive = true;
     this.notify();
   }
 
@@ -425,6 +454,7 @@ export class GameEngine {
     this.state.happening = null;
     this.state.selectedHappeningChoice = null;
     this.state.chainDepth = 0;
+    this.state.swirlActive = false;
     this.notify();
   }
 
