@@ -1,6 +1,7 @@
 import type { InteractionRule, InteractionEvent, PendingEffect, SlotResult } from './types';
 import type { TagSystem } from './TagSystem';
 import type { EventBus } from './EventBus';
+import { bandOf } from '../data/affinities';
 
 const MAX_CHAIN_DEPTH = 3;
 
@@ -32,7 +33,8 @@ export class InteractionResolver {
       if (!this.tagSystem.hasAllTags(sourceResult, rule.trigger.sourceTags)) {
         // Also check if the source itself carries the affinity-dominant tag
         const sourceTags = [...rule.trigger.sourceTags];
-        if (sourceTags.includes('chaos-dominant') && affinities.chaos >= 0.5) {
+        const chaosBand = bandOf(affinities.chaos ?? 0);
+        if (sourceTags.includes('chaos-dominant') && (chaosBand === 'ascendant' || chaosBand === 'dominant')) {
           // Matched via affinity injection — continue
         } else {
           continue;

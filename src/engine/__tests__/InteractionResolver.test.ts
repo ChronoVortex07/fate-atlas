@@ -45,7 +45,7 @@ describe('InteractionResolver', () => {
     const resolver = new InteractionResolver(tagSystem, bus);
     const slots: (SlotResult | null)[] = [foolCard, diceRoll, null];
 
-    const events = resolver.checkAndResolve(slots, 0, { chaos: 0.3, order: 0.5 }, INTERACTION_RULES);
+    const events = resolver.checkAndResolve(slots, 0, { chaos: 30, order: 50 }, INTERACTION_RULES);
 
     const rerollEvent = events.find((e) => e.ruleId === 'fool-reroll');
     expect(rerollEvent).toBeTruthy();
@@ -56,7 +56,7 @@ describe('InteractionResolver', () => {
     const resolver = new InteractionResolver(tagSystem, bus);
     const slots: (SlotResult | null)[] = [foolCard, diceRoll, null];
 
-    const events = resolver.checkAndResolve(slots, 1, { chaos: 0.3, order: 0.5 }, INTERACTION_RULES);
+    const events = resolver.checkAndResolve(slots, 1, { chaos: 30, order: 50 }, INTERACTION_RULES);
 
     const flipEvent = events.find((e) => e.ruleId === 'critical-low-flip');
     expect(flipEvent).toBeTruthy();
@@ -72,7 +72,7 @@ describe('InteractionResolver', () => {
     } as SlotResult;
     const slots: (SlotResult | null)[] = [ichingHex, happeningSlot, null];
 
-    const events = resolver.checkAndResolve(slots, 0, { chaos: 0.3, order: 0.5 }, INTERACTION_RULES);
+    const events = resolver.checkAndResolve(slots, 0, { chaos: 30, order: 50 }, INTERACTION_RULES);
 
     const boostEvent = events.find((e) => e.ruleId === 'iching-happening-boost');
     expect(boostEvent).toBeTruthy();
@@ -91,7 +91,7 @@ describe('InteractionResolver', () => {
     } as SlotResult;
     const slots: (SlotResult | null)[] = [noMatch, null, null];
 
-    const events = resolver.checkAndResolve(slots, 0, { chaos: 0.3, order: 0.5 }, INTERACTION_RULES);
+    const events = resolver.checkAndResolve(slots, 0, { chaos: 30, order: 50 }, INTERACTION_RULES);
     expect(events).toHaveLength(0);
   });
 });
