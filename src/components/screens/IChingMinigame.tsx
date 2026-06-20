@@ -31,6 +31,11 @@ export default function IChingMinigame() {
     return () => clearTimeout(timer);
   }, [done, hexagramResult, engine]);
 
+  const committedSlot =
+    state.activeSlotIndex !== null ? state.turnResults[state.activeSlotIndex] : undefined;
+  const displayHex =
+    committedSlot && committedSlot.type === 'iching' ? committedSlot : hexagramResult;
+
   return (
     <motion.div
       style={containerStyle}
@@ -56,14 +61,20 @@ export default function IChingMinigame() {
             <span style={lineLabelStyle}>{LINE_LABELS[castCount]}</span>
           </motion.button>
         ) : (
-          <motion.div style={hexagramResultStyle} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8 }}>
-            <div style={hexagramSymbolStyle}>{hexagramResult?.symbol}</div>
-            <div style={hexagramNameStyle}>{hexagramResult?.name}</div>
-            <div style={hexagramNumberStyle}>Hexagram #{hexagramResult?.hexagramNumber}</div>
-            <p style={hexagramJudgmentStyle}>{hexagramResult?.judgment}</p>
-            {hexagramResult && hexagramResult.changingLines.length > 0 && (
+          <motion.div
+            key={displayHex ? `${displayHex.hexagramNumber}-${displayHex.changingLines.join(',')}` : 'hex'}
+            style={hexagramResultStyle}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8 }}
+          >
+            <div style={hexagramSymbolStyle}>{displayHex?.symbol}</div>
+            <div style={hexagramNameStyle}>{displayHex?.name}</div>
+            <div style={hexagramNumberStyle}>Hexagram #{displayHex?.hexagramNumber}</div>
+            <p style={hexagramJudgmentStyle}>{displayHex?.judgment}</p>
+            {displayHex && displayHex.changingLines.length > 0 && (
               <div style={changingLinesStyle}>
-                Changing lines: {hexagramResult.changingLines.join(', ')}
+                Changing lines: {displayHex.changingLines.join(', ')}
               </div>
             )}
           </motion.div>

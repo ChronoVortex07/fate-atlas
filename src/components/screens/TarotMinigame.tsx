@@ -48,6 +48,21 @@ export default function TarotMinigame() {
     return () => clearTimeout(timer);
   }, [phase, chosenIndex, willReverse, faceDownCards, engine]);
 
+  // Once committed, the engine owns this slot. Prefer it so flip/mirror are
+  // reflected; fall back to the locally chosen card before commit.
+  const committedSlot =
+    state.activeSlotIndex !== null ? state.turnResults[state.activeSlotIndex] : undefined;
+  const engineCard = committedSlot && committedSlot.type === 'tarot' ? committedSlot : null;
+  const localCard = chosenIndex !== null ? faceDownCards[chosenIndex] : null;
+  const localOrientation: 'upright' | 'reversed' | null = localCard
+    ? (willReverse
+        ? (localCard.orientation === 'upright' ? 'reversed' : 'upright')
+        : localCard.orientation)
+    : null;
+  const displaySymbol = engineCard?.symbol ?? localCard?.symbol ?? '';
+  const displayName = engineCard?.name ?? localCard?.name ?? '';
+  const displayOrientation = engineCard?.orientation ?? localOrientation;
+
   return (
     <motion.div
       style={containerStyle}
@@ -101,14 +116,18 @@ export default function TarotMinigame() {
           </motion.div>
         )}
 
-        {phase === 'revealed' && chosenIndex !== null && (
-          <motion.div style={revealStyle} initial={{ opacity: 0, scale: 0.8, rotateY: 180 }} animate={{ opacity: 1, scale: 1, rotateY: 0 }} transition={{ duration: 0.8, ease: 'easeOut' }}>
-            <div style={revealedSymbolStyle}>{faceDownCards[chosenIndex].symbol}</div>
-            <div style={revealedNameStyle}>{faceDownCards[chosenIndex].name}</div>
-            <div style={{ ...revealedOrientStyle, color: willReverse !== (faceDownCards[chosenIndex].orientation === 'reversed') ? '#d4a854' : '#7b9ec7' }}>
-              {willReverse !== (faceDownCards[chosenIndex].orientation === 'reversed')
-                ? `▼ ${faceDownCards[chosenIndex].orientation === 'upright' ? 'Reversed' : 'Upright'}`
-                : `▲ ${faceDownCards[chosenIndex].orientation === 'upright' ? 'Upright' : 'Reversed'}`}
+        {phase === 'revealed' && displayOrientation && (
+          <motion.div
+            key={`${displayName}-${displayOrientation}`}
+            style={revealStyle}
+            initial={{ opacity: 0, scale: 0.8, rotateY: 180 }}
+            animate={{ opacity: 1, scale: 1, rotateY: 0 }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+          >
+            <div style={revealedSymbolStyle}>{displaySymbol}</div>
+            <div style={revealedNameStyle}>{displayName}</div>
+            <div style={{ ...revealedOrientStyle, color: displayOrientation === 'reversed' ? '#d4a854' : '#7b9ec7' }}>
+              {displayOrientation === 'reversed' ? '▼ Reversed' : '▲ Upright'}
             </div>
           </motion.div>
         )}
