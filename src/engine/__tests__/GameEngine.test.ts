@@ -269,7 +269,6 @@ describe('GameEngine — new lifecycle', () => {
 
     const beforeResult = engine.getState().turnResults[0];
     expect(beforeResult.type).toBe('d20');
-    const beforeValue = (beforeResult as { result: number }).result;
 
     engine.advanceInteractionQueue();
 
