@@ -189,8 +189,8 @@ export class GameEngine {
 
       const chaos = this.affinityEngine.getState().chaos;
       if (chaos >= 0.4 && Math.random() < chaos * 0.5) {
-        this.state.pendingHappening = true;
         this.triggerHappening();
+        return;
       } else {
         const affinities = this.affinityEngine.getState();
         this.state.availableMethods = this.orchestrator.refillPool(
