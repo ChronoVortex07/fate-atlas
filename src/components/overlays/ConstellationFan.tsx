@@ -206,14 +206,15 @@ export default function ConstellationFan({ results, activeSlots }: Props) {
       <div
         style={{
           position: 'absolute',
-          bottom: isDesktop ? '76px' : '56px',
+          bottom: '14px',
           right: isDesktop ? undefined : '14px',
           left: isDesktop ? 0 : undefined,
           width: isDesktop ? '100%' : '220px',
           height: isDesktop ? '320px' : '220px',
           zIndex: expanded ? 16 : 8,
-          pointerEvents: isDesktop && !expanded ? 'none' : undefined,
+          cursor: !expanded ? 'pointer' : undefined,
         }}
+        onClick={!expanded ? handleToggle : undefined}
       >
         {results
           .map((result, i) => ({ result, i }))
@@ -238,76 +239,36 @@ export default function ConstellationFan({ results, activeSlots }: Props) {
           })}
       </div>
 
-      {/* ✧ FAB button */}
-      <motion.button
-        type="button"
-        style={{
-          position: 'absolute',
-          bottom: '14px',
-          left: isDesktop ? '50%' : undefined,
-          right: isDesktop ? undefined : '14px',
-          transform: isDesktop ? 'translateX(-50%)' : undefined,
-          width: isDesktop ? '48px' : '42px',
-          height: isDesktop ? '48px' : '42px',
-          background: '#0d1220',
-          border: '1.5px solid #d4a854',
-          borderRadius: '50%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 17,
-          boxShadow: expanded
-            ? '0 0 24px rgba(212,168,84,0.5)'
-            : '0 0 16px rgba(212,168,84,0.3)',
-          cursor: 'pointer',
-          outline: 'none',
-        }}
-        animate={{ rotate: expanded ? 45 : 0 }}
-        transition={{ duration: 0.3 }}
-        onClick={handleToggle}
-        whileTap={{ scale: 0.9 }}
-      >
-        <span
+      {/* Collapsed hint — subtle ✧ indicator near the deck */}
+      {!expanded && (
+        <motion.div
           style={{
-            fontSize: isDesktop ? '1.15rem' : '1rem',
-            color: '#d4a854',
-            lineHeight: 1,
+            position: 'absolute',
+            bottom: '4px',
+            left: isDesktop ? '50%' : undefined,
+            right: isDesktop ? undefined : '14px',
+            transform: isDesktop ? 'translateX(-50%)' : undefined,
+            zIndex: 9,
+            pointerEvents: 'none',
+            opacity: 0.4,
           }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.4 }}
         >
-          ✧
-        </span>
-
-        {/* Count badge */}
-        {results.length > 0 && (
-          <div
+          <span
             style={{
-              position: 'absolute',
-              top: '-5px',
-              right: '-5px',
-              width: isDesktop ? '20px' : '18px',
-              height: isDesktop ? '20px' : '18px',
-              background: '#c75b4a',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 18,
+              fontSize: '0.65rem',
+              color: '#d4a854',
+              lineHeight: 1,
+              fontFamily: "'Inter', sans-serif",
+              fontWeight: 300,
+              letterSpacing: '0.05em',
             }}
           >
-            <span
-              style={{
-                fontFamily: "'Inter', sans-serif",
-                fontWeight: 600,
-                fontSize: isDesktop ? '0.55rem' : '0.5rem',
-                color: '#fff',
-                lineHeight: 1,
-              }}
-            >
-              {results.length}
-            </span>
-          </div>
-        )}
-      </motion.button>
+            {results.length} ✧ tap to expand
+          </span>
+        </motion.div>
+      )}
     </>
   );
 }
