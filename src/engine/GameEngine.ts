@@ -4,7 +4,8 @@ import { TagSystem } from './TagSystem';
 import { AffinityEngine } from './AffinityEngine';
 import { TurnOrchestrator } from './TurnOrchestrator';
 import { InteractionResolver } from './InteractionResolver';
-import { SynthesisEngine } from './SynthesisEngine';
+import { ReadingPlanner } from './ReadingPlanner';
+import { NarrativeAssembler } from './NarrativeAssembler';
 import { CHAOS_AFFINITY, ORDER_AFFINITY } from '../data/affinities';
 import { INTERACTION_RULES } from '../data/interactions';
 import { selectHappening } from '../data/happenings';
@@ -18,7 +19,8 @@ export class GameEngine {
   private affinityEngine: AffinityEngine;
   private orchestrator: TurnOrchestrator;
   private interactionResolver: InteractionResolver;
-  private synthesisEngine: SynthesisEngine;
+  private readingPlanner: ReadingPlanner;
+  private narrativeAssembler: NarrativeAssembler;
 
   private state: GameState;
   private cachedSnapshot: GameState;
@@ -33,7 +35,8 @@ export class GameEngine {
     this.affinityEngine = new AffinityEngine([CHAOS_AFFINITY, ORDER_AFFINITY]);
     this.orchestrator = new TurnOrchestrator(this.bus);
     this.interactionResolver = new InteractionResolver(this.tagSystem, this.bus);
-    this.synthesisEngine = new SynthesisEngine();
+    this.readingPlanner = new ReadingPlanner();
+    this.narrativeAssembler = new NarrativeAssembler();
     this.state = this.defaultState();
     this.cachedSnapshot = JSON.parse(JSON.stringify(this.state)) as GameState;
   }
@@ -100,6 +103,8 @@ export class GameEngine {
     this.state.happening = null;
     this.state.selectedHappeningChoice = null;
     this.state.chainDepth = 0;
+
+    this.narrativeAssembler.resetRotation();
 
     this.bus.emit('turn-started', { question, availableMethods });
     this.notify();
@@ -190,9 +195,12 @@ export class GameEngine {
         return;
       } else {
         const affinities = this.affinityEngine.getState();
+        const gaps = this.readingPlanner.analyzeGaps(this.state.turnResults);
+        const bias = this.readingPlanner.getBiasForRefill(gaps);
         this.state.availableMethods = this.orchestrator.refillPool(
           this.state.questionType!,
           affinities,
+          bias,
         );
         this.state.screen = 'method-select';
         this.state.selectedMethod = null;
@@ -243,9 +251,12 @@ export class GameEngine {
       this.state.screen = 'result';
     } else {
       const affinities = this.affinityEngine.getState();
+      const gaps = this.readingPlanner.analyzeGaps(this.state.turnResults);
+      const bias = this.readingPlanner.getBiasForRefill(gaps);
       this.state.availableMethods = this.orchestrator.refillPool(
         this.state.questionType!,
         affinities,
+        bias,
       );
       this.state.screen = 'method-select';
       this.state.selectedMethod = null;
@@ -345,14 +356,17 @@ export class GameEngine {
     const results = this.state.turnResults;
     if (results.length === 0) return;
 
-    const nonHappeningResults = results.filter((r) => r.type !== 'happening');
-    if (nonHappeningResults.length === 0) return;
-
+    const question = this.state.questionType!;
     const affinities = this.affinityEngine.getState();
-    const synthesisResult = this.synthesisEngine.synthesize(
-      nonHappeningResults,
-      this.state.questionType!,
-      this.state.interactions,
+
+    // Aggregate all results
+    const aggregated = this.readingPlanner.aggregate(results, question);
+
+    // Assemble narrative
+    const synthesisResult = this.narrativeAssembler.assemble(
+      aggregated,
+      results,
+      question,
       affinities,
     );
 
@@ -495,13 +509,18 @@ export class GameEngine {
   generateLLMPrompt(): string {
     const results = this.state.turnResults;
     if (results.length === 0) return '';
-    const nonHappening = results.filter((r) => r.type !== 'happening');
-    if (nonHappening.length === 0) return '';
-    return this.synthesisEngine.generateLLMPrompt({
-      question: this.state.questionType!,
-      slots: nonHappening,
+    const question = this.state.questionType!;
+    const affinities = this.affinityEngine.getState();
+
+    // Re-aggregate for the prompt
+    const aggregated = this.readingPlanner.aggregate(results, question);
+
+    return this.narrativeAssembler.generateLLMPrompt({
+      question,
+      slots: results,
       interactions: this.state.interactions,
-      affinities: this.affinityEngine.getState(),
+      affinities,
+      aggregated,
     });
   }
 

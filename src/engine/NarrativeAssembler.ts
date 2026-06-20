@@ -55,7 +55,7 @@ export class NarrativeAssembler {
    */
   assemble(
     aggregated: AggregatedReading,
-    results: SlotResult[],
+    _results: SlotResult[],
     question: QuestionType,
     affinities: Record<string, number>,
   ): SynthesisResult {

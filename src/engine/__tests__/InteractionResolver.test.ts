@@ -14,19 +14,28 @@ const foolCard: SlotResult = {
   orientation: 'upright', symbol: '☉',
   meaningUpright: '...', meaningReversed: '...',
   tags: ['draw', 'random', 'major-arcana', 'reversible', 'fool-archetype', 'upright'],
-};
+  themes: ['renewal', 'mystery'],
+  dimensions: { favorability: 0.5, certainty: -1.5, volatility: 1.5 },
+  modifierRoles: ['subject'],
+} as SlotResult;
 
 const diceRoll: SlotResult = {
   type: 'd20', result: 3, threshold: 'critical-low',
   interpretation: '...',
   tags: ['roll', 'random', 'numeric', 'threshold', 'low', 'critical-low', 'pending'],
-};
+  themes: ['upheaval', 'conflict'],
+  dimensions: { favorability: -2.0, certainty: 0.0, volatility: 1.5 },
+  modifierRoles: ['effect'],
+} as SlotResult;
 
 const ichingHex: SlotResult = {
   type: 'iching', hexagramNumber: 27, name: 'Nourishment',
   symbol: '䷛', judgment: '...', changingLines: [3, 5],
   tags: ['draw', 'random', 'binary', 'iching', 'reversible', 'changing-lines'],
-};
+  themes: ['harmony', 'renewal'],
+  dimensions: { favorability: 1.0, certainty: 0.5, volatility: -0.5 },
+  modifierRoles: ['subject', 'action', 'effect'],
+} as SlotResult;
 
 describe('InteractionResolver', () => {
   const tagSystem = new TagSystem();
@@ -59,7 +68,8 @@ describe('InteractionResolver', () => {
     const happeningSlot: SlotResult = {
       type: 'happening', id: 'crossroads', scene: '...', choices: [],
       tags: ['event', 'happening', 'choice', 'affinity-shift', 'pending'],
-    };
+      themes: ['mystery', 'transformation'], dimensions: { favorability: 0.0, certainty: -1.5, volatility: 1.5 }, modifierRoles: ['action'],
+    } as SlotResult;
     const slots: (SlotResult | null)[] = [ichingHex, happeningSlot, null];
 
     const events = resolver.checkAndResolve(slots, 0, { chaos: 0.3, order: 0.5 }, INTERACTION_RULES);
@@ -75,7 +85,10 @@ describe('InteractionResolver', () => {
       orientation: 'upright', symbol: '⭐',
       meaningUpright: 'Hope...', meaningReversed: 'Despair...',
       tags: ['draw', 'random', 'major-arcana', 'reversible', 'star-archetype'],
-    };
+      themes: ['renewal', 'harmony'],
+      dimensions: { favorability: 2.0, certainty: -0.5, volatility: 0.5 },
+      modifierRoles: ['subject', 'effect'],
+    } as SlotResult;
     const slots: (SlotResult | null)[] = [noMatch, null, null];
 
     const events = resolver.checkAndResolve(slots, 0, { chaos: 0.3, order: 0.5 }, INTERACTION_RULES);
@@ -94,7 +107,10 @@ describe('InteractionResolver — pending effects', () => {
     meaningUpright: 'New beginnings',
     meaningReversed: 'Recklessness',
     tags: ['major-arcana', 'fool-archetype', 'reversible'],
-  };
+    themes: ['renewal', 'mystery'],
+    dimensions: { favorability: 0.5, certainty: -1.5, volatility: 1.5 },
+    modifierRoles: ['subject'],
+  } as SlotResult;
 
   const diceResult: SlotResult = {
     type: 'd20',
@@ -102,7 +118,10 @@ describe('InteractionResolver — pending effects', () => {
     threshold: 'critical-low',
     interpretation: 'Dire outcome',
     tags: ['roll', 'numeric', 'threshold', 'critical-low'],
-  };
+    themes: ['upheaval', 'conflict'],
+    dimensions: { favorability: -2.0, certainty: 0.0, volatility: 1.5 },
+    modifierRoles: ['effect'],
+  } as SlotResult;
 
   it('checkPendingEffects: matches tags and returns matched + remaining', () => {
     const resolver = makeResolver();

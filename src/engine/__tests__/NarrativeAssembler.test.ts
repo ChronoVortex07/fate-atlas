@@ -10,15 +10,15 @@ const makeSlot = (type: string, overrides: Record<string, unknown> = {}): SlotRe
     ...overrides,
   };
   if (type === 'tarot') {
-    return { ...base, id: 'test', name: 'The Fool', number: 0, orientation: 'upright' as const, symbol: '☉', meaningUpright: 'New beginnings', meaningReversed: 'Recklessness' } as SlotResult;
+    return { ...base, id: 'test', name: 'The Fool', number: 0, orientation: 'upright' as const, symbol: '☉', meaningUpright: 'New beginnings', meaningReversed: 'Recklessness' } as unknown as SlotResult;
   }
   if (type === 'd20') {
-    return { ...base, result: 10, threshold: 'neutral' as const, interpretation: 'Steady' } as SlotResult;
+    return { ...base, result: 10, threshold: 'neutral' as const, interpretation: 'Steady' } as unknown as SlotResult;
   }
   if (type === 'iching') {
-    return { ...base, hexagramNumber: 1, name: 'Creative', symbol: '䷀', judgment: 'Success', changingLines: [] } as SlotResult;
+    return { ...base, hexagramNumber: 1, name: 'Creative', symbol: '䷀', judgment: 'Success', changingLines: [] } as unknown as SlotResult;
   }
-  return base as SlotResult;
+  return base as unknown as SlotResult;
 };
 
 const baseAggregated: AggregatedReading = {
@@ -60,7 +60,7 @@ describe('NarrativeAssembler', () => {
 
   it('opening falls back when no dominant theme', () => {
     // Use a theme not in the template set
-    const agg = { ...baseAggregated, dominantTheme: 'unknown_theme' as const };
+    const agg = { ...baseAggregated, dominantTheme: 'unknown_theme' as unknown as AggregatedReading['dominantTheme'] };
     const result = assembler.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
     // Should use fallback noDominantTheme template
     expect(result.paragraphs[0].length).toBeGreaterThan(0);
@@ -124,7 +124,7 @@ describe('NarrativeAssembler', () => {
       dominantTheme: 'upheaval' as const,
       secondaryTheme: 'harmony' as const,
       hasTension: true,
-      tensionPair: ['upheaval' as const, 'harmony' as const],
+      tensionPair: ['upheaval', 'harmony'] as [AggregatedReading['dominantTheme'], AggregatedReading['dominantTheme']],
     };
     const result = assembler.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
     expect(result.paragraphs.some((p) => p.includes('Upheaval') && p.includes('harmony'))).toBe(true);
@@ -195,7 +195,7 @@ describe('NarrativeAssembler', () => {
       },
     };
     const result1 = assembler4.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
-    const result2 = assembler4.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
+    assembler4.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
     // Third call wraps back to index 0 (mystery has 2 openings)
     const result3 = assembler4.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
     expect(result3.paragraphs[0]).toBe(result1.paragraphs[0]);

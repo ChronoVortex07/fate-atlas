@@ -10,6 +10,9 @@ const reversedCard: TarotResult = {
   orientation: 'reversed', symbol: '☉',
   meaningUpright: '...', meaningReversed: '...',
   tags: ['draw', 'random', 'major-arcana', 'reversible', 'fool-archetype', 'reversed'],
+  themes: ['stagnation', 'illumination'],
+  dimensions: { favorability: -0.5, certainty: -1.5, volatility: 1.5 },
+  modifierRoles: ['subject'],
 };
 
 const uprightCard: TarotResult = {
@@ -17,6 +20,9 @@ const uprightCard: TarotResult = {
   orientation: 'upright', symbol: '⭐',
   meaningUpright: 'Hope...', meaningReversed: 'Despair...',
   tags: ['draw', 'random', 'major-arcana', 'reversible', 'star-archetype', 'upright'],
+  themes: ['renewal', 'harmony'],
+  dimensions: { favorability: 2.0, certainty: -0.5, volatility: 0.5 },
+  modifierRoles: ['subject', 'effect'],
 };
 
 describe('AffinityEngine', () => {

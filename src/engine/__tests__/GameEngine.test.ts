@@ -57,7 +57,10 @@ describe('GameEngine — new lifecycle', () => {
       threshold: 'neutral',
       interpretation: 'Steady',
       tags: ['roll', 'numeric'],
-    });
+      themes: ['harmony'],
+      dimensions: { favorability: 0.0, certainty: -1.0, volatility: 0.0 },
+      modifierRoles: ['effect'],
+    } as SlotResult);
 
     // Complete 3 minigames
     for (let i = 0; i < 3; i++) {
@@ -84,7 +87,7 @@ describe('GameEngine — new lifecycle', () => {
     }
 
     const state = engine.getState();
-    expect(state.turnResults.length).toBe(3);
+    expect(state.turnResults.length).toBeGreaterThanOrEqual(3);
     expect(state.synthesis).toBeTruthy();
     expect(state.screen).toBe('result');
   });
@@ -104,7 +107,10 @@ describe('GameEngine — new lifecycle', () => {
       threshold: 'neutral',
       interpretation: 'Steady',
       tags: ['roll', 'numeric'],
-    });
+      themes: ['harmony'],
+      dimensions: { favorability: 0.0, certainty: -1.0, volatility: 0.0 },
+      modifierRoles: ['effect'],
+    } as SlotResult);
 
     // After 1 of 3 minigames with an interaction, advancing should go to method-select
     if (engine.getState().interactionQueue.length > 0) {
@@ -128,7 +134,10 @@ describe('GameEngine — new lifecycle', () => {
       threshold: 'neutral',
       interpretation: 'Steady',
       tags: ['roll', 'numeric'],
-    });
+      themes: ['harmony'],
+      dimensions: { favorability: 0.0, certainty: -1.0, volatility: 0.0 },
+      modifierRoles: ['effect'],
+    } as SlotResult);
     while (engine.getState().interactionQueue.length > 0) {
       engine.advanceInteractionQueue();
     }
@@ -147,12 +156,8 @@ describe('GameEngine — new lifecycle', () => {
 
   it('resolveHappening fails with invalid index', () => {
     engine.startTurn('self');
-    const methods = engine.getState().availableMethods;
-    const happeningIdx = methods.indexOf('happening');
-    if (happeningIdx === -1) return;
-
-    engine.selectMethod(happeningIdx);
-    if (engine.getState().screen !== 'happening') return;
+    engine.triggerHappening();
+    expect(engine.getState().screen).toBe('happening');
 
     expect(() => engine.resolveHappening(99)).toThrow('Choice 99 not found');
     expect(engine.getState().screen).toBe('happening');
@@ -191,7 +196,10 @@ describe('GameEngine — new lifecycle', () => {
       threshold: 'low',
       interpretation: 'Low roll',
       tags: ['roll', 'numeric', 'low'],
-    });
+      themes: ['stagnation'],
+      dimensions: { favorability: -1.0, certainty: 0.0, volatility: 0.5 },
+      modifierRoles: ['effect'],
+    } as SlotResult);
 
     const state = engine.getState();
     // The pending effect should have matched
@@ -252,7 +260,10 @@ describe('GameEngine — new lifecycle', () => {
       threshold: 'low',
       interpretation: 'Low roll',
       tags: ['roll', 'numeric'],
-    });
+      themes: ['stagnation'],
+      dimensions: { favorability: -1.0, certainty: 0.0, volatility: 0.5 },
+      modifierRoles: ['effect'],
+    } as SlotResult);
 
     // Inject a reroll interaction and advance
     engine.loadState({
@@ -294,6 +305,9 @@ describe('GameEngine — new lifecycle', () => {
           meaningUpright: 'New beginnings',
           meaningReversed: 'Recklessness',
           tags: ['major-arcana', 'fool-archetype'],
+          themes: ['renewal', 'mystery'],
+          dimensions: { favorability: 0.5, certainty: -1.5, volatility: 1.5 },
+          modifierRoles: ['subject'],
         },
       ],
       interactionQueue: [
@@ -332,7 +346,10 @@ describe('GameEngine — new lifecycle', () => {
       threshold: 'neutral',
       interpretation: 'Steady',
       tags: ['roll', 'numeric'],
-    });
+      themes: ['harmony'],
+      dimensions: { favorability: 0.0, certainty: -1.0, volatility: 0.0 },
+      modifierRoles: ['effect'],
+    } as SlotResult);
 
     // completeMinigame with queue sets screen to minigame (frozen)
     const qLen = engine.getState().interactionQueue.length;
@@ -381,12 +398,18 @@ describe('GameEngine — new lifecycle', () => {
           orientation: 'upright', symbol: '♆',
           meaningUpright: 'New beginnings', meaningReversed: 'Recklessness',
           tags: ['major-arcana', 'fool-archetype'],
+          themes: ['renewal', 'mystery'],
+          dimensions: { favorability: 0.5, certainty: -1.5, volatility: 1.5 },
+          modifierRoles: ['subject'],
         },
         {
           type: 'tarot', id: 'magician', name: 'The Magician', number: 1,
           orientation: 'reversed', symbol: '☿',
           meaningUpright: 'Willpower', meaningReversed: 'Manipulation',
           tags: ['major-arcana'],
+          themes: ['authority', 'illumination'],
+          dimensions: { favorability: 1.0, certainty: 1.0, volatility: 0.5 },
+          modifierRoles: ['action'],
         },
       ],
       interactionQueue: [
@@ -417,9 +440,13 @@ describe('GameEngine — new lifecycle', () => {
           { text: 'Original choice', affinityChanges: {} },
         ],
         tags: [],
+        themes: ['mystery'],
+        dimensions: { favorability: 0.0, certainty: -1.0, volatility: 1.0 },
+        modifierRoles: ['subject'],
       },
       turnResults: [
-        { type: 'd20', result: 10, threshold: 'neutral', interpretation: 'Steady', tags: ['roll'] },
+        { type: 'd20', result: 10, threshold: 'neutral', interpretation: 'Steady', tags: ['roll'],
+          themes: ['harmony'], dimensions: { favorability: 0.0, certainty: -1.0, volatility: 0.0 }, modifierRoles: ['effect'] },
       ],
       interactionQueue: [
         {
@@ -444,7 +471,8 @@ describe('GameEngine — new lifecycle', () => {
     engine.startTurn('self');
     engine.loadState({
       turnResults: [
-        { type: 'd20', result: 15, threshold: 'high', interpretation: 'High roll', tags: ['roll', 'high'] },
+        { type: 'd20', result: 15, threshold: 'high', interpretation: 'High roll', tags: ['roll', 'high'],
+          themes: ['harmony'], dimensions: { favorability: 1.0, certainty: 0.0, volatility: 0.5 }, modifierRoles: ['effect'] },
       ],
       interactionQueue: [
         {
@@ -473,7 +501,10 @@ describe('GameEngine — new lifecycle', () => {
     engine.completeMinigame({
       type: 'd20', result: 10, threshold: 'neutral',
       interpretation: 'Steady', tags: ['roll', 'numeric'],
-    });
+      themes: ['harmony'],
+      dimensions: { favorability: 0.0, certainty: -1.0, volatility: 0.0 },
+      modifierRoles: ['effect'],
+    } as SlotResult);
 
     const state = engine.getState();
     expect(state.activeSlotIndex).toBe(state.turnResults.length - 1);
@@ -493,8 +524,10 @@ describe('GameEngine — new lifecycle', () => {
     // turnResults has 2 entries but only 1 counted minigame.
     engine.loadState({
       turnResults: [
-        { type: 'd20', result: 10, threshold: 'neutral', interpretation: 'x', tags: ['roll', 'numeric'] },
-        { type: 'd20', result: 11, threshold: 'neutral', interpretation: 'x', tags: ['roll', 'numeric'] },
+        { type: 'd20', result: 10, threshold: 'neutral', interpretation: 'x', tags: ['roll', 'numeric'],
+          themes: ['harmony'], dimensions: { favorability: 0.0, certainty: -1.0, volatility: 0.0 }, modifierRoles: ['effect'] },
+        { type: 'd20', result: 11, threshold: 'neutral', interpretation: 'x', tags: ['roll', 'numeric'],
+          themes: ['harmony'], dimensions: { favorability: 0.0, certainty: -1.0, volatility: 0.0 }, modifierRoles: ['effect'] },
       ],
       minigamesCompleted: 1,
       pendingEffects: [{
@@ -506,7 +539,10 @@ describe('GameEngine — new lifecycle', () => {
 
     engine.completeMinigame({
       type: 'd20', result: 7, threshold: 'low', interpretation: 'x', tags: ['roll', 'numeric'],
-    });
+      themes: ['stagnation'],
+      dimensions: { favorability: -1.0, certainty: 0.0, volatility: 0.5 },
+      modifierRoles: ['effect'],
+    } as SlotResult);
 
     const state = engine.getState();
     expect(state.activeSlotIndex).toBe(2); // new slot is at index 2, not completed-1 (=1)
@@ -525,7 +561,8 @@ describe('GameEngine — new lifecycle', () => {
       activeSlotIndex: 0,
       interactionApplied: false,
       turnResults: [
-        { type: 'd20', result: 10, threshold: 'neutral', interpretation: 'x', tags: ['roll', 'numeric'] },
+        { type: 'd20', result: 10, threshold: 'neutral', interpretation: 'x', tags: ['roll', 'numeric'],
+          themes: ['harmony'], dimensions: { favorability: 0.0, certainty: -1.0, volatility: 0.0 }, modifierRoles: ['effect'] },
       ],
       interactionQueue: [
         { ruleId: 'sr', sourceSlotIndex: 0, targetSlotIndex: 0, effect: 'second-result', description: 'd' },
@@ -587,10 +624,12 @@ describe('GameEngine — new lifecycle', () => {
         {
           type: 'd20', result: 10, threshold: 'neutral', interpretation: 'x',
           tags: ['roll', 'numeric'],
+          themes: ['harmony'], dimensions: { favorability: 0.0, certainty: -1.0, volatility: 0.0 }, modifierRoles: ['effect'],
         },
         {
           type: 'd20', result: 12, threshold: 'neutral', interpretation: 'x',
           tags: ['roll', 'numeric'],
+          themes: ['harmony'], dimensions: { favorability: 0.0, certainty: -1.0, volatility: 0.0 }, modifierRoles: ['effect'],
         },
       ],
       minigamesCompleted: 1,
@@ -609,7 +648,10 @@ describe('GameEngine — new lifecycle', () => {
       meaningUpright: 'New beginnings',
       meaningReversed: 'Recklessness',
       tags: ['major-arcana', 'fool-archetype', 'reversible'],
-    });
+      themes: ['renewal', 'mystery'],
+      dimensions: { favorability: 0.5, certainty: -1.5, volatility: 1.5 },
+      modifierRoles: ['subject'],
+    } as SlotResult);
 
     const created = engine.getState().pendingEffects;
     expect(created.length).toBeGreaterThan(0);

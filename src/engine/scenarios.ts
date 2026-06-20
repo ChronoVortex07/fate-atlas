@@ -1,4 +1,4 @@
-import type { GameState, PendingEffect } from './types';
+import type { GameState, PendingEffect, SlotResult } from './types';
 import { MAJOR_ARCANA } from '../data/tarot';
 
 export interface ScenarioPreset {
@@ -83,7 +83,10 @@ export const SCENARIO_PRESETS: ScenarioPreset[] = [
         meaningUpright: card.meaningUpright,
         meaningReversed: card.meaningReversed,
         tags: ['draw', 'random', 'major-arcana', 'reversible', card.archetypeTag, 'upright'],
-      }];
+        themes: ['renewal', 'mystery'],
+        dimensions: { favorability: 0.5, certainty: -1.5, volatility: 1.5 },
+        modifierRoles: ['subject'],
+      } as SlotResult];
       state.minigamesCompleted = 1;
       state.pendingEffects = [foolsRerollEffect];
       state.selectedMethod = 'd20';

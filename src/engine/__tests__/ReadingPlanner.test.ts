@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ReadingPlanner } from '../ReadingPlanner';
-import type { SlotResult, QuestionType } from '../types';
+import type { SlotResult } from '../types';
 
 // Test fixtures
 const makeTarot = (overrides: Partial<SlotResult> = {}): SlotResult => ({
