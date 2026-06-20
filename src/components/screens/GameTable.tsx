@@ -86,6 +86,7 @@ export default function GameTable() {
       {historyOpen && <HistoryModal onClose={() => setHistoryOpen(false)} />}
       <div style={{
         ...centerStyle,
+        ...(showTableau ? { paddingBottom: '100px' } : {}),
         ...(state.interactionQueue.length > 0 ? { pointerEvents: 'none' as const } : {}),
       }}>
         <AnimatePresence mode="wait">
@@ -139,5 +140,4 @@ const centerStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   overflow: 'hidden',
-  paddingBottom: '100px', // leave room for the fan area at bottom
 };
