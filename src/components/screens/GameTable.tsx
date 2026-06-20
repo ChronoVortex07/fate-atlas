@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
 import TitleScreen from './TitleScreen';
@@ -27,6 +27,7 @@ export default function GameTable() {
     targetIndex: null,
     effect: null,
   });
+  const [sequencerReady, setSequencerReady] = useState(false);
 
   const showTableau = state.screen !== 'title' && state.screen !== 'question' && state.screen !== 'result';
 
@@ -39,6 +40,21 @@ export default function GameTable() {
     () => setActiveSlots({ sourceIndex: null, targetIndex: null, effect: null }),
     [],
   );
+
+  const handleExitComplete = useCallback(() => {
+    // When the minigame finishes exiting and we're on the interaction screen,
+    // signal that the sequencer can now appear
+    if (state.screen === 'interaction') {
+      setSequencerReady(true);
+    }
+  }, [state.screen]);
+
+  // Reset sequencer readiness when leaving interaction screen or queue empties
+  useEffect(() => {
+    if (state.screen !== 'interaction' || state.interactionQueue.length === 0) {
+      setSequencerReady(false);
+    }
+  }, [state.screen, state.interactionQueue.length]);
 
   const renderCenter = () => {
     switch (state.screen) {
@@ -87,14 +103,14 @@ export default function GameTable() {
       )}
       {historyOpen && <HistoryModal onClose={() => setHistoryOpen(false)} />}
       <div style={centerStyle}>
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="wait" onExitComplete={handleExitComplete}>
           {renderCenter()}
         </AnimatePresence>
       </div>
       {showTableau && (
         <CardTableau results={state.turnResults} activeSlots={activeSlots} />
       )}
-      {state.interactionQueue.length > 0 && (
+      {state.interactionQueue.length > 0 && sequencerReady && (
         <InteractionSequencer
           onActiveSlotsChange={handleActiveSlotsChange}
           onAnimationComplete={handleAnimationComplete}

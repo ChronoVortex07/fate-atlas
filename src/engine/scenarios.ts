@@ -1,5 +1,5 @@
 import type { GameState, PendingEffect } from './types';
-import { drawTarotCard } from '../data/tarot';
+import { MAJOR_ARCANA } from '../data/tarot';
 
 export interface ScenarioPreset {
   id: string;
@@ -72,8 +72,18 @@ export const SCENARIO_PRESETS: ScenarioPreset[] = [
     id: 'fools-reroll',
     label: "Fool's Reroll",
     apply: (state) => {
-      const theFool = drawTarotCard({ chaos: 0.5, order: 0.5 });
-      state.turnResults = [theFool];
+      const card = MAJOR_ARCANA.find((c) => c.id === 'the-fool')!;
+      state.turnResults = [{
+        type: 'tarot',
+        id: card.id,
+        name: card.name,
+        number: card.number,
+        orientation: 'upright',
+        symbol: card.symbol,
+        meaningUpright: card.meaningUpright,
+        meaningReversed: card.meaningReversed,
+        tags: ['draw', 'random', 'major-arcana', 'reversible', card.archetypeTag, 'upright'],
+      }];
       state.minigamesCompleted = 1;
       state.pendingEffects = [foolsRerollEffect];
       state.selectedMethod = 'd20';
