@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { AffinityEngine } from '../AffinityEngine';
-import { CHAOS_AFFINITY, ORDER_AFFINITY } from '../../data/affinities';
+import { AFFINITY_DEFINITIONS } from '../../data/affinities';
 import type { TarotResult } from '../types';
 
-const definitions = [CHAOS_AFFINITY, ORDER_AFFINITY];
+const defs = AFFINITY_DEFINITIONS;
 
 const reversedCard: TarotResult = {
   type: 'tarot', id: 'the-fool', name: 'The Fool', number: 0,
@@ -26,54 +26,56 @@ const uprightCard: TarotResult = {
 };
 
 describe('AffinityEngine', () => {
-  it('starts with both affinities at 0.5', () => {
-    const engine = new AffinityEngine(definitions);
-    const state = engine.getState();
-    expect(state.chaos).toBe(0.5);
-    expect(state.order).toBe(0.5);
+  it('starts every affinity at baseline 50', () => {
+    const e = new AffinityEngine(defs);
+    const s = e.getState();
+    expect(s.chaos).toBe(50);
+    expect(s.order).toBe(50);
+    expect(s.fate).toBe(50);
   });
 
-  it('apply() increases chaos for reversed/random results', () => {
-    const engine = new AffinityEngine(definitions);
-    engine.apply([reversedCard]);
-    expect(engine.getState().chaos).toBeGreaterThan(0.5);
+  it('applyResultTags increases chaos for reversed/random results', () => {
+    const e = new AffinityEngine(defs);
+    e.applyResultTags(reversedCard);
+    expect(e.getState().chaos).toBeGreaterThan(50);
   });
 
-  it('apply() increases order for upright/stable results', () => {
-    const engine = new AffinityEngine(definitions);
-    engine.apply([uprightCard]);
-    expect(engine.getState().order).toBeGreaterThan(0.5);
+  it('applyResultTags increases order for upright results', () => {
+    const e = new AffinityEngine(defs);
+    e.applyResultTags(uprightCard);
+    expect(e.getState().order).toBeGreaterThan(50);
   });
 
-  it('clamps values to 0.0–1.0', () => {
-    const engine = new AffinityEngine(definitions);
-    engine.setState({ chaos: 0.99, order: 0.01 });
-    engine.apply([reversedCard]); // chaos should not exceed 1.0
-    engine.apply([reversedCard]);
-    expect(engine.getState().chaos).toBeLessThanOrEqual(1.0);
+  it('clamps values to 0–100', () => {
+    const e = new AffinityEngine(defs);
+    e.setState({ chaos: 99, order: 1 });
+    e.applyResultTags(reversedCard);
+    e.applyResultTags(reversedCard);
+    expect(e.getState().chaos).toBeLessThanOrEqual(100);
+    expect(e.getState().chaos).toBeGreaterThanOrEqual(0);
   });
 
-  it('isDominant() returns true when affinity >= threshold', () => {
-    const engine = new AffinityEngine(definitions);
-    engine.setState({ chaos: 0.6, order: 0.3 });
-    expect(engine.isDominant('chaos')).toBe(true);
-    expect(engine.isDominant('order')).toBe(false);
+  it('bandOf reports the current band of an affinity', () => {
+    const e = new AffinityEngine(defs);
+    e.setState({ chaos: 85, order: 20 });
+    expect(e.bandOf('chaos')).toBe('dominant');
+    expect(e.bandOf('order')).toBe('latent');
   });
 
-  it('getHint() returns flavor text for dominant affinity', () => {
-    const engine = new AffinityEngine(definitions);
-    engine.setState({ chaos: 0.6, order: 0.3 });
-    expect(engine.getHint('chaos')).toBeTruthy();
-    expect(engine.getHint('order')).toBeNull();
+  it('getHint returns band flavor when out of latent, null when latent', () => {
+    const e = new AffinityEngine(defs);
+    e.setState({ chaos: 70 });
+    expect(e.getHint('chaos')).toBeTruthy();
+    e.setState({ chaos: 10 });
+    expect(e.getHint('chaos')).toBeNull(); // latent pool is empty
   });
 
-  it('serialize() and loadFrom() round-trip', () => {
-    const engine = new AffinityEngine(definitions);
-    engine.setState({ chaos: 0.7, order: 0.3 });
-    const json = engine.serialize();
-
-    const engine2 = new AffinityEngine(definitions);
-    engine2.loadFrom(json);
-    expect(engine2.getState()).toEqual({ chaos: 0.7, order: 0.3 });
+  it('serialize and loadFrom round-trip all six', () => {
+    const e = new AffinityEngine(defs);
+    e.setState({ chaos: 70, order: 30, fate: 55 });
+    const json = e.serialize();
+    const e2 = new AffinityEngine(defs);
+    e2.loadFrom(json);
+    expect(e2.getState()).toEqual(e.getState());
   });
 });

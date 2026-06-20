@@ -1,51 +1,125 @@
-import type { AffinityId, Taggable } from './types';
+import type { AffinityId, AffinityBand, Taggable } from './types';
 import type { AffinityDefinition } from '../data/affinities';
-
-const DEFAULT_VALUE = 0.5;
-const CHANGE_PER_MATCH = 0.05;
+import {
+  AFFINITY_IDS,
+  AFFINITY_PAIRS,
+  BASELINE,
+  BAND_ORDER,
+  bandOf,
+  REACH_UP_CHANCE,
+  COUPLING_OPPOSITE,
+  COUPLING_OTHER,
+  DR_STEP,
+  DR_FLOOR,
+  JITTER_MIN,
+  JITTER_MAX,
+  RUN_DRIFT,
+  FEED_PER_MATCH,
+} from '../data/affinities';
 
 export class AffinityEngine {
-  private state: Record<string, number> = {};
+  private state: Record<AffinityId, number>;
+  private feedsThisRun: Record<AffinityId, number>;
   private definitions: AffinityDefinition[];
+  private defById: Record<string, AffinityDefinition>;
 
   constructor(definitions: AffinityDefinition[]) {
     this.definitions = definitions;
-    for (const def of definitions) {
-      this.state[def.id] = DEFAULT_VALUE;
+    this.defById = {};
+    this.state = {} as Record<AffinityId, number>;
+    this.feedsThisRun = {} as Record<AffinityId, number>;
+    for (const id of AFFINITY_IDS) {
+      this.state[id] = BASELINE;
+      this.feedsThisRun[id] = 0;
     }
+    for (const def of definitions) this.defById[def.id] = def;
   }
 
-  apply(results: Taggable[]): void {
+  // ── The single mutation chokepoint ──
+  // Returns the realized delta actually applied to `id` (signed).
+  shift(id: AffinityId, baseDelta: number, _sourceId: string): number {
+    if (baseDelta === 0) return 0;
+
+    // Penalty: direct subtraction, no fan-out.
+    if (baseDelta < 0) {
+      this.state[id] = this.clamp(this.state[id] + baseDelta);
+      return baseDelta;
+    }
+
+    // Gain: diminishing returns → jitter → apply → coupling fan-out.
+    const dr = Math.max(DR_FLOOR, 1 - DR_STEP * this.feedsThisRun[id]);
+    this.feedsThisRun[id] += 1;
+    const jitter = JITTER_MIN + Math.random() * (JITTER_MAX - JITTER_MIN);
+    const gain = baseDelta * dr * jitter;
+
+    this.state[id] = this.clamp(this.state[id] + gain);
+
+    const opp = AFFINITY_PAIRS[id];
+    this.state[opp] = this.clamp(this.state[opp] - gain * COUPLING_OPPOSITE);
+    for (const other of AFFINITY_IDS) {
+      if (other === id || other === opp) continue;
+      this.state[other] = this.clamp(this.state[other] - gain * COUPLING_OTHER);
+    }
+    return gain;
+  }
+
+  // Result tags → Chaos/Order feeds (the only tag-driven feeds in Phase 1).
+  applyResultTags(result: Taggable): void {
     for (const def of this.definitions) {
-      let delta = 0;
-      for (const result of results) {
-        const matches = def.accumulateFrom.filter((tag) => result.tags.includes(tag)).length;
-        delta += matches * CHANGE_PER_MATCH;
-      }
-      this.state[def.id] = this.clamp(this.state[def.id] + delta);
+      if (def.feeds.tags.length === 0) continue;
+      const matches = def.feeds.tags.filter((t) => result.tags.includes(t)).length;
+      if (matches > 0) this.shift(def.id, matches * FEED_PER_MATCH, `result:${def.id}`);
     }
   }
 
-  isDominant(id: AffinityId): boolean {
-    const def = this.definitions.find((d) => d.id === id);
-    if (!def) return false;
-    return this.state[id] >= def.dominantThreshold;
+  // Run boundary: drift toward baseline, reset per-run counters. Reshuffle hook.
+  beginRun(): void {
+    for (const id of AFFINITY_IDS) {
+      this.state[id] = this.clamp(this.state[id] + (BASELINE - this.state[id]) * RUN_DRIFT);
+      this.feedsThisRun[id] = 0;
+    }
+  }
+
+  bandOf(id: AffinityId): AffinityBand {
+    return bandOf(this.state[id]);
+  }
+
+  // Soft reach-up: ~12% chance to act one band higher (never lower, never two up).
+  resolveBand(id: AffinityId): AffinityBand {
+    const base = bandOf(this.state[id]);
+    const idx = BAND_ORDER.indexOf(base);
+    if (idx < BAND_ORDER.length - 1 && Math.random() < REACH_UP_CHANCE) {
+      return BAND_ORDER[idx + 1];
+    }
+    return base;
+  }
+
+  // Top 1–2 forces only, keyed to each one's current band hint pool.
+  getActiveHints(max = 2): string[] {
+    const sorted = [...AFFINITY_IDS].sort((a, b) => this.state[b] - this.state[a]);
+    const hints: string[] = [];
+    for (const id of sorted.slice(0, max)) {
+      const hint = this.getHint(id);
+      if (hint) hints.push(hint);
+    }
+    return hints;
   }
 
   getHint(id: AffinityId): string | null {
-    if (!this.isDominant(id)) return null;
-    const def = this.definitions.find((d) => d.id === id);
-    if (!def || !def.dominantHints.length) return null;
-    return def.dominantHints[Math.floor(Math.random() * def.dominantHints.length)];
+    const def = this.defById[id];
+    if (!def) return null;
+    const pool = def.hints[bandOf(this.state[id])];
+    if (!pool || pool.length === 0) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
   getState(): Record<AffinityId, number> {
-    return { ...this.state } as Record<AffinityId, number>;
+    return { ...this.state };
   }
 
   setState(values: Partial<Record<AffinityId, number>>): void {
     for (const [id, val] of Object.entries(values)) {
-      this.state[id] = this.clamp(val);
+      if (typeof val === 'number') this.state[id as AffinityId] = this.clamp(val);
     }
   }
 
@@ -53,16 +127,20 @@ export class AffinityEngine {
     return JSON.stringify(this.state);
   }
 
+  // Migration: any value <= 1 is an old 0–1 figure (×100); missing ids default to baseline.
   loadFrom(json: string): void {
-    const parsed = JSON.parse(json);
-    for (const [id, val] of Object.entries(parsed)) {
-      if (typeof val === 'number') {
-        this.state[id] = this.clamp(val);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    for (const id of AFFINITY_IDS) {
+      const v = parsed[id];
+      if (typeof v === 'number') {
+        this.state[id] = this.clamp(v <= 1 ? v * 100 : v);
+      } else {
+        this.state[id] = BASELINE;
       }
     }
   }
 
   private clamp(value: number): number {
-    return Math.max(0.0, Math.min(1.0, Math.round(value * 100) / 100));
+    return Math.max(0, Math.min(100, Math.round(value)));
   }
 }

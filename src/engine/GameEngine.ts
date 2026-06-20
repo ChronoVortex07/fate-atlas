@@ -6,7 +6,7 @@ import { TurnOrchestrator } from './TurnOrchestrator';
 import { InteractionResolver } from './InteractionResolver';
 import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
-import { CHAOS_AFFINITY, ORDER_AFFINITY, defaultAffinityState } from '../data/affinities';
+import { AFFINITY_DEFINITIONS, defaultAffinityState } from '../data/affinities';
 import { INTERACTION_RULES } from '../data/interactions';
 import { selectHappening } from '../data/happenings';
 import { loadScenario, SCENARIO_PRESETS } from './scenarios';
@@ -32,7 +32,7 @@ export class GameEngine {
     this.minigamesPerTurn = minigamesPerTurn;
     this.bus = new EventBus();
     this.tagSystem = new TagSystem();
-    this.affinityEngine = new AffinityEngine([CHAOS_AFFINITY, ORDER_AFFINITY]);
+    this.affinityEngine = new AffinityEngine(AFFINITY_DEFINITIONS);
     this.orchestrator = new TurnOrchestrator(this.bus);
     this.interactionResolver = new InteractionResolver(this.tagSystem, this.bus);
     this.readingPlanner = new ReadingPlanner();
@@ -80,6 +80,7 @@ export class GameEngine {
   // ---------- Turn lifecycle ----------
 
   startTurn(question: QuestionType): void {
+    this.affinityEngine.beginRun();
     const affinities = this.affinityEngine.getState();
     const availableMethods = this.orchestrator.generatePool(question, affinities);
 
@@ -134,9 +135,9 @@ export class GameEngine {
     const completed = this.state.minigamesCompleted + 1;
     this.state.minigamesCompleted = completed;
 
-    // Apply affinities from the result
+    // Apply affinities from the result (Chaos/Order tag feeds, routed through shift)
     if (result.type !== 'happening') {
-      this.affinityEngine.apply([result]);
+      this.affinityEngine.applyResultTags(result);
     }
 
     // Check pending effects against this result
@@ -192,7 +193,7 @@ export class GameEngine {
       this.orchestrator.removeUsedMethod(result.type as 'tarot' | 'd20' | 'iching');
 
       const chaos = this.affinityEngine.getState().chaos;
-      if (chaos >= 0.4 && Math.random() < chaos * 0.5) {
+      if (chaos >= 40 && Math.random() < (chaos / 100) * 0.5) {
         this.triggerHappening();
         return;
       } else {
@@ -318,7 +319,7 @@ export class GameEngine {
         if (this.state.happening && this.state.happening.choices.length > 0) {
           const bonusChoice = {
             text: 'A hidden path emerges — ' + this.state.happening.choices[0].text,
-            affinityChanges: { chaos: 0.05 },
+            affinityChanges: { chaos: 5 },
           };
           this.state.happening = {
             ...this.state.happening,
@@ -412,15 +413,10 @@ export class GameEngine {
       throw new Error(`Choice ${choiceIndex} not found in happening`);
     }
 
-    // Apply affinity changes from chosen option
-    const current = this.affinityEngine.getState();
+    // Apply affinity changes from chosen option through the shift pipeline.
     for (const [id, delta] of Object.entries(choice.affinityChanges)) {
-      const key = id as AffinityId;
-      current[key] = Math.max(0, Math.min(1,
-        Math.round((current[key] + (delta as number)) * 100) / 100,
-      ));
+      this.affinityEngine.shift(id as AffinityId, delta as number, `happening:${this.state.happening.id}`);
     }
-    this.affinityEngine.setState(current);
 
     this.state.selectedHappeningChoice = choiceIndex;
     this.state.affinities = this.affinityEngine.getState();

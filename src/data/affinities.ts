@@ -41,49 +41,128 @@ export function defaultAffinityState(): Record<AffinityId, number> {
   );
 }
 
+export type EffectTier = 'ambient' | 'notable' | 'major';
+
+export interface BandedEffect {
+  id: string;
+  tier: EffectTier;
+  band: AffinityBand; // minimum band at which it can fire
+  description: string;
+}
+
 export interface AffinityDefinition {
   id: AffinityId;
   name: string;
+  opposite: AffinityId;
   description: string;
-  accumulateFrom: string[]; // tags that increase this affinity
-  dominantThreshold: number; // value at which effects kick in
-  dominantHints: string[]; // flavor text shown when dominant
-  effects: {
-    description: string;
-    magnitude: string; // for tooltip/debug
-  }[];
+  feeds: {
+    tags: string[];    // result tags that feed this affinity (Chaos/Order)
+    actions: string[]; // player-action ids that feed it (Fate/Will/Light/Shadow — Phase 2/3)
+  };
+  hints: Record<AffinityBand, string[]>; // per-band flavor, top-forces only
+  bandedEffects: BandedEffect[];         // effects this affinity grants (stubbed for the new four)
 }
 
 export const CHAOS_AFFINITY: AffinityDefinition = {
   id: 'chaos',
   name: 'Chaos',
-  description: 'Fueled by randomness, reversals, and changing patterns. Makes outcomes more volatile and unpredictable.',
-  accumulateFrom: ['random', 'reversed', 'changing-lines'],
-  dominantThreshold: 0.5,
-  dominantHints: [
-    'The air feels charged with unpredictability...',
-    'The stars shift restlessly above...',
-  ],
-  effects: [
-    { description: 'Increased chance of wild modifiers', magnitude: 'moderate' },
-    { description: 'Interaction chains more likely', magnitude: 'significant' },
-    { description: 'Happenings appear more often', magnitude: 'moderate' },
+  opposite: 'order',
+  description: 'Fueled by randomness, reversals, and changing patterns. Volatile, swingy outcomes.',
+  feeds: { tags: ['random', 'reversed', 'changing-lines'], actions: [] },
+  hints: {
+    latent: [],
+    stirring: ['The air carries a faint restlessness...'],
+    ascendant: ['The currents run unpredictable and quick...', 'The stars shift restlessly above...'],
+    dominant: ['Reality frays at the edges — anything may surface...'],
+  },
+  bandedEffects: [
+    { id: 'wild-surge', tier: 'major', band: 'dominant', description: 'A result can spawn a second.' },
+    { id: 'happening-interrupt', tier: 'major', band: 'dominant', description: 'A happening can interrupt a minigame.' },
   ],
 };
 
 export const ORDER_AFFINITY: AffinityDefinition = {
   id: 'order',
   name: 'Order',
-  description: 'Grows through stable results and measured choices. Steadies outcomes and brings clarity.',
-  accumulateFrom: ['upright', 'neutral', 'stable'],
-  dominantThreshold: 0.5,
-  dominantHints: [
-    'Patterns align with unusual clarity...',
-    'A sense of steady purpose settles over the reading...',
-  ],
-  effects: [
-    { description: 'Reduced chance of negative reversals', magnitude: 'moderate' },
-    { description: 'Results lean toward balanced outcomes', magnitude: 'significant' },
-    { description: 'Extra clarity in interpretation', magnitude: 'moderate' },
-  ],
+  opposite: 'chaos',
+  description: 'Grows through stable, upright, measured results. Steadies and clarifies outcomes.',
+  feeds: { tags: ['upright', 'neutral', 'stable'], actions: [] },
+  hints: {
+    latent: [],
+    stirring: ['A quiet steadiness settles in...'],
+    ascendant: ['Patterns align with unusual clarity...', 'A sense of steady purpose settles over the reading...'],
+    dominant: ['Everything coheres — the weave lies flat and legible...'],
+  },
+  bandedEffects: [],
 };
+
+// The new four are defined now so coupling and migration treat all six uniformly;
+// their EFFECTS (bandedEffects) and action feeds are wired in Phases 2–3.
+export const FATE_AFFINITY: AffinityDefinition = {
+  id: 'fate',
+  name: 'Fate',
+  opposite: 'will',
+  description: 'Control taken from the player — choices decided by the weave.',
+  feeds: { tags: [], actions: [] },
+  hints: {
+    latent: [],
+    stirring: ['The current seems to tug at your hand...'],
+    ascendant: ['Something else is choosing alongside you...'],
+    dominant: ['The weave moves your hand more than you do...'],
+  },
+  bandedEffects: [],
+};
+
+export const WILL_AFFINITY: AffinityDefinition = {
+  id: 'will',
+  name: 'Will',
+  opposite: 'fate',
+  description: 'Agency given to the player — more autonomy over the reading.',
+  feeds: { tags: [], actions: [] },
+  hints: {
+    latent: [],
+    stirring: ['Your choices feel a little freer...'],
+    ascendant: ['The reading bends readily to your intent...'],
+    dominant: ['The outcome is yours to shape...'],
+  },
+  bandedEffects: [],
+};
+
+export const LIGHT_AFFINITY: AffinityDefinition = {
+  id: 'light',
+  name: 'Light',
+  opposite: 'shadow',
+  description: 'The game reveals more — clearer readings and foresight.',
+  feeds: { tags: [], actions: [] },
+  hints: {
+    latent: [],
+    stirring: ['The reading reads a touch clearer...'],
+    ascendant: ['Meaning surfaces readily; foresight beckons...'],
+    dominant: ['Everything is laid bare and luminous...'],
+  },
+  bandedEffects: [],
+};
+
+export const SHADOW_AFFINITY: AffinityDefinition = {
+  id: 'shadow',
+  name: 'Shadow',
+  opposite: 'light',
+  description: 'The game conceals more — terse, cryptic, veiled readings.',
+  feeds: { tags: [], actions: [] },
+  hints: {
+    latent: [],
+    stirring: ['The edges of meaning blur...'],
+    ascendant: ['Much is withheld; the reading speaks in riddles...'],
+    dominant: ['Darkness swallows all but the faintest sign...'],
+  },
+  bandedEffects: [],
+};
+
+export const AFFINITY_DEFINITIONS: AffinityDefinition[] = [
+  CHAOS_AFFINITY,
+  ORDER_AFFINITY,
+  FATE_AFFINITY,
+  WILL_AFFINITY,
+  LIGHT_AFFINITY,
+  SHADOW_AFFINITY,
+];
