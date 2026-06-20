@@ -71,6 +71,7 @@ export default function TarotMinigame() {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.4 }}
     >
+      <style>{`.snap-scroll-row::-webkit-scrollbar { display: none; }`}</style>
       <div style={contentStyle}>
         <h1 style={headingStyle}>
           {phase === 'pick' && 'Draw a card'}
@@ -79,7 +80,7 @@ export default function TarotMinigame() {
         </h1>
 
         {phase === 'pick' && (
-          <motion.div style={cardsRowStyle} initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.15 } } }}>
+          <motion.div style={cardsRowStyle} className="snap-scroll-row" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.15 } } }}>
             {faceDownCards.map((_, i) => (
               <motion.button
                 key={i}
@@ -163,6 +164,16 @@ const cardsRowStyle: React.CSSProperties = {
   display: 'flex',
   gap: '1.25rem',
   justifyContent: 'center',
+  overflowX: 'auto',
+  overflowY: 'hidden',
+  scrollSnapType: 'x mandatory',
+  WebkitOverflowScrolling: 'touch',
+  padding: '10px 40px',
+  margin: '0 -40px',
+  // Invisible scrollbar
+  scrollbarWidth: 'none',          // Firefox
+  msOverflowStyle: 'none',         // IE/Edge
+  // Chrome/Safari: handled via injected style below
 };
 
 const faceDownCardStyle: React.CSSProperties = {
@@ -179,6 +190,7 @@ const faceDownCardStyle: React.CSSProperties = {
   cursor: 'pointer',
   outline: 'none',
   fontFamily: 'inherit',
+  scrollSnapAlign: 'center',
   transition: 'border-color 0.3s, box-shadow 0.3s',
 };
 
