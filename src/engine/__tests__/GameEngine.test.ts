@@ -738,6 +738,16 @@ function diceResult(): DiceResult {
   };
 }
 
+describe('GameEngine — affinity effects snapshot', () => {
+  it('carries affinityEffects in the snapshot and reflects band changes after notify', () => {
+    const engine = new GameEngine();
+    engine.startTurn('self');
+    engine.loadState({ affinities: { ...engine.getState().affinities, will: 90 } });
+    expect(engine.getState().affinityEffects.handSize).toBe(5);
+    expect(engine.getAffinityEffects().handSize).toBe(5);
+  });
+});
+
 describe('GameEngine — event-resolved Chaos effects', () => {
   it('maybeWildSurge fires with probability 1 when debugForcedEffect names it, then clears the flag', () => {
     const engine = new GameEngine();

@@ -76,6 +76,7 @@ export class GameEngine {
 
   private notify(): void {
     this.state.affinities = this.affinityEngine.getState();
+    this.state.affinityEffects = this.affinityEngine.getEffects();
     this.state.eventLog = this.bus.getHistory();
     this.cachedSnapshot = JSON.parse(JSON.stringify(this.state)) as GameState;
     this.listeners.forEach((fn) => fn(this.cachedSnapshot));
@@ -494,6 +495,10 @@ export class GameEngine {
 
   getState(): GameState {
     return this.cachedSnapshot;
+  }
+
+  getAffinityEffects() {
+    return this.affinityEngine.getEffects();
   }
 
   loadState(json: Partial<GameState>): void {
