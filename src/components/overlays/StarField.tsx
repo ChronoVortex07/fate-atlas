@@ -73,12 +73,12 @@ export default function StarField() {
   }, [state.swirlActive, engine]);
 
   const swirlClass = state.swirlActive ? ' starfield--swirling' : '';
-  const dimmedClass = state.screen !== 'title' ? ' starfield--dimmed' : '';
+  const veilOpacity = state.screen !== 'title' ? 0.4 : 0;
 
   return (
     <div style={containerStyle}>
       <svg
-        className={`starfield${swirlClass}${dimmedClass}`}
+        className={`starfield${swirlClass}`}
         width="100%"
         height="100%"
         viewBox="0 0 100 100"
@@ -193,14 +193,6 @@ export default function StarField() {
             100% { opacity: 0; }
           }
 
-          /* Dimming veil — darkens field during gameplay, lifts on title screen */
-          .starfield__veil {
-            opacity: 0;
-            transition: opacity 1.2s ease;
-          }
-          .starfield--dimmed .starfield__veil {
-            opacity: 0.4;
-          }
         `}</style>
 
         {/* Base fill */}
@@ -303,7 +295,7 @@ export default function StarField() {
         ))}
 
         {/* Dimming veil — dark overlay during gameplay, transparent on title */}
-        <rect className="starfield__veil" x="0" y="0" width="100" height="100" fill="#070a12" />
+        <rect x="0" y="0" width="100" height="100" fill="#070a12" style={{ opacity: veilOpacity, transition: 'opacity 1.2s ease' }} />
 
         {/* Swirl flash overlay */}
         <use href="#swirl-flash" />
