@@ -198,6 +198,7 @@ export interface GameState {
   turnResults: SlotResult[];
   minigamesCompleted: number;
   activeSlotIndex: number | null;
+  interactionApplied: boolean;
   minigameState: MinigameState | null;
   pendingEffects: PendingEffect[];
   interactionQueue: InteractionEvent[];

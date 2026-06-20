@@ -50,6 +50,7 @@ export class GameEngine {
       turnResults: [],
       minigamesCompleted: 0,
       activeSlotIndex: null,
+      interactionApplied: false,
       minigameState: null,
       pendingEffects: [],
       interactionQueue: [],
@@ -90,6 +91,7 @@ export class GameEngine {
     this.state.turnResults = [];
     this.state.minigamesCompleted = 0;
     this.state.activeSlotIndex = null;
+    this.state.interactionApplied = false;
     this.state.minigameState = null;
     this.state.interactionQueue = [];
     this.state.pendingHappening = false;
@@ -213,11 +215,27 @@ export class GameEngine {
     this.notify();
   }
 
+  // Apply the head interaction's effect while the minigame is still mounted
+  // (called by the sequencer at its reveal step). Does not dequeue or change
+  // the screen; the guard makes repeat calls safe.
+  applyHeadInteraction(): void {
+    if (this.state.interactionQueue.length === 0) return;
+    if (this.state.interactionApplied) return;
+    this.executeEffect(this.state.interactionQueue[0]);
+    this.state.interactionApplied = true;
+    this.notify();
+  }
+
   advanceInteractionQueue(): void {
     if (this.state.interactionQueue.length === 0) return;
 
     const completed = this.state.interactionQueue[0];
-    this.executeEffect(completed);
+    // The effect is normally applied earlier at the sequencer's reveal step;
+    // apply here only if that didn't happen (e.g. a fast tap skipped the beat).
+    if (!this.state.interactionApplied) {
+      this.executeEffect(completed);
+    }
+    this.state.interactionApplied = false;
     this.state.interactionQueue = this.state.interactionQueue.slice(1);
 
     if (this.state.interactionQueue.length > 0) {
@@ -515,6 +533,7 @@ export class GameEngine {
     this.state.turnResults = [];
     this.state.minigamesCompleted = 0;
     this.state.activeSlotIndex = null;
+    this.state.interactionApplied = false;
     this.state.minigameState = null;
     this.state.interactionQueue = [];
     this.state.pendingHappening = false;

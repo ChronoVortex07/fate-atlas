@@ -513,4 +513,59 @@ describe('GameEngine — new lifecycle', () => {
     const ev = state.interactions[state.interactions.length - 1];
     expect(ev.targetSlotIndex).toBe(2);
   });
+
+  // Shared helper: a frozen-on-minigame state with one second-result interaction
+  // queued against slot 0. second-result appends exactly one slot per application,
+  // which makes double-application observable via turnResults.length.
+  const loadQueuedSecondResult = (e: GameEngine) => {
+    e.startTurn('self');
+    e.loadState({
+      screen: 'minigame',
+      minigamesCompleted: 1,
+      activeSlotIndex: 0,
+      interactionApplied: false,
+      turnResults: [
+        { type: 'd20', result: 10, threshold: 'neutral', interpretation: 'x', tags: ['roll', 'numeric'] },
+      ],
+      interactionQueue: [
+        { ruleId: 'sr', sourceSlotIndex: 0, targetSlotIndex: 0, effect: 'second-result', description: 'd' },
+      ],
+    });
+  };
+
+  it('applyHeadInteraction applies the head effect without dequeuing or transitioning', () => {
+    loadQueuedSecondResult(engine);
+    engine.applyHeadInteraction();
+    const s = engine.getState();
+    expect(s.turnResults).toHaveLength(2);      // one slot appended
+    expect(s.interactionQueue).toHaveLength(1); // not dequeued
+    expect(s.screen).toBe('minigame');          // no transition
+    expect(s.interactionApplied).toBe(true);
+  });
+
+  it('applyHeadInteraction is idempotent for the same head', () => {
+    loadQueuedSecondResult(engine);
+    engine.applyHeadInteraction();
+    engine.applyHeadInteraction();
+    expect(engine.getState().turnResults).toHaveLength(2); // still only one append
+  });
+
+  it('advanceInteractionQueue after apply does not re-apply, resets flag, and transitions', () => {
+    loadQueuedSecondResult(engine);
+    engine.applyHeadInteraction();
+    engine.advanceInteractionQueue();
+    const s = engine.getState();
+    expect(s.turnResults).toHaveLength(2);       // no second append
+    expect(s.interactionQueue).toHaveLength(0);
+    expect(s.interactionApplied).toBe(false);
+    expect(s.screen).toBe('method-select');      // 1 < 3 minigames
+  });
+
+  it('advanceInteractionQueue applies the head effect when not yet applied (fast tap)', () => {
+    loadQueuedSecondResult(engine);
+    engine.advanceInteractionQueue();
+    const s = engine.getState();
+    expect(s.turnResults).toHaveLength(2);       // applied during advance
+    expect(s.interactionQueue).toHaveLength(0);
+  });
 });
