@@ -1,4 +1,4 @@
-import type { AffinityId, AffinityBand, AffinityAction, Taggable } from './types';
+import type { AffinityId, AffinityBand, AffinityAction, AffinityEffects, Taggable } from './types';
 import type { AffinityDefinition } from '../data/affinities';
 import {
   AFFINITY_IDS,
@@ -6,6 +6,7 @@ import {
   BASELINE,
   BAND_ORDER,
   bandOf,
+  bandIndex,
   REACH_UP_CHANCE,
   COUPLING_OPPOSITE,
   COUPLING_OTHER,
@@ -105,6 +106,31 @@ export class AffinityEngine {
     }
     this.applyAction('use-peek'); // seeking clarity feeds Light
     return { failed: false };
+  }
+
+  // Static, band-derived modifiers (no per-event roll). Carried in the snapshot.
+  getEffects(): AffinityEffects {
+    const willIdx   = bandIndex(bandOf(this.state.will));
+    const fateIdx   = bandIndex(bandOf(this.state.fate));
+    const lightIdx  = bandIndex(bandOf(this.state.light));
+    const shadowIdx = bandIndex(bandOf(this.state.shadow));
+
+    const info = lightIdx - shadowIdx; // -3..3
+    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+    let poolPreview: AffinityEffects['poolPreview'] = 'none';
+    if (shadowIdx >= 2) poolPreview = 'hidden';
+    else if (lightIdx >= 2) poolPreview = 'full';
+    else if (lightIdx >= 1 && lightIdx > shadowIdx) poolPreview = 'theme';
+
+    return {
+      handSize: 3 + clamp(willIdx - 1, 0, 2),   // latent/stirring 3, ascendant 4, dominant 5
+      methodCount: fateIdx >= 2 ? 2 : 3,          // Fate Ascendant+ → fewer methods
+      hintClarity: clamp(info, -2, 2),
+      readingDetail: clamp(info, -1, 1),
+      poolPreview,
+      peekAvailable: this.peekAvailable(),
+    };
   }
 
   // Run boundary: drift toward baseline, reset per-run counters. Reshuffle hook.
