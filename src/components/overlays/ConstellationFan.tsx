@@ -206,7 +206,7 @@ export default function ConstellationFan({ results, activeSlots }: Props) {
       <div
         style={{
           position: 'absolute',
-          bottom: '14px',
+          bottom: isDesktop ? '14px' : '56px',
           right: isDesktop ? undefined : '14px',
           left: isDesktop ? 0 : undefined,
           width: isDesktop ? '100%' : '220px',
