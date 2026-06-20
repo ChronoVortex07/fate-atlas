@@ -462,4 +462,55 @@ describe('GameEngine — new lifecycle', () => {
     expect(resultsAfter).toBe(resultsBefore + 1);
     expect(engine.getState().interactionQueue).toHaveLength(0);
   });
+
+  it('completeMinigame sets activeSlotIndex to the committed slot index', () => {
+    engine.startTurn('self');
+    const idx = engine.getState().availableMethods.findIndex((m) => m !== 'happening');
+    if (idx === -1) return;
+    engine.selectMethod(idx);
+    if (engine.getState().screen !== 'minigame') return;
+
+    engine.completeMinigame({
+      type: 'd20', result: 10, threshold: 'neutral',
+      interpretation: 'Steady', tags: ['roll', 'numeric'],
+    });
+
+    const state = engine.getState();
+    expect(state.activeSlotIndex).toBe(state.turnResults.length - 1);
+  });
+
+  it('startTurn resets activeSlotIndex to null', () => {
+    engine.startTurn('self');
+    engine.loadState({ activeSlotIndex: 2 });
+    expect(engine.getState().activeSlotIndex).toBe(2);
+    engine.startTurn('self');
+    expect(engine.getState().activeSlotIndex).toBeNull();
+  });
+
+  it('activeSlotIndex and targetSlotIndex use the real appended index after a prior append', () => {
+    engine.startTurn('self');
+    // Simulate a turn where a second-result already appended an extra slot:
+    // turnResults has 2 entries but only 1 counted minigame.
+    engine.loadState({
+      turnResults: [
+        { type: 'd20', result: 10, threshold: 'neutral', interpretation: 'x', tags: ['roll', 'numeric'] },
+        { type: 'd20', result: 11, threshold: 'neutral', interpretation: 'x', tags: ['roll', 'numeric'] },
+      ],
+      minigamesCompleted: 1,
+      pendingEffects: [{
+        id: 'pe', sourceRunId: 'r', sourceCard: 'c', sourceSlotIndex: 0,
+        triggerTags: ['roll', 'numeric'], action: 'reroll', description: 'd',
+        expiresAfter: 3, turnsRemaining: 3,
+      }],
+    });
+
+    engine.completeMinigame({
+      type: 'd20', result: 7, threshold: 'low', interpretation: 'x', tags: ['roll', 'numeric'],
+    });
+
+    const state = engine.getState();
+    expect(state.activeSlotIndex).toBe(2); // new slot is at index 2, not completed-1 (=1)
+    const ev = state.interactions[state.interactions.length - 1];
+    expect(ev.targetSlotIndex).toBe(2);
+  });
 });

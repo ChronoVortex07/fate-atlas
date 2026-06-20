@@ -49,6 +49,7 @@ export class GameEngine {
       selectedMethod: null,
       turnResults: [],
       minigamesCompleted: 0,
+      activeSlotIndex: null,
       minigameState: null,
       pendingEffects: [],
       interactionQueue: [],
@@ -88,6 +89,7 @@ export class GameEngine {
     this.state.selectedMethod = null;
     this.state.turnResults = [];
     this.state.minigamesCompleted = 0;
+    this.state.activeSlotIndex = null;
     this.state.minigameState = null;
     this.state.interactionQueue = [];
     this.state.pendingHappening = false;
@@ -129,6 +131,10 @@ export class GameEngine {
   completeMinigame(result: SlotResult): void {
     // Add result to the turn's results array
     this.state.turnResults = [...this.state.turnResults, result];
+    // Canonical index of the just-committed result. NOTE: not `completed - 1`,
+    // which diverges from the array index after a `second-result` append.
+    const committedIndex = this.state.turnResults.length - 1;
+    this.state.activeSlotIndex = committedIndex;
     const completed = this.state.minigamesCompleted + 1;
     this.state.minigamesCompleted = completed;
 
@@ -148,7 +154,7 @@ export class GameEngine {
     const interactionEvents: InteractionEvent[] = matched.map((effect) => ({
       ruleId: effect.id,
       sourceSlotIndex: effect.sourceSlotIndex,
-      targetSlotIndex: completed - 1,
+      targetSlotIndex: committedIndex,
       effect: effect.action,
       description: effect.description,
     }));
@@ -508,6 +514,7 @@ export class GameEngine {
     this.state.selectedMethod = null;
     this.state.turnResults = [];
     this.state.minigamesCompleted = 0;
+    this.state.activeSlotIndex = null;
     this.state.minigameState = null;
     this.state.interactionQueue = [];
     this.state.pendingHappening = false;

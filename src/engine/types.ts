@@ -197,6 +197,7 @@ export interface GameState {
   selectedMethod: DivinationType | null;
   turnResults: SlotResult[];
   minigamesCompleted: number;
+  activeSlotIndex: number | null;
   minigameState: MinigameState | null;
   pendingEffects: PendingEffect[];
   interactionQueue: InteractionEvent[];
