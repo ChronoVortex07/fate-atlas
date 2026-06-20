@@ -13,6 +13,10 @@ export default function DebugPanel() {
   const [activeTab, setActiveTab] = useState<Tab>('State');
   const [scenarioId, setScenarioId] = useState('');
   const presets = engine.getScenarioPresets();
+  const groupedPresets = presets.reduce<Record<string, typeof presets>>((acc, p) => {
+    (acc[p.group] ??= []).push(p);
+    return acc;
+  }, {});
 
   const handleClose = useCallback(() => {
     engine.loadState({ debug: false });
@@ -83,10 +87,14 @@ export default function DebugPanel() {
             style={selectStyle}
           >
             <option value="">-- Select --</option>
-            {presets.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
+            {Object.entries(groupedPresets).map(([group, items]) => (
+              <optgroup key={group} label={group}>
+                {items.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
           <button onClick={handleLoadScenario} style={btnStyle}>

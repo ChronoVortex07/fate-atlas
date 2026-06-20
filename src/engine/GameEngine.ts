@@ -509,15 +509,17 @@ export class GameEngine {
   }
 
   loadScenarioById(presetId: string): boolean {
-    const success = loadScenario(presetId, this.state);
-    if (success) {
-      this.notify();
-    }
-    return success;
+    const patch = loadScenario(presetId, this.state);
+    if (patch === null) return false;
+    // Affinities must go through the engine BEFORE notify(), which overwrites
+    // state.affinities from the engine. Routing here fixes the old clobber bug.
+    this.affinityEngine.setState(patch);
+    this.notify();
+    return true;
   }
 
   getScenarioPresets() {
-    return SCENARIO_PRESETS.map((p) => ({ id: p.id, label: p.label }));
+    return SCENARIO_PRESETS.map((p) => ({ id: p.id, label: p.label, group: p.group }));
   }
 
   // ---------- Persistence ----------
