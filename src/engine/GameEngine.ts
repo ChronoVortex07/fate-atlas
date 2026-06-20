@@ -67,6 +67,10 @@ export class GameEngine {
       chainDepth: 0,
       debug: false,
       debugForcedEffect: null,
+      affinityEffects: {
+        handSize: 3, methodCount: 3, hintClarity: 0,
+        readingDetail: 0, poolPreview: 'none', peekAvailable: false,
+      },
     };
   }
 

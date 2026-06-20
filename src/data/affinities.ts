@@ -1,4 +1,4 @@
-import type { AffinityId, AffinityBand } from '../engine/types';
+import type { AffinityId, AffinityBand, AffinityAction } from '../engine/types';
 
 // ── Scale & bands (playtest defaults) ──
 export const BASELINE = 50;
@@ -15,6 +15,12 @@ export const JITTER_MIN = 0.85;
 export const JITTER_MAX = 1.15;
 export const RUN_DRIFT = 0.33;
 export const FEED_PER_MATCH = 5;
+export const FEED_PER_ACTION = 6;        // base affinity gain per agency/information action
+export const SECONDARY_FEED_FACTOR = 0.5; // secondary axis (e.g. Chaos when reversing) feeds at half
+export const BAND_POWER_STEP = 0.7;       // event-resolved chance scales +70% per band above the gate
+
+// Tier base chances (playtest defaults; midpoints of the spec's ranges).
+export const TIER_BASE_CHANCE = { ambient: 0.5, notable: 0.22, major: 0.08 } as const;
 
 export const AFFINITY_IDS: AffinityId[] = ['chaos', 'order', 'fate', 'will', 'light', 'shadow'];
 
@@ -33,6 +39,30 @@ export function bandOf(value: number): AffinityBand {
   if (value <= BAND_BOUNDS.ascendantMax) return 'ascendant';
   return 'dominant';
 }
+
+export function bandIndex(band: AffinityBand): number {
+  return BAND_ORDER.indexOf(band);
+}
+
+export interface ActionFeed {
+  primary: AffinityId;
+  secondary?: AffinityId;
+}
+
+// Single source of truth for which affinity each player action feeds.
+export const ACTION_FEEDS: Record<AffinityAction, ActionFeed> = {
+  'reveal-as-drawn': { primary: 'fate' },
+  'keep-roll':       { primary: 'fate' },
+  'decline-reroll':  { primary: 'fate' },
+  'reverse':         { primary: 'will', secondary: 'chaos' },
+  'take-reroll':     { primary: 'will' },
+  'swap-method':     { primary: 'will' },
+  'set-orientation': { primary: 'will' },
+  'use-peek':        { primary: 'light' },
+  'seek-pattern':    { primary: 'light' },
+  'decline-peek':    { primary: 'shadow' },
+  'embrace-mystery': { primary: 'shadow' },
+};
 
 export function defaultAffinityState(): Record<AffinityId, number> {
   return AFFINITY_IDS.reduce(
@@ -103,14 +133,20 @@ export const FATE_AFFINITY: AffinityDefinition = {
   name: 'Fate',
   opposite: 'will',
   description: 'Control taken from the player — choices decided by the weave.',
-  feeds: { tags: [], actions: [] },
+  feeds: { tags: [], actions: ['reveal-as-drawn', 'keep-roll', 'decline-reroll'] },
   hints: {
     latent: [],
     stirring: ['The current seems to tug at your hand...'],
     ascendant: ['Something else is choosing alongside you...'],
     dominant: ['The weave moves your hand more than you do...'],
   },
-  bandedEffects: [],
+  bandedEffects: [
+    { id: 'auto-orient',      tier: 'notable', band: 'stirring',  description: 'A coin-flip detail is decided for you.' },
+    { id: 'card-swap',        tier: 'major',   band: 'ascendant', description: 'The card you pick may not be the one revealed.' },
+    { id: 'hollow-reroll',    tier: 'major',   band: 'ascendant', description: 'A reroll may return the same result.' },
+    { id: 'the-hand-chooses', tier: 'major',   band: 'dominant',  description: 'Sometimes the hand is picked for you.' },
+    { id: 'force-method',     tier: 'notable', band: 'dominant',  description: 'The method may be forced.' },
+  ],
 };
 
 export const WILL_AFFINITY: AffinityDefinition = {
@@ -118,14 +154,18 @@ export const WILL_AFFINITY: AffinityDefinition = {
   name: 'Will',
   opposite: 'fate',
   description: 'Agency given to the player — more autonomy over the reading.',
-  feeds: { tags: [], actions: [] },
+  feeds: { tags: [], actions: ['reverse', 'take-reroll', 'swap-method', 'set-orientation'] },
   hints: {
     latent: [],
     stirring: ['Your choices feel a little freer...'],
     ascendant: ['The reading bends readily to your intent...'],
     dominant: ['The outcome is yours to shape...'],
   },
-  bandedEffects: [],
+  bandedEffects: [
+    { id: 'offer-reroll',     tier: 'notable', band: 'stirring',  description: 'A "Reroll?" prompt may appear after an action.' },
+    { id: 'free-orientation', tier: 'ambient', band: 'ascendant', description: 'Free orientation choice.' },
+    { id: 'keep-one-of-two',  tier: 'major',   band: 'dominant',  description: 'Keep one of two results.' },
+  ],
 };
 
 export const LIGHT_AFFINITY: AffinityDefinition = {
@@ -133,14 +173,17 @@ export const LIGHT_AFFINITY: AffinityDefinition = {
   name: 'Light',
   opposite: 'shadow',
   description: 'The game reveals more — clearer readings and foresight.',
-  feeds: { tags: [], actions: [] },
+  feeds: { tags: [], actions: ['use-peek', 'seek-pattern'] },
   hints: {
     latent: [],
     stirring: ['The reading reads a touch clearer...'],
     ascendant: ['Meaning surfaces readily; foresight beckons...'],
     dominant: ['Everything is laid bare and luminous...'],
   },
-  bandedEffects: [],
+  bandedEffects: [
+    { id: 'peek',         tier: 'notable', band: 'ascendant', description: 'Foresight (peek) becomes available.' },
+    { id: 'illumination', tier: 'ambient', band: 'dominant',  description: 'Rich, explicit reading; hints name the forces.' },
+  ],
 };
 
 export const SHADOW_AFFINITY: AffinityDefinition = {
@@ -148,14 +191,17 @@ export const SHADOW_AFFINITY: AffinityDefinition = {
   name: 'Shadow',
   opposite: 'light',
   description: 'The game conceals more — terse, cryptic, veiled readings.',
-  feeds: { tags: [], actions: [] },
+  feeds: { tags: [], actions: ['decline-peek', 'embrace-mystery'] },
   hints: {
     latent: [],
     stirring: ['The edges of meaning blur...'],
     ascendant: ['Much is withheld; the reading speaks in riddles...'],
     dominant: ['Darkness swallows all but the faintest sign...'],
   },
-  bandedEffects: [],
+  bandedEffects: [
+    { id: 'veiled',  tier: 'notable', band: 'ascendant', description: 'Results show less; threshold hidden until commit.' },
+    { id: 'eclipse', tier: 'ambient', band: 'dominant',  description: 'Cryptic, sparse reading; results may stay partly hidden.' },
+  ],
 };
 
 export const AFFINITY_DEFINITIONS: AffinityDefinition[] = [
