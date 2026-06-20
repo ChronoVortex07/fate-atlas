@@ -208,4 +208,5 @@ export interface GameState {
   eventLog: GameEvent[];
   chainDepth: number;
   debug: boolean;
+  swirlActive: boolean;
 }
