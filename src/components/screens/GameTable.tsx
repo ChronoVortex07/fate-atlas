@@ -10,7 +10,7 @@ import IChingMinigame from './IChingMinigame';
 import HappeningScene from './HappeningScene';
 import ResultReading from './ResultReading';
 import HistoryModal from '../overlays/HistoryModal';
-import CardTableau from '../overlays/CardTableau';
+import ConstellationFan from '../overlays/ConstellationFan';
 import InteractionSequencer from '../overlays/InteractionSequencer';
 
 interface ActiveSlots {
@@ -93,7 +93,7 @@ export default function GameTable() {
         </AnimatePresence>
       </div>
       {showTableau && (
-        <CardTableau results={state.turnResults} activeSlots={activeSlots} />
+        <ConstellationFan results={state.turnResults} activeSlots={activeSlots} />
       )}
       {state.interactionQueue.length > 0 && (
         <InteractionSequencer
@@ -139,4 +139,5 @@ const centerStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   overflow: 'hidden',
+  paddingBottom: '100px', // leave room for the fan area at bottom
 };
