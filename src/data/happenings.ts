@@ -121,9 +121,10 @@ export function selectHappening(
     available = [...HAPPENINGS];
   }
 
+  const chaosNorm = (chaosAffinity ?? 0) / 100;
   const weighted = available.map((h) => ({
     happening: h,
-    weight: 1 + (h.choices.length > 2 ? chaosAffinity : 0),
+    weight: 1 + (h.choices.length > 2 ? chaosNorm : 0),
   }));
   const totalWeight = weighted.reduce((sum, w) => sum + w.weight, 0);
   let roll = Math.random() * totalWeight;

@@ -53,8 +53,8 @@ export function getThreshold(value: number): Threshold {
 export function rollD20(affinities: Record<string, number>): DiceResult {
   let roll = Math.floor(Math.random() * 20) + 1;
 
-  const chaosInfluence = (affinities.chaos ?? 0) * 4;
-  const orderInfluence = (affinities.order ?? 0) * 3;
+  const chaosInfluence = ((affinities.chaos ?? 0) / 100) * 4;
+  const orderInfluence = ((affinities.order ?? 0) / 100) * 3;
 
   if (chaosInfluence > 0 && Math.random() < chaosInfluence / 10) {
     roll = roll <= 10 ? Math.max(1, roll - Math.ceil(chaosInfluence)) : Math.min(20, roll + Math.ceil(chaosInfluence));

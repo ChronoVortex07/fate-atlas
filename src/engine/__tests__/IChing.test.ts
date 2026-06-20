@@ -38,7 +38,7 @@ describe('castHexagram', () => {
   it('includes [changing-lines] tag when there are changing lines', () => {
     let hadChanging = false;
     for (let i = 0; i < 50; i++) {
-      const result = castHexagram({ chaos: 0.5, order: 0 });
+      const result = castHexagram({ chaos: 50, order: 0 });
       if (result.changingLines.length > 0) {
         hadChanging = true;
         expect(result.tags).toContain('changing-lines');

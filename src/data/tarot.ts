@@ -77,8 +77,8 @@ export function drawTarotCard(affinities: Record<string, number>): TarotResult {
   const index = Math.floor(Math.random() * MAJOR_ARCANA.length);
   const card = MAJOR_ARCANA[index];
 
-  const reversalChance = 0.5 + (affinities.chaos ?? 0) * 0.3;
-  const orderMod = (affinities.order ?? 0) * 0.2;
+  const reversalChance = 0.5 + ((affinities.chaos ?? 0) / 100) * 0.3;
+  const orderMod = ((affinities.order ?? 0) / 100) * 0.2;
   const finalChance = Math.max(0.1, Math.min(0.9, reversalChance - orderMod));
   const orientation = Math.random() < finalChance ? 'reversed' : 'upright';
 

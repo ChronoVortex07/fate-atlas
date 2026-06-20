@@ -36,7 +36,7 @@ describe('drawTarotCard', () => {
     let reversals = 0;
     const iterations = 1000;
     for (let i = 0; i < iterations; i++) {
-      const result = drawTarotCard({ chaos: 0.9, order: 0 });
+      const result = drawTarotCard({ chaos: 90, order: 0 });
       if (result.orientation === 'reversed') reversals++;
     }
     // With chaos at 0.9, reversal chance ≈ 0.5 + 0.27 = 0.77
@@ -47,7 +47,7 @@ describe('drawTarotCard', () => {
     let reversals = 0;
     const iterations = 1000;
     for (let i = 0; i < iterations; i++) {
-      const result = drawTarotCard({ chaos: 0, order: 0.9 });
+      const result = drawTarotCard({ chaos: 0, order: 90 });
       if (result.orientation === 'reversed') reversals++;
     }
     // Order 0.9 gives -0.18 mod, so chance ≈ 0.32, but clamped to 0.1 min
