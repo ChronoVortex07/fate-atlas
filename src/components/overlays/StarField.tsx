@@ -66,8 +66,8 @@ export default function StarField() {
   const dustStars = useMemo(() => generateDustStars(42, 70), []);
   const mediumStars = useMemo(() => generateMediumStars(137, 18), []);
 
-  const handleAnimationEnd = useCallback(() => {
-    if (state.swirlActive) {
+  const handleAnimationEnd = useCallback((event: React.AnimationEvent<SVGSVGElement>) => {
+    if (state.swirlActive && event.animationName === 'star-swirl') {
       engine.finishSwirl();
     }
   }, [state.swirlActive, engine]);
@@ -216,6 +216,7 @@ export default function StarField() {
           <g key={`d-${i}`} style={{
             animation: `twinkle ${s.twinkleDuration}s ease-in-out infinite`,
             animationDelay: `${s.twinkleDelay}s`,
+            willChange: 'opacity',
           } as React.CSSProperties}>
             <circle cx={s.cx} cy={s.cy} r={s.r * 2} fill="#7b9ec7" opacity={s.opacity * 0.3} filter="url(#glow-dust)" />
             <circle cx={s.cx} cy={s.cy} r={s.r} fill="#7b9ec7" opacity={s.opacity} />
@@ -227,6 +228,7 @@ export default function StarField() {
           <g key={`m-${i}`} style={{
             animation: `twinkle ${s.twinkleDuration}s ease-in-out infinite`,
             animationDelay: `${s.twinkleDelay}s`,
+            willChange: 'opacity',
           } as React.CSSProperties}>
             <circle cx={s.cx} cy={s.cy} r={s.r * 2} fill="#c8d8f0" opacity={s.opacity * 0.3} filter="url(#glow-dust)" />
             <circle cx={s.cx} cy={s.cy} r={s.r} fill="#c8d8f0" opacity={s.opacity} />
