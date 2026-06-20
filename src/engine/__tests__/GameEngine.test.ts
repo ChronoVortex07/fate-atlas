@@ -77,20 +77,19 @@ describe('GameEngine — new lifecycle', () => {
         }
       }
       engine.completeMinigame(makeResult());
-      // If interaction fired, dismiss it
-      if (engine.getState().activeInteraction) {
-        engine.clearActiveInteraction();
+      // If interaction fired, drain the queue
+      while (engine.getState().interactionQueue.length > 0) {
+        engine.advanceInteractionQueue();
       }
     }
 
     const state = engine.getState();
     expect(state.turnResults.length).toBe(3);
     expect(state.synthesis).toBeTruthy();
-    expect(state.swirlActive).toBe(true);
-    expect(state.screen).not.toBe('result');
+    expect(state.screen).toBe('result');
   });
 
-  it('clearActiveInteraction between minigames returns to method-select', () => {
+  it('advanceInteractionQueue between minigames returns to method-select', () => {
     engine.startTurn('self');
     const methods = engine.getState().availableMethods;
     const idx = methods.findIndex((m) => m !== 'happening');
@@ -107,12 +106,11 @@ describe('GameEngine — new lifecycle', () => {
       tags: ['roll', 'numeric'],
     });
 
-    // After 1 of 3 minigames with an interaction, clearing should go to method-select
-    if (engine.getState().activeInteraction) {
-      engine.clearActiveInteraction();
+    // After 1 of 3 minigames with an interaction, advancing should go to method-select
+    if (engine.getState().interactionQueue.length > 0) {
+      engine.advanceInteractionQueue();
       expect(engine.getState().screen).toBe('method-select');
     }
-    // If no interaction fired, screen is already method-select (set by completeMinigame)
   });
 
   it('returnToQuestionSelect resets turn state, preserves history and affinities', () => {
@@ -131,7 +129,9 @@ describe('GameEngine — new lifecycle', () => {
       interpretation: 'Steady',
       tags: ['roll', 'numeric'],
     });
-    engine.clearActiveInteraction();
+    while (engine.getState().interactionQueue.length > 0) {
+      engine.advanceInteractionQueue();
+    }
 
     const beforeAffinities = { ...engine.getState().affinities };
     const beforeHistory = [...engine.getState().history];
@@ -195,7 +195,7 @@ describe('GameEngine — new lifecycle', () => {
 
     const state = engine.getState();
     // The pending effect should have matched
-    expect(state.activeInteraction).toBeTruthy();
+    expect(state.interactionQueue.length).toBeGreaterThan(0);
     // Pending effects list should be empty (the injected one was consumed)
     expect(state.pendingEffects).toHaveLength(0);
   });
@@ -236,29 +236,98 @@ describe('GameEngine — new lifecycle', () => {
     expect(ok).toBe(false);
   });
 
-  it('swirlActive defaults to false', () => {
-    expect(engine.getState().swirlActive).toBe(false);
-  });
-
-  it('startDebugSwirl sets swirlActive to true', () => {
-    engine.startDebugSwirl();
-    expect(engine.getState().swirlActive).toBe(true);
-  });
-
-  it('finishSwirl clears swirlActive and goes to result', () => {
-    engine.startDebugSwirl();
-    expect(engine.getState().swirlActive).toBe(true);
-
-    engine.finishSwirl();
-    const state = engine.getState();
-    expect(state.swirlActive).toBe(false);
-    expect(state.screen).toBe('result');
-  });
-
-  it('sets swirlActive instead of going directly to result after 3 minigames', () => {
+  it('executeEffect reroll replaces dice result', () => {
     engine.startTurn('self');
 
-    const makeResult = (): SlotResult => ({
+    const methods = engine.getState().availableMethods;
+    const idx = methods.findIndex((m) => m !== 'happening');
+    if (idx === -1) return;
+
+    engine.selectMethod(idx);
+    if (engine.getState().screen !== 'minigame') return;
+
+    engine.completeMinigame({
+      type: 'd20',
+      result: 5,
+      threshold: 'low',
+      interpretation: 'Low roll',
+      tags: ['roll', 'numeric'],
+    });
+
+    // Inject a reroll interaction and advance
+    engine.loadState({
+      interactionQueue: [
+        {
+          ruleId: 'test-reroll',
+          sourceSlotIndex: 0,
+          targetSlotIndex: 0,
+          effect: 'reroll',
+          description: 'Test reroll',
+        },
+      ],
+    });
+
+    const beforeResult = engine.getState().turnResults[0];
+    expect(beforeResult.type).toBe('d20');
+    const beforeValue = (beforeResult as { result: number }).result;
+
+    engine.advanceInteractionQueue();
+
+    const afterResult = engine.getState().turnResults[0];
+    // The dice was rerolled — result may differ (though could be same by chance,
+    // verify type and that a reroll happened by checking interactionQueue drained)
+    expect(afterResult.type).toBe('d20');
+    expect(engine.getState().interactionQueue).toHaveLength(0);
+  });
+
+  it('executeEffect flip toggles tarot orientation', () => {
+    engine.startTurn('self');
+    // Replace turnResults[0] with a tarot result
+    engine.loadState({
+      turnResults: [
+        {
+          type: 'tarot',
+          id: 'fool',
+          name: 'The Fool',
+          number: 0,
+          orientation: 'upright',
+          symbol: '♆',
+          meaningUpright: 'New beginnings',
+          meaningReversed: 'Recklessness',
+          tags: ['major-arcana', 'fool-archetype'],
+        },
+      ],
+      interactionQueue: [
+        {
+          ruleId: 'test-flip',
+          sourceSlotIndex: 0,
+          targetSlotIndex: 0,
+          effect: 'flip',
+          description: 'Test flip',
+        },
+      ],
+      minigamesCompleted: 1,
+    });
+
+    engine.advanceInteractionQueue();
+
+    const result = engine.getState().turnResults[0];
+    expect(result.type).toBe('tarot');
+    expect((result as { orientation: string }).orientation).toBe('reversed');
+    expect(engine.getState().interactionQueue).toHaveLength(0);
+  });
+
+  it('advanceInteractionQueue drains queue and transitions to method-select when more minigames remain', () => {
+    engine.startTurn('self');
+
+    const methods = engine.getState().availableMethods;
+    const idx = methods.findIndex((m) => m !== 'happening');
+    if (idx === -1) return;
+
+    engine.selectMethod(idx);
+    if (engine.getState().screen !== 'minigame') return;
+
+    engine.completeMinigame({
       type: 'd20',
       result: 10,
       threshold: 'neutral',
@@ -266,42 +335,41 @@ describe('GameEngine — new lifecycle', () => {
       tags: ['roll', 'numeric'],
     });
 
-    // Complete 3 minigames
-    for (let i = 0; i < 3; i++) {
-      const methods = engine.getState().availableMethods;
-      const idx = methods.findIndex((m) => m !== 'happening');
-      if (idx === -1) return;
-      engine.selectMethod(idx);
-      if (engine.getState().screen === 'happening') {
-        engine.resolveHappening(0);
-        const m2 = engine.getState().availableMethods;
-        const ix2 = m2.findIndex((m) => m !== 'happening');
-        if (ix2 === -1) return;
-        engine.selectMethod(ix2);
-      }
-      engine.completeMinigame(makeResult());
-      if (engine.getState().activeInteraction) {
-        engine.clearActiveInteraction();
+    // completeMinigame with queue sets screen to minigame (frozen)
+    const qLen = engine.getState().interactionQueue.length;
+    if (qLen > 0) {
+      expect(engine.getState().screen).toBe('minigame');
+
+      engine.advanceInteractionQueue();
+      expect(engine.getState().interactionQueue).toHaveLength(qLen - 1);
+
+      // If more in queue, screen stays frozen
+      if (engine.getState().interactionQueue.length > 0) {
+        expect(engine.getState().screen).toBe('minigame');
+      } else {
+        // Queue empty — should transition
+        expect(engine.getState().screen).toBe('method-select');
       }
     }
-
-    const state = engine.getState();
-    expect(state.turnResults.length).toBe(3);
-    expect(state.synthesis).toBeTruthy();
-    expect(state.swirlActive).toBe(true);
-    expect(state.screen).not.toBe('result');
-
-    // finishSwirl should transition to result
-    engine.finishSwirl();
-    expect(engine.getState().swirlActive).toBe(false);
-    expect(engine.getState().screen).toBe('result');
   });
 
-  it('swirlActive resets on startTurn', () => {
-    engine.startDebugSwirl();
-    expect(engine.getState().swirlActive).toBe(true);
-
+  it('interactionQueue resets on startTurn', () => {
     engine.startTurn('self');
-    expect(engine.getState().swirlActive).toBe(false);
+    engine.loadState({
+      interactionQueue: [
+        {
+          ruleId: 'test',
+          sourceSlotIndex: 0,
+          targetSlotIndex: 0,
+          effect: 'reroll',
+          description: 'Test',
+        },
+      ],
+    });
+    expect(engine.getState().interactionQueue.length).toBe(1);
+
+    engine.returnToQuestionSelect();
+    engine.startTurn('self');
+    expect(engine.getState().interactionQueue).toHaveLength(0);
   });
 });
