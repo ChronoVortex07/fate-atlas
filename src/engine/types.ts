@@ -186,6 +186,7 @@ export type Screen =
   | 'method-select'
   | 'minigame'
   | 'happening'
+  | 'interaction'
   | 'result';
 
 export interface GameState {

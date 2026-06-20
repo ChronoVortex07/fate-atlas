@@ -172,8 +172,9 @@ export class GameEngine {
       ];
     }
 
-    // If queue is non-empty, freeze current screen — sequencer handles advancing
+    // If queue is non-empty, transition to interaction screen — sequencer handles advancing
     if (this.state.interactionQueue.length > 0) {
+      this.state.screen = 'interaction';
       this.bus.emit('minigame-complete', { result, completed, interactions: interactionEvents });
       this.notify();
       return;

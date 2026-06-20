@@ -16,6 +16,7 @@ import InteractionSequencer from '../overlays/InteractionSequencer';
 interface ActiveSlots {
   sourceIndex: number | null;
   targetIndex: number | null;
+  effect: string | null;
 }
 
 export default function GameTable() {
@@ -24,9 +25,10 @@ export default function GameTable() {
   const [activeSlots, setActiveSlots] = useState<ActiveSlots>({
     sourceIndex: null,
     targetIndex: null,
+    effect: null,
   });
 
-  const showTableau = state.screen !== 'title' && state.screen !== 'question';
+  const showTableau = state.screen !== 'title' && state.screen !== 'question' && state.screen !== 'result';
 
   const handleActiveSlotsChange = useCallback(
     (slots: ActiveSlots) => setActiveSlots(slots),
@@ -34,7 +36,7 @@ export default function GameTable() {
   );
 
   const handleAnimationComplete = useCallback(
-    () => setActiveSlots({ sourceIndex: null, targetIndex: null }),
+    () => setActiveSlots({ sourceIndex: null, targetIndex: null, effect: null }),
     [],
   );
 
@@ -50,6 +52,8 @@ export default function GameTable() {
         return renderMinigame();
       case 'happening':
         return <HappeningScene key="happening" />;
+      case 'interaction':
+        return null;
       case 'result':
         return <ResultReading key="result" />;
       default:

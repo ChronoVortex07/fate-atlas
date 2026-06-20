@@ -3,11 +3,11 @@ import type { AnimationDescriptor } from '../InteractionSequencer';
 
 interface Props {
   descriptor: AnimationDescriptor;
-  phase: 'showing' | 'animating';
+  step: string;
 }
 
-export default function MirrorAnimation({ descriptor: _descriptor, phase }: Props) {
-  if (phase !== 'animating') return null;
+export default function MirrorAnimation({ descriptor: _descriptor, step }: Props) {
+  if (step === 'desc') return null;
 
   return (
     <motion.div style={containerStyle}>

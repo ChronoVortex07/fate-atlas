@@ -17,6 +17,17 @@ interface AnimationDescriptor {
 
 export type { AnimationDescriptor };
 
+interface AnimationStep {
+  id: string;
+  autoAdvanceMs: number; // 0 = requires manual tap
+}
+
+interface SlotInfo {
+  sourceIndex: number | null;
+  targetIndex: number | null;
+  effect: string | null;
+}
+
 const EFFECT_LABELS: Record<string, string> = {
   reroll: "Fool's Reroll",
   flip: 'Critical Flip',
@@ -34,22 +45,65 @@ function eventToDescriptor(event: InteractionEvent): AnimationDescriptor {
   };
 }
 
-interface Props {
-  onActiveSlotsChange: (slots: { sourceIndex: number | null; targetIndex: number | null }) => void;
-  onAnimationComplete: () => void;
+function getStepsForEffect(effect: AnimationDescriptor['effect']): AnimationStep[] {
+  switch (effect) {
+    case 'reroll':
+      return [
+        { id: 'desc', autoAdvanceMs: 1200 },
+        { id: 'source-glint', autoAdvanceMs: 700 },
+        { id: 'projectile', autoAdvanceMs: 600 },
+        { id: 'rerolling', autoAdvanceMs: 1000 },
+        { id: 'reveal', autoAdvanceMs: 0 },
+      ];
+    case 'flip':
+      return [
+        { id: 'desc', autoAdvanceMs: 1200 },
+        { id: 'source-glint', autoAdvanceMs: 700 },
+        { id: 'wave', autoAdvanceMs: 800 },
+        { id: 'reveal', autoAdvanceMs: 0 },
+      ];
+    case 'mirror':
+      return [
+        { id: 'desc', autoAdvanceMs: 1200 },
+        { id: 'source-glint', autoAdvanceMs: 700 },
+        { id: 'reflection', autoAdvanceMs: 900 },
+        { id: 'reveal', autoAdvanceMs: 0 },
+      ];
+    case 'add-choice':
+      return [
+        { id: 'desc', autoAdvanceMs: 1200 },
+        { id: 'source-glint', autoAdvanceMs: 700 },
+        { id: 'branching', autoAdvanceMs: 900 },
+        { id: 'reveal', autoAdvanceMs: 0 },
+      ];
+    case 'second-result':
+      return [
+        { id: 'desc', autoAdvanceMs: 1200 },
+        { id: 'source-glint', autoAdvanceMs: 700 },
+        { id: 'portal', autoAdvanceMs: 800 },
+        { id: 'reveal', autoAdvanceMs: 0 },
+      ];
+  }
 }
 
-const AUTO_ADVANCE_MS = 2500; // base auto-advance time per interaction
+interface Props {
+  onActiveSlotsChange: (slots: SlotInfo) => void;
+  onAnimationComplete: () => void;
+}
 
 export default function InteractionSequencer({ onActiveSlotsChange, onAnimationComplete }: Props) {
   const { state, engine } = useGameEngine();
   const [currentDescriptor, setCurrentDescriptor] = useState<AnimationDescriptor | null>(null);
-  const [phase, setPhase] = useState<'showing' | 'animating' | 'done'>('showing');
-  const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const phaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [stepIndex, setStepIndex] = useState(0);
+  const stepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startedRef = useRef(false);
 
   const queue = state.interactionQueue;
+
+  const steps = currentDescriptor ? getStepsForEffect(currentDescriptor.effect) : [];
+  const currentStep = steps[stepIndex];
+  const isLastStep = stepIndex >= steps.length - 1;
+  const totalSteps = steps.length;
 
   // When queue changes, start playing the first interaction
   useEffect(() => {
@@ -57,42 +111,78 @@ export default function InteractionSequencer({ onActiveSlotsChange, onAnimationC
       startedRef.current = true;
       const desc = eventToDescriptor(queue[0]);
       setCurrentDescriptor(desc);
-      setPhase('showing');
-      onActiveSlotsChange({ sourceIndex: desc.sourceIndex, targetIndex: desc.targetIndex });
-
-      // Auto-advance from showing to animating
-      phaseTimerRef.current = setTimeout(() => {
-        setPhase('animating');
-      }, 600);
-
-      // Auto-advance to done
-      advanceTimerRef.current = setTimeout(() => {
-        handleComplete();
-      }, AUTO_ADVANCE_MS);
+      setStepIndex(0);
+      onActiveSlotsChange({
+        sourceIndex: desc.sourceIndex,
+        targetIndex: desc.targetIndex,
+        effect: desc.effect,
+      });
     }
 
     return () => {
-      if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
-      if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current);
+      if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
     };
   }, [queue.length]);
+
+  // Reset stepIndex when currentDescriptor changes (new interaction starts)
+  useEffect(() => {
+    if (currentDescriptor) {
+      setStepIndex(0);
+    }
+  }, [currentDescriptor]);
+
+  // Auto-advance timer per step
+  useEffect(() => {
+    if (!currentStep || currentStep.autoAdvanceMs <= 0) return;
+
+    stepTimerRef.current = setTimeout(() => {
+      if (isLastStep) {
+        handleComplete();
+      } else {
+        setStepIndex((i) => i + 1);
+      }
+    }, currentStep.autoAdvanceMs);
+
+    return () => {
+      if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
+    };
+  }, [stepIndex, currentDescriptor]);
+
+  // Update activeSlots based on current step
+  useEffect(() => {
+    if (!currentDescriptor || !currentStep) return;
+
+    const desc = currentDescriptor;
+    const stepId = currentStep.id;
+
+    // Source highlighted during desc, source-glint, and effect-specific steps
+    const highlightSource = ['desc', 'source-glint', 'projectile', 'wave', 'reflection', 'branching', 'portal'].includes(stepId);
+    // Target highlighted during rerolling and reveal steps
+    const highlightTarget = ['rerolling', 'reveal'].includes(stepId);
+    // Obscure (placeholder) target during rerolling
+    const effect = stepId === 'rerolling' ? 'reroll' : null;
+
+    onActiveSlotsChange({
+      sourceIndex: highlightSource ? desc.sourceIndex : null,
+      targetIndex: highlightTarget ? desc.targetIndex : null,
+      effect,
+    });
+  }, [stepIndex, currentDescriptor]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
-      if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current);
+      if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
     };
   }, []);
 
   const handleComplete = useCallback(() => {
-    if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
-    if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current);
+    if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
 
-    onActiveSlotsChange({ sourceIndex: null, targetIndex: null });
+    onActiveSlotsChange({ sourceIndex: null, targetIndex: null, effect: null });
     engine.advanceInteractionQueue();
     setCurrentDescriptor(null);
-    setPhase('done');
+    setStepIndex(0);
     startedRef.current = false;
 
     // Check actual queue state after advancing to avoid stale closure
@@ -102,18 +192,13 @@ export default function InteractionSequencer({ onActiveSlotsChange, onAnimationC
   }, [engine, onActiveSlotsChange, onAnimationComplete]);
 
   const handleTap = useCallback(() => {
-    if (phase === 'showing') {
-      setPhase('animating');
-      if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current);
-      // Reduce remaining auto-advance time
-      if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
-      advanceTimerRef.current = setTimeout(() => {
-        handleComplete();
-      }, 800);
-    } else if (phase === 'animating') {
+    if (isLastStep) {
       handleComplete();
+    } else {
+      if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
+      setStepIndex((i) => i + 1);
     }
-  }, [phase, handleComplete]);
+  }, [isLastStep, handleComplete]);
 
   if (!currentDescriptor || queue.length === 0) return null;
 
@@ -138,49 +223,48 @@ export default function InteractionSequencer({ onActiveSlotsChange, onAnimationC
           exit={{ opacity: 0 }}
         />
 
-        {/* Description banner */}
+        {/* Description banner — always visible */}
         <motion.div
           style={bannerStyle}
           initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: phase === 'showing' ? 1 : 0.6, y: 0 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
           <div style={bannerLabelStyle}>{label}</div>
           <div style={bannerDescStyle}>{currentDescriptor.description}</div>
+          {currentStep && (
+            <div style={stepIndicatorStyle}>
+              Step {stepIndex + 1} of {totalSteps}
+            </div>
+          )}
         </motion.div>
 
-        {/* Tap hint */}
-        {phase === 'showing' && (
-          <motion.div
-            style={tapHintStyle}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.5 }}
-            transition={{ delay: 0.8, duration: 0.3 }}
-          >
-            Tap to continue
-          </motion.div>
+        {/* Per-effect animation */}
+        {currentDescriptor.effect === 'reroll' && (
+          <RerollAnimation descriptor={currentDescriptor} step={currentStep?.id ?? 'desc'} />
+        )}
+        {currentDescriptor.effect === 'flip' && (
+          <FlipAnimation descriptor={currentDescriptor} step={currentStep?.id ?? 'desc'} />
+        )}
+        {currentDescriptor.effect === 'mirror' && (
+          <MirrorAnimation descriptor={currentDescriptor} step={currentStep?.id ?? 'desc'} />
+        )}
+        {currentDescriptor.effect === 'add-choice' && (
+          <AddChoiceAnimation descriptor={currentDescriptor} step={currentStep?.id ?? 'desc'} />
+        )}
+        {currentDescriptor.effect === 'second-result' && (
+          <SecondResultAnimation descriptor={currentDescriptor} step={currentStep?.id ?? 'desc'} />
         )}
 
-        {/* Per-effect animation — only show when not in 'done' phase */}
-        {phase !== 'done' && (
-          <>
-            {currentDescriptor.effect === 'reroll' && (
-              <RerollAnimation descriptor={currentDescriptor} phase={phase} />
-            )}
-            {currentDescriptor.effect === 'flip' && (
-              <FlipAnimation descriptor={currentDescriptor} phase={phase} />
-            )}
-            {currentDescriptor.effect === 'mirror' && (
-              <MirrorAnimation descriptor={currentDescriptor} phase={phase} />
-            )}
-            {currentDescriptor.effect === 'add-choice' && (
-              <AddChoiceAnimation descriptor={currentDescriptor} phase={phase} />
-            )}
-            {currentDescriptor.effect === 'second-result' && (
-              <SecondResultAnimation descriptor={currentDescriptor} phase={phase} />
-            )}
-          </>
-        )}
+        {/* Tap hint */}
+        <motion.div
+          style={tapHintStyle}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.5 }}
+          transition={{ delay: 0.5, duration: 0.3 }}
+        >
+          {isLastStep ? 'Tap to complete' : 'Tap to continue'}
+        </motion.div>
       </motion.div>
     </AnimatePresence>
   );
@@ -236,6 +320,15 @@ const bannerDescStyle: React.CSSProperties = {
   color: '#7b9ec7',
   fontStyle: 'italic',
   lineHeight: 1.5,
+};
+
+const stepIndicatorStyle: React.CSSProperties = {
+  fontFamily: "'Inter', sans-serif",
+  fontWeight: 300,
+  fontSize: '0.6rem',
+  color: '#5b7290',
+  letterSpacing: '0.08em',
+  marginTop: '0.5rem',
 };
 
 const tapHintStyle: React.CSSProperties = {

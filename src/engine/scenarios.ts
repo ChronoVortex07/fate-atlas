@@ -1,4 +1,5 @@
 import type { GameState, PendingEffect } from './types';
+import { drawTarotCard } from '../data/tarot';
 
 export interface ScenarioPreset {
   id: string;
@@ -71,6 +72,9 @@ export const SCENARIO_PRESETS: ScenarioPreset[] = [
     id: 'fools-reroll',
     label: "Fool's Reroll",
     apply: (state) => {
+      const theFool = drawTarotCard({ chaos: 0.5, order: 0.5 });
+      state.turnResults = [theFool];
+      state.minigamesCompleted = 1;
       state.pendingEffects = [foolsRerollEffect];
       state.selectedMethod = 'd20';
       state.screen = 'minigame';

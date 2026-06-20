@@ -6,6 +6,7 @@ type CardSlotState = 'idle' | 'source' | 'target' | 'animating';
 interface ActiveSlots {
   sourceIndex: number | null;
   targetIndex: number | null;
+  effect: string | null;
 }
 
 interface Props {
@@ -60,6 +61,8 @@ export default function CardTableau({ results, activeSlots }: Props) {
         {results.map((result, index) => {
           const slotState = getSlotState(index, activeSlots);
           const display = getSlotDisplay(result);
+          const showPlaceholder =
+            slotState === 'target' && activeSlots.effect === 'reroll';
           return (
             <motion.div
               key={index}
@@ -79,10 +82,23 @@ export default function CardTableau({ results, activeSlots }: Props) {
               exit={{ opacity: 0, y: 20 }}
               transition={{ duration: 0.4, ease: 'easeOut' }}
             >
-              <div style={cardSymbolStyle}>{display.symbol}</div>
-              <div style={cardNameStyle}>{display.name}</div>
-              {display.typeLabel && (
-                <div style={cardTypeStyle}>{display.typeLabel}</div>
+              {showPlaceholder ? (
+                <motion.div
+                  style={placeholderStyle}
+                  animate={{ opacity: [0.3, 1, 0.3] }}
+                  transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
+                >
+                  <div style={placeholderSymbolStyle}>⟳</div>
+                  <div style={placeholderLabelStyle}>Rerolling...</div>
+                </motion.div>
+              ) : (
+                <>
+                  <div style={cardSymbolStyle}>{display.symbol}</div>
+                  <div style={cardNameStyle}>{display.name}</div>
+                  {display.typeLabel && (
+                    <div style={cardTypeStyle}>{display.typeLabel}</div>
+                  )}
+                </>
               )}
             </motion.div>
           );
@@ -160,4 +176,26 @@ const cardTypeStyle: React.CSSProperties = {
   color: '#5b7290',
   letterSpacing: '0.08em',
   textTransform: 'uppercase',
+};
+
+const placeholderStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '4px',
+};
+
+const placeholderSymbolStyle: React.CSSProperties = {
+  fontSize: '1.6rem',
+  color: '#d4a854',
+  lineHeight: 1,
+};
+
+const placeholderLabelStyle: React.CSSProperties = {
+  fontFamily: "'Inter', sans-serif",
+  fontWeight: 300,
+  fontSize: '0.5rem',
+  color: '#7b7b5a',
+  letterSpacing: '0.05em',
 };
