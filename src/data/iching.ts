@@ -102,7 +102,7 @@ export function castHexagram(affinities: Record<string, number>): IChingResult {
 
   const tags: string[] = ['draw', 'random', 'binary'];
   if (changingLines.length > 0) {
-    tags.push('reversible', 'changing-lines');
+    tags.push('changing-lines');
   }
 
   return {

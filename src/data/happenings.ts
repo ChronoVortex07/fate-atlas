@@ -86,7 +86,13 @@ export function selectHappening(
   excludeIds: string[],
   chaosAffinity: number,
 ): HappeningData {
-  const available = HAPPENINGS.filter((h) => !excludeIds.includes(h.id));
+  let available = HAPPENINGS.filter((h) => !excludeIds.includes(h.id));
+
+  // If all happenings have been used, reset the pool
+  if (available.length === 0) {
+    available = [...HAPPENINGS];
+  }
+
   // High chaos slightly weights toward happenings with more choices
   const weighted = available.map((h) => ({
     happening: h,

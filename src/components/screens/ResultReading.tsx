@@ -57,7 +57,7 @@ export default function ResultReading() {
   const [copied, setCopied] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  const { turnResult, synthesis, happening, selectedHappeningChoice, questionType } = state;
+  const { turnResults, synthesis, happening, selectedHappeningChoice, questionType } = state;
 
   const handleDrawAgain = useCallback(() => engine.returnToQuestionSelect(), [engine]);
   const handleShare = useCallback(async () => {
@@ -73,7 +73,6 @@ export default function ResultReading() {
     } catch { /* silent */ }
   }, [engine]);
 
-  const resultDisplay = turnResult ? getResultDisplay(turnResult) : null;
   const questionLabel = questionType ? formatQuestionType(questionType) : 'the unknown';
 
   return (
@@ -84,12 +83,20 @@ export default function ResultReading() {
         <div style={questionStyle}>{questionLabel}</div>
         <OrnamentalBorder margin="0.25rem 0" />
 
-        {/* Divination Result */}
-        {resultDisplay && (
-          <div style={resultCardStyle}>
-            <div style={resultSymbolStyle}>{resultDisplay.symbol}</div>
-            <div style={resultNameStyle}>{resultDisplay.name}</div>
-            <div style={resultSubtitleStyle}>{resultDisplay.subtitle}</div>
+        {/* Divination Results */}
+        {turnResults.length > 0 && (
+          <div style={resultsGridStyle}>
+            {turnResults.map((r, i) => {
+              const d = getResultDisplay(r);
+              return (
+                <div key={i} style={resultCardStyle}>
+                  <div style={resultIndexStyle}>{i + 1}</div>
+                  <div style={resultSymbolStyle}>{d.symbol}</div>
+                  <div style={resultNameStyle}>{d.name}</div>
+                  <div style={resultSubtitleStyle}>{d.subtitle}</div>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -173,7 +180,18 @@ const questionStyle: React.CSSProperties = {
   fontStyle: 'italic', letterSpacing: '0.08em',
 };
 
+const resultsGridStyle: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%',
+};
+
+const resultIndexStyle: React.CSSProperties = {
+  fontFamily: "'Inter', sans-serif", fontWeight: 600,
+  fontSize: '0.6rem', color: '#5b7290', letterSpacing: '0.1em',
+  position: 'absolute', top: '0.5rem', left: '0.5rem',
+};
+
 const resultCardStyle: React.CSSProperties = {
+  position: 'relative',
   display: 'flex', flexDirection: 'column', alignItems: 'center',
   gap: '0.3rem', padding: '1rem', background: '#0d1220',
   border: '1px solid #1a2440', borderRadius: '6px', width: '100%',

@@ -31,9 +31,7 @@ const STAR_POINTS = [
 ].join(',\n');
 
 export default function TitleScreen() {
-  const { state, engine } = useGameEngine();
-
-  if (state.screen !== 'title') return null;
+  const { engine } = useGameEngine();
 
   const handleStart = () => {
     engine.loadState({ screen: 'question' });

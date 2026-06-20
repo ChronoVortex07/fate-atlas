@@ -3,21 +3,25 @@ import { useGameEngine } from '../../hooks/useGameEngine';
 import type { RunRecord } from '../../engine/types';
 
 function getTileIcon(run: RunRecord): string {
-  if (!run.turnResult || run.turnResult.type === 'happening') return '*';
-  switch (run.turnResult.type) {
-    case 'tarot': return run.turnResult.symbol;
-    case 'd20': return String.fromCodePoint(0x2685); // D20 die face
-    case 'iching': return run.turnResult.symbol;
+  if (!run.turnResults || run.turnResults.length === 0) return '*';
+  const last = run.turnResults[run.turnResults.length - 1];
+  if (last.type === 'happening') return '*';
+  switch (last.type) {
+    case 'tarot': return last.symbol;
+    case 'd20': return String.fromCodePoint(0x2685);
+    case 'iching': return last.symbol;
     default: return '*';
   }
 }
 
 function getTileLabel(run: RunRecord): string {
-  if (!run.turnResult || run.turnResult.type === 'happening') return 'Happening';
-  switch (run.turnResult.type) {
-    case 'tarot': return run.turnResult.name;
-    case 'd20': return `D20 ${run.turnResult.result}`;
-    case 'iching': return run.turnResult.name;
+  if (!run.turnResults || run.turnResults.length === 0) return 'Empty';
+  const last = run.turnResults[run.turnResults.length - 1];
+  if (last.type === 'happening') return 'Happening';
+  switch (last.type) {
+    case 'tarot': return last.name;
+    case 'd20': return `D20 ${last.result}`;
+    case 'iching': return last.name;
     default: return 'Unknown';
   }
 }

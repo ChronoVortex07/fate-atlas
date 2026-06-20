@@ -35,13 +35,13 @@ describe('castHexagram', () => {
     expect(result.changingLines.length).toBeLessThanOrEqual(6);
   });
 
-  it('includes [reversible] tag when there are changing lines', () => {
+  it('includes [changing-lines] tag when there are changing lines', () => {
     let hadChanging = false;
     for (let i = 0; i < 50; i++) {
       const result = castHexagram({ chaos: 0.5, order: 0 });
       if (result.changingLines.length > 0) {
         hadChanging = true;
-        expect(result.tags).toContain('reversible');
+        expect(result.tags).toContain('changing-lines');
         break;
       }
     }

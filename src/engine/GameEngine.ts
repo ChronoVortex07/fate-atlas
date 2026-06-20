@@ -24,8 +24,10 @@ export class GameEngine {
   private cachedSnapshot: GameState;
   private listeners = new Set<(state: GameState) => void>();
   private usedHappeningIds = new Set<string>();
+  private minigamesPerTurn: number;
 
-  constructor() {
+  constructor(minigamesPerTurn = 3) {
+    this.minigamesPerTurn = minigamesPerTurn;
     this.bus = new EventBus();
     this.tagSystem = new TagSystem();
     this.affinityEngine = new AffinityEngine([CHAOS_AFFINITY, ORDER_AFFINITY]);
@@ -45,10 +47,12 @@ export class GameEngine {
       questionType: null,
       availableMethods: [],
       selectedMethod: null,
-      turnResult: null,
+      turnResults: [],
+      minigamesCompleted: 0,
       minigameState: null,
       pendingEffects: [],
       activeInteraction: null,
+      pendingHappening: false,
       interactions: [],
       synthesis: null,
       happening: null,
@@ -82,9 +86,11 @@ export class GameEngine {
     this.state.questionType = question;
     this.state.availableMethods = availableMethods;
     this.state.selectedMethod = null;
-    this.state.turnResult = null;
+    this.state.turnResults = [];
+    this.state.minigamesCompleted = 0;
     this.state.minigameState = null;
     this.state.activeInteraction = null;
+    this.state.pendingHappening = false;
     this.state.interactions = [];
     this.state.synthesis = null;
     this.state.happening = null;
@@ -102,29 +108,17 @@ export class GameEngine {
     }
 
     this.state.selectedMethod = methodType;
-
-    // Happening gate check
-    const chaos = this.affinityEngine.getState().chaos;
-    if (methodType === 'happening') {
-      // Always trigger happening if happening was drawn and selected
-      this.triggerHappening();
-      return;
-    }
-
-    if (chaos >= 0.7 && Math.random() < 0.3) {
-      // Chaos override — replace with happening
-      this.triggerHappening();
-      return;
-    }
-
     this.state.screen = 'minigame';
     this.notify();
   }
 
   completeMinigame(result: SlotResult): void {
-    this.state.turnResult = result;
+    // Add result to the turn's results array
+    this.state.turnResults = [...this.state.turnResults, result];
+    const completed = this.state.minigamesCompleted + 1;
+    this.state.minigamesCompleted = completed;
 
-    // Apply affinities from result
+    // Apply affinities from the result
     if (result.type !== 'happening') {
       this.affinityEngine.apply([result]);
     }
@@ -155,42 +149,111 @@ export class GameEngine {
     );
     this.state.pendingEffects = [...this.state.pendingEffects, ...newEffects];
 
-    // If any matched effects, set activeInteraction for the InteractionLayer
+    // If any matched effects, show the interaction layer
     if (interactionEvents.length > 0) {
       this.state.activeInteraction = interactionEvents[0];
-      // Screen stays 'minigame' — InteractionLayer handles the transition to result
-    } else {
-      // No interactions to show, go straight to result
-      this.state.screen = 'result';
     }
 
-    // Synthesize
-    this.synthesize();
+    if (completed >= this.minigamesPerTurn) {
+      // All minigames done — synthesize and go to result
+      this.synthesizeAll();
+      // Build run record
+      this.buildRunRecord();
+      // If active interaction, stay on minigame screen briefly then go to result
+      if (this.state.activeInteraction) {
+        // InteractionLayer will clear and we need to go to result
+        // We'll handle this in clearActiveInteraction
+      } else {
+        this.state.screen = 'result';
+      }
+    } else {
+      // More minigames to go — check for happening chance
+      const goingBackToSelect = () => {
+        // Remove the used method and refill pool
+        this.orchestrator.removeUsedMethod(result.type as 'tarot' | 'd20' | 'iching');
+        const affinities = this.affinityEngine.getState();
+        this.state.availableMethods = this.orchestrator.refillPool(
+          this.state.questionType!,
+          affinities,
+        );
+        this.state.screen = 'method-select';
+        this.state.selectedMethod = null;
+        if (!this.state.activeInteraction) {
+          this.notify();
+        }
+      };
 
-    this.bus.emit('minigame-complete', { result, interactions: interactionEvents });
+      // Happening chance after each minigame (except the last)
+      const chaos = this.affinityEngine.getState().chaos;
+      if (chaos >= 0.4 && Math.random() < chaos * 0.5) {
+        // Trigger a happening between minigames
+        this.state.screen = 'method-select'; // set temporarily so clearActiveInteraction knows where to go
+        if (this.state.activeInteraction) {
+          // Show interaction first, then happening via clearActiveInteraction override
+          // Store that we need to go to happening after interaction clears
+          this.state.pendingHappening = true;
+        } else {
+          this.triggerHappening();
+          return;
+        }
+      } else {
+        goingBackToSelect();
+      }
+    }
+
+    this.bus.emit('minigame-complete', { result, completed, interactions: interactionEvents });
     this.notify();
   }
 
   clearActiveInteraction(): void {
+    const hadPendingHappening = this.state.pendingHappening;
+    this.state.pendingHappening = false;
     this.state.activeInteraction = null;
-    this.state.screen = 'result';
+
+    if (hadPendingHappening) {
+      this.triggerHappening();
+      return;
+    }
+
+    if (this.state.minigamesCompleted >= this.minigamesPerTurn) {
+      this.state.screen = 'result';
+    } else {
+      this.state.screen = 'method-select';
+      this.state.selectedMethod = null;
+    }
     this.notify();
   }
 
-  private synthesize(): void {
-    const result = this.state.turnResult;
-    if (!result || result.type === 'happening') return;
+  private buildRunRecord(): void {
+    const run: RunRecord = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      timestamp: Date.now(),
+      question: this.state.questionType!,
+      turnResults: this.state.turnResults,
+      interactions: this.state.interactions,
+      synthesis: this.state.synthesis!,
+      happening: this.state.happening ?? undefined,
+      happeningChoice: this.state.selectedHappeningChoice ?? undefined,
+    };
+    this.state.history = [...this.state.history, run].slice(-10);
+  }
+
+  private synthesizeAll(): void {
+    const results = this.state.turnResults;
+    if (results.length === 0) return;
+
+    const nonHappeningResults = results.filter((r) => r.type !== 'happening');
+    if (nonHappeningResults.length === 0) return;
 
     const affinities = this.affinityEngine.getState();
     const synthesisResult = this.synthesisEngine.synthesize(
-      [result],
+      nonHappeningResults,
       this.state.questionType!,
       this.state.interactions,
       affinities,
     );
 
     this.state.synthesis = synthesisResult;
-
     this.bus.emit('synthesis-complete', { result: synthesisResult });
   }
 
@@ -235,30 +298,22 @@ export class GameEngine {
     this.affinityEngine.setState(current);
 
     this.state.selectedHappeningChoice = choiceIndex;
-
-    // If we came from selectMethod gate, we still need to synthesize
-    // Use the happening itself as the "result" for the reading
-    if (!this.state.synthesis) {
-      this.synthesize();
-    }
-
-    this.state.screen = 'result';
     this.state.affinities = this.affinityEngine.getState();
 
-    // Build run record
-    const run: RunRecord = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      timestamp: Date.now(),
-      question: this.state.questionType!,
-      turnResult: this.state.turnResult ?? this.state.happening,
-      interactions: this.state.interactions,
-      synthesis: this.state.synthesis!,
-      happening: this.state.happening,
-      happeningChoice: choiceIndex,
-    };
-    this.state.history = [...this.state.history, run].slice(-10);
+    // Happening resolved — return to method select for the next minigame
+    this.state.screen = 'method-select';
+    this.state.selectedMethod = null;
+    this.state.happening = null;
+    this.state.selectedHappeningChoice = null;
 
     this.bus.emit('happening-resolved', { choiceIndex });
+
+    // Refill pool for next minigame (the used method was already removed)
+    const affinities = this.affinityEngine.getState();
+    this.state.availableMethods = this.orchestrator.refillPool(
+      this.state.questionType!,
+      affinities,
+    );
 
     this.saveToStorage();
     this.notify();
@@ -332,11 +387,13 @@ export class GameEngine {
   // ---------- LLM Prompt ----------
 
   generateLLMPrompt(): string {
-    const result = this.state.turnResult;
-    if (!result || result.type === 'happening') return '';
+    const results = this.state.turnResults;
+    if (results.length === 0) return '';
+    const nonHappening = results.filter((r) => r.type !== 'happening');
+    if (nonHappening.length === 0) return '';
     return this.synthesisEngine.generateLLMPrompt({
       question: this.state.questionType!,
-      slots: [result],
+      slots: nonHappening,
       interactions: this.state.interactions,
       affinities: this.affinityEngine.getState(),
     });
@@ -358,9 +415,11 @@ export class GameEngine {
     this.state.questionType = null;
     this.state.availableMethods = [];
     this.state.selectedMethod = null;
-    this.state.turnResult = null;
+    this.state.turnResults = [];
+    this.state.minigamesCompleted = 0;
     this.state.minigameState = null;
     this.state.activeInteraction = null;
+    this.state.pendingHappening = false;
     this.state.interactions = [];
     this.state.synthesis = null;
     this.state.happening = null;

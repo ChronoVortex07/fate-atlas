@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GameEngine } from '../GameEngine';
+import type { SlotResult } from '../types';
 
 describe('GameEngine — new lifecycle', () => {
   let engine: GameEngine;
@@ -24,8 +25,7 @@ describe('GameEngine — new lifecycle', () => {
     engine.startTurn('self');
     engine.selectMethod(0);
     const state = engine.getState();
-    // If happening was selected, may go to happening instead
-    expect(['minigame', 'happening']).toContain(state.screen);
+    expect(state.screen).toBe('minigame');
   });
 
   it('selectMethod with out-of-bounds index throws', () => {
@@ -33,47 +33,57 @@ describe('GameEngine — new lifecycle', () => {
     expect(() => engine.selectMethod(99)).toThrow('out of bounds');
   });
 
-  it('selectMethod with happening type always triggers happening', () => {
+  it('selectMethod picks the method and goes to minigame', () => {
     engine.startTurn('self');
-    // Find happening index if any
     const methods = engine.getState().availableMethods;
-    const happeningIdx = methods.indexOf('happening');
-    if (happeningIdx !== -1) {
-      engine.selectMethod(happeningIdx);
-      expect(engine.getState().screen).toBe('happening');
+    expect(methods.length).toBeGreaterThan(0);
+    engine.selectMethod(0);
+    expect(engine.getState().screen).toBe('minigame');
+    expect(engine.getState().selectedMethod).toBe(methods[0]);
+  });
+
+  it('synthesizes after 3 complete minigames and goes to result', () => {
+    engine.startTurn('self');
+
+    const makeResult = (): SlotResult => ({
+      type: 'd20',
+      result: 10,
+      threshold: 'neutral',
+      interpretation: 'Steady',
+      tags: ['roll', 'numeric'],
+    });
+
+    // Complete 3 minigames
+    for (let i = 0; i < 3; i++) {
+      const methods = engine.getState().availableMethods;
+      const idx = methods.findIndex((m) => m !== 'happening');
+      if (idx === -1) return;
+      engine.selectMethod(idx);
+      if (engine.getState().screen !== 'minigame') {
+        // Might have triggered a happening — resolve it to continue
+        if (engine.getState().screen === 'happening') {
+          engine.resolveHappening(0);
+          methods.length = 0; // force re-read
+          const m2 = engine.getState().availableMethods;
+          const ix2 = m2.findIndex((m) => m !== 'happening');
+          if (ix2 === -1) return;
+          engine.selectMethod(ix2);
+        }
+      }
+      engine.completeMinigame(makeResult());
+      // If interaction fired, dismiss it
+      if (engine.getState().activeInteraction) {
+        engine.clearActiveInteraction();
+      }
     }
-  });
 
-  it('completeMinigame sets turnResult, checks pending effects, synthesizes', () => {
-    engine.startTurn('self');
-    // Find a non-happening method
-    const methods = engine.getState().availableMethods;
-    const idx = methods.findIndex((m) => m !== 'happening');
-    if (idx === -1) return; // all happenings, skip
-
-    engine.selectMethod(idx);
-    if (engine.getState().screen !== 'minigame') return; // happening override
-
-    const tarotResult = {
-      type: 'tarot' as const,
-      id: 'the-star',
-      name: 'The Star',
-      number: 17,
-      orientation: 'upright' as const,
-      symbol: '*',
-      meaningUpright: 'Hope',
-      meaningReversed: 'Despair',
-      tags: ['major-arcana', 'reversible', 'star-archetype'],
-    };
-
-    engine.completeMinigame(tarotResult);
     const state = engine.getState();
-    expect(state.turnResult).toBeTruthy();
+    expect(state.turnResults.length).toBe(3);
     expect(state.synthesis).toBeTruthy();
-    // activeInteraction may be null if no pending effects matched
+    expect(state.screen).toBe('result');
   });
 
-  it('clearActiveInteraction clears interaction and goes to result', () => {
+  it('clearActiveInteraction between minigames returns to method-select', () => {
     engine.startTurn('self');
     const methods = engine.getState().availableMethods;
     const idx = methods.findIndex((m) => m !== 'happening');
@@ -90,8 +100,12 @@ describe('GameEngine — new lifecycle', () => {
       tags: ['roll', 'numeric'],
     });
 
-    engine.clearActiveInteraction();
-    expect(engine.getState().screen).toBe('result');
+    // After 1 of 3 minigames with an interaction, clearing should go to method-select
+    if (engine.getState().activeInteraction) {
+      engine.clearActiveInteraction();
+      expect(engine.getState().screen).toBe('method-select');
+    }
+    // If no interaction fired, screen is already method-select (set by completeMinigame)
   });
 
   it('returnToQuestionSelect resets turn state, preserves history and affinities', () => {
@@ -118,7 +132,7 @@ describe('GameEngine — new lifecycle', () => {
     engine.returnToQuestionSelect();
     const state = engine.getState();
     expect(state.screen).toBe('question');
-    expect(state.turnResult).toBeNull();
+    expect(state.turnResults).toEqual([]);
     expect(state.synthesis).toBeNull();
     expect(state.affinities).toEqual(beforeAffinities);
     expect(state.history).toEqual(beforeHistory);

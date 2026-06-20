@@ -25,6 +25,7 @@ export class TurnOrchestrator {
     affinities: Record<string, number>,
   ): DivinationType[] {
     this.availableMethods = [];
+    this.usedThisTurn = [];
     const weights = QUESTION_WEIGHTS[question];
 
     const entries: { type: DivinationType; weight: number }[] = [
@@ -90,5 +91,61 @@ export class TurnOrchestrator {
 
   getAvailableMethods(): DivinationType[] {
     return [...this.availableMethods];
+  }
+
+  private usedThisTurn: DivinationType[] = [];
+
+  removeUsedMethod(method: 'tarot' | 'd20' | 'iching'): void {
+    this.usedThisTurn.push(method);
+    // Remove the used method from availableMethods (it'll be refilled)
+    const idx = this.availableMethods.indexOf(method);
+    if (idx !== -1) {
+      this.availableMethods.splice(idx, 1);
+    }
+  }
+
+  refillPool(
+    question: QuestionType,
+    affinities: Record<string, number>,
+  ): DivinationType[] {
+    // Keep remaining methods, draw new ones to fill back to POOL_SIZE
+    const weights = QUESTION_WEIGHTS[question];
+
+    const entries: { type: DivinationType; weight: number }[] = [
+      { type: 'tarot', weight: weights.tarot ?? 1 },
+      { type: 'd20', weight: weights.d20 ?? 1 },
+      { type: 'iching', weight: weights.iching ?? 1 },
+      { type: 'happening', weight: weights.happening ?? 1 },
+    ];
+
+    if ((affinities.chaos ?? 0) >= 0.5 && Math.random() < 0.3) {
+      entries.find((e) => e.type === 'happening')!.weight += 2;
+    }
+
+    while (this.availableMethods.length < POOL_SIZE) {
+      const totalWeight = entries.reduce((s, e) => s + e.weight, 0);
+      let roll = Math.random() * totalWeight;
+      for (const entry of entries) {
+        roll -= entry.weight;
+        if (roll <= 0) {
+          if (!this.availableMethods.includes(entry.type)) {
+            this.availableMethods.push(entry.type);
+          }
+          break;
+        }
+      }
+    }
+
+    this.bus.emit('pool-refilled', {
+      question,
+      pool: [...this.availableMethods],
+    });
+
+    return [...this.availableMethods];
+  }
+
+  resetTurn(): void {
+    this.usedThisTurn = [];
+    this.availableMethods = [];
   }
 }

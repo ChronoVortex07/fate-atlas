@@ -69,11 +69,11 @@ export default function HistoryModal({ onClose }: { onClose: () => void }) {
                     <span style={dateStyle}>{formatDate(run.timestamp)}</span>
                   </div>
                   <div style={chipsRow}>
-                    {run.turnResult && (
-                      <span style={chipStyle}>
-                        {slotLabel(run.turnResult)}
+                    {run.turnResults && run.turnResults.map((r, i) => (
+                      <span key={i} style={chipStyle}>
+                        {slotLabel(r)}
                       </span>
-                    )}
+                    ))}
                   </div>
                   {run.synthesis?.headline && (
                     <p style={headlineStyle}>{run.synthesis.headline}</p>

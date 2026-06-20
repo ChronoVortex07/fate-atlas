@@ -38,9 +38,7 @@ const cardVariants = {
 };
 
 export default function QuestionSelect() {
-  const { state, engine } = useGameEngine();
-
-  if (state.screen !== 'question') return null;
+  const { engine } = useGameEngine();
 
   const handleSelect = (questionType: QuestionType) => {
     engine.startTurn(questionType);

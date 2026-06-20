@@ -36,7 +36,20 @@ export default function MethodSelect() {
     >
       <div style={contentStyle}>
         <h1 style={headingStyle}>Choose your divination</h1>
-        <p style={subtitleStyle}>The stars have dealt three methods — pick one to reveal your fate</p>
+        <p style={subtitleStyle}>
+          {state.minigamesCompleted > 0
+            ? `Reading ${state.minigamesCompleted + 1} of ${3} — pick your next method`
+            : 'The stars have dealt three methods — pick one to reveal your fate'}
+        </p>
+        <div style={turnProgressStyle}>
+          {Array.from({ length: 3 }, (_, i) => (
+            <div key={i} style={{
+              ...progressDotStyle,
+              background: i < state.minigamesCompleted ? '#d4a854' : '#1a2440',
+              boxShadow: i < state.minigamesCompleted ? '0 0 6px rgba(212,168,84,0.4)' : 'none',
+            }} />
+          ))}
+        </div>
         <div style={goldRuleStyle} />
 
         <motion.div style={gridStyle} variants={containerVariants} initial="hidden" animate="visible">
@@ -100,6 +113,15 @@ const goldRuleStyle: React.CSSProperties = {
   width: '40px',
   height: '2px',
   background: 'linear-gradient(90deg, transparent, #d4a854, transparent)',
+};
+
+const turnProgressStyle: React.CSSProperties = {
+  display: 'flex', gap: '10px',
+};
+
+const progressDotStyle: React.CSSProperties = {
+  width: '10px', height: '10px', borderRadius: '50%',
+  transition: 'background 0.4s ease, box-shadow 0.4s ease',
 };
 
 const gridStyle: React.CSSProperties = {

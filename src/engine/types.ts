@@ -82,6 +82,7 @@ export type EventType =
   | 'turn-complete'
   | 'affinity-changed'
   | 'minigame-complete'
+  | 'pool-refilled'
   | 'state-loaded';
 
 export interface GameEvent {
@@ -125,7 +126,7 @@ export interface RunRecord {
   id: string;
   timestamp: number;
   question: QuestionType;
-  turnResult: SlotResult | null;
+  turnResults: SlotResult[];
   interactions: InteractionEvent[];
   synthesis: SynthesisResult;
   happening?: HappeningResult;
@@ -193,10 +194,12 @@ export interface GameState {
   questionType: QuestionType | null;
   availableMethods: DivinationType[];
   selectedMethod: DivinationType | null;
-  turnResult: SlotResult | null;
+  turnResults: SlotResult[];
+  minigamesCompleted: number;
   minigameState: MinigameState | null;
   pendingEffects: PendingEffect[];
   activeInteraction: InteractionEvent | null;
+  pendingHappening: boolean; // interaction was shown before a between-minigame happening
   interactions: InteractionEvent[];
   synthesis: SynthesisResult | null;
   happening: HappeningResult | null;
