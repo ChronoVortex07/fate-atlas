@@ -42,12 +42,14 @@ export default function InteractionSequencer({ onActiveSlotsChange, onAnimationC
   const [phase, setPhase] = useState<'showing' | 'animating' | 'done'>('showing');
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const phaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startedRef = useRef(false);
 
   const queue = state.interactionQueue;
 
   // When queue changes, start playing the first interaction
   useEffect(() => {
-    if (queue.length > 0 && !currentDescriptor) {
+    if (queue.length > 0 && !startedRef.current) {
+      startedRef.current = true;
       const desc = eventToDescriptor(queue[0]);
       setCurrentDescriptor(desc);
       setPhase('showing');
@@ -68,7 +70,7 @@ export default function InteractionSequencer({ onActiveSlotsChange, onAnimationC
       if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
       if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current);
     };
-  }, [queue.length, currentDescriptor]);
+  }, [queue.length]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -86,12 +88,13 @@ export default function InteractionSequencer({ onActiveSlotsChange, onAnimationC
     engine.advanceInteractionQueue();
     setCurrentDescriptor(null);
     setPhase('done');
+    startedRef.current = false;
 
-    if (queue.length <= 1) {
-      // This was the last interaction
+    // Check actual queue state after advancing to avoid stale closure
+    if (engine.getState().interactionQueue.length === 0) {
       onAnimationComplete();
     }
-  }, [engine, onActiveSlotsChange, onAnimationComplete, queue.length]);
+  }, [engine, onActiveSlotsChange, onAnimationComplete]);
 
   const handleTap = useCallback(() => {
     if (phase === 'showing') {
@@ -114,6 +117,7 @@ export default function InteractionSequencer({ onActiveSlotsChange, onAnimationC
   return (
     <AnimatePresence>
       <motion.div
+        key={currentDescriptor.effect + '-' + currentDescriptor.sourceIndex + '-' + currentDescriptor.targetIndex}
         style={overlayStyle}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
