@@ -23,6 +23,8 @@ import {
 export class AffinityEngine {
   private state: Record<AffinityId, number>;
   private feedsThisRun: Record<AffinityId, number>;
+  private peeksThisRun = 0;
+  private peekLocked = false;
   private definitions: AffinityDefinition[];
   private defById: Record<string, AffinityDefinition>;
 
@@ -85,12 +87,34 @@ export class AffinityEngine {
     }
   }
 
+  // ── Peek (Light-only foresight) ──
+  peekAvailable(): boolean {
+    if (this.peekLocked) return false;
+    return BAND_ORDER.indexOf(bandOf(this.state.light)) >= BAND_ORDER.indexOf('ascendant');
+  }
+
+  // Resolves a peek attempt: escalating fail chance, lockout + Light penalty on failure,
+  // a small Light feed on success. Caller supplies the player-facing leaning text.
+  usePeek(): { failed: boolean } {
+    const failChance = Math.min(0.9, 0.18 * this.peeksThisRun);
+    this.peeksThisRun += 1;
+    if (Math.random() < failChance) {
+      this.peekLocked = true;
+      this.shift('light', -12, 'peek-fail'); // direct subtraction, no fan-out
+      return { failed: true };
+    }
+    this.applyAction('use-peek'); // seeking clarity feeds Light
+    return { failed: false };
+  }
+
   // Run boundary: drift toward baseline, reset per-run counters. Reshuffle hook.
   beginRun(): void {
     for (const id of AFFINITY_IDS) {
       this.state[id] = this.clamp(this.state[id] + (BASELINE - this.state[id]) * RUN_DRIFT);
       this.feedsThisRun[id] = 0;
     }
+    this.peeksThisRun = 0;
+    this.peekLocked = false;
   }
 
   bandOf(id: AffinityId): AffinityBand {
