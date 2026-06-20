@@ -568,4 +568,54 @@ describe('GameEngine — new lifecycle', () => {
     expect(s.turnResults).toHaveLength(2);       // applied during advance
     expect(s.interactionQueue).toHaveLength(0);
   });
+
+  it('selectMethod clears activeSlotIndex when entering a minigame', () => {
+    engine.startTurn('self');
+    engine.loadState({ availableMethods: ['d20', 'tarot', 'iching'], activeSlotIndex: 0, screen: 'method-select' });
+    engine.selectMethod(0);
+    const s = engine.getState();
+    expect(s.screen).toBe('minigame');
+    expect(s.activeSlotIndex).toBeNull();
+  });
+
+  it('createPendingEffects uses committedIndex not completed-1 after a prior second-result append', () => {
+    engine.startTurn('self');
+    // Diverged state: turnResults has 2 entries (one was a second-result append) but
+    // minigamesCompleted is only 1. So completed-1 = 1, but committedIndex should be 2.
+    engine.loadState({
+      turnResults: [
+        {
+          type: 'd20', result: 10, threshold: 'neutral', interpretation: 'x',
+          tags: ['roll', 'numeric'],
+        },
+        {
+          type: 'd20', result: 12, threshold: 'neutral', interpretation: 'x',
+          tags: ['roll', 'numeric'],
+        },
+      ],
+      minigamesCompleted: 1,
+      pendingEffects: [], // no pre-existing effects to avoid matching
+    });
+
+    // A tarot result with major-arcana + fool-archetype triggers the 'fool-reroll' rule,
+    // causing createPendingEffects to produce a PendingEffect.
+    engine.completeMinigame({
+      type: 'tarot',
+      id: 'fool',
+      name: 'The Fool',
+      number: 0,
+      orientation: 'upright',
+      symbol: '0',
+      meaningUpright: 'New beginnings',
+      meaningReversed: 'Recklessness',
+      tags: ['major-arcana', 'fool-archetype', 'reversible'],
+    });
+
+    const created = engine.getState().pendingEffects;
+    expect(created.length).toBeGreaterThan(0);
+    for (const eff of created) {
+      // The committed slot is at index 2 (third entry), not completed-1 = 1
+      expect(eff.sourceSlotIndex).toBe(2);
+    }
+  });
 });

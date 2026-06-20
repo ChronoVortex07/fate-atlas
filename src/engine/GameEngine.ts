@@ -126,6 +126,7 @@ export class GameEngine {
       return;
     }
 
+    this.state.activeSlotIndex = null;
     this.state.screen = 'minigame';
     this.notify();
   }
@@ -168,7 +169,7 @@ export class GameEngine {
       result,
       runId,
       INTERACTION_RULES,
-      completed - 1,
+      committedIndex,
     );
     this.state.pendingEffects = [...this.state.pendingEffects, ...newEffects];
 
