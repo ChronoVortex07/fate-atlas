@@ -3,45 +3,34 @@ import { motion } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
 import { rollD20 } from '../../data/dice';
 import type { DiceResult } from '../../engine/types';
-
-const THRESHOLD_COLORS: Record<string, string> = {
-  'critical-low': '#c0392b',
-  'low': '#c75b4a',
-  'neutral': '#7b9ec7',
-  'high': '#5b8c5a',
-  'critical-high': '#d4a854',
-};
+import DiceThrowAnimation, { THRESHOLD_COLORS } from './DiceThrowAnimation';
 
 export default function DiceMinigame() {
   const { state, engine } = useGameEngine();
   const [thrown, setThrown] = useState(false);
-  const [result, setResult] = useState<DiceResult | null>(null);
-  const [rollValue, setRollValue] = useState(10);
+  const [localResult, setLocalResult] = useState<DiceResult | null>(null);
 
   const handleThrow = useCallback(() => {
     setThrown(true);
-    const finalResult = rollD20(state.affinities);
-    setResult(finalResult);
-    // Animate the count-up
-    let count = 0;
-    const interval = setInterval(() => {
-      count++;
-      if (count >= finalResult.result) {
-        clearInterval(interval);
-        setRollValue(finalResult.result);
-      } else {
-        setRollValue(Math.min(count, 20));
-      }
-    }, 50);
+    setLocalResult(rollD20(state.affinities));
   }, [state.affinities]);
 
+  // Commit after a beat so the player sees the initial roll before any
+  // interaction sequence begins.
   useEffect(() => {
-    if (!result || !thrown) return;
+    if (!localResult || !thrown) return;
     const timer = setTimeout(() => {
-      engine.completeMinigame(result);
+      engine.completeMinigame(localResult);
     }, 1500);
     return () => clearTimeout(timer);
-  }, [result, thrown, engine]);
+  }, [localResult, thrown, engine]);
+
+  // Once committed, the engine owns this slot — display from it so interaction
+  // effects (e.g. Fool's Reroll) are reflected. Before commit, use local roll.
+  const committedSlot =
+    state.activeSlotIndex !== null ? state.turnResults[state.activeSlotIndex] : undefined;
+  const displayResult: DiceResult | null =
+    committedSlot && committedSlot.type === 'd20' ? committedSlot : localResult;
 
   return (
     <motion.div
@@ -67,26 +56,18 @@ export default function DiceMinigame() {
             <span style={tapHintStyle}>Tap to throw</span>
           </motion.button>
         ) : (
-          <motion.div style={resultContainerStyle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
-            <motion.div
-              style={dieResultStyle}
-              initial={{ y: -100, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 200, damping: 12 }}
-            >
-              <span style={{ ...resultNumberStyle, color: result ? THRESHOLD_COLORS[result.threshold] : '#c8d8f0' }}>
-                {rollValue}
-              </span>
-            </motion.div>
-            {result && (
+          displayResult && (
+            <motion.div style={resultContainerStyle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+              {/* key on the value so a reroll remounts and replays the throw */}
+              <DiceThrowAnimation key={displayResult.result} value={displayResult.result} threshold={displayResult.threshold} />
               <motion.div style={thresholdStyle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
-                <span style={{ ...thresholdBadgeStyle, color: THRESHOLD_COLORS[result.threshold], borderColor: THRESHOLD_COLORS[result.threshold] }}>
-                  {result.threshold.replace(/-/g, ' ').toUpperCase()}
+                <span style={{ ...thresholdBadgeStyle, color: THRESHOLD_COLORS[displayResult.threshold], borderColor: THRESHOLD_COLORS[displayResult.threshold] }}>
+                  {displayResult.threshold.replace(/-/g, ' ').toUpperCase()}
                 </span>
-                <p style={interpretationStyle}>{result.interpretation}</p>
+                <p style={interpretationStyle}>{displayResult.interpretation}</p>
               </motion.div>
-            )}
-          </motion.div>
+            </motion.div>
+          )
         )}
       </div>
     </motion.div>
@@ -150,24 +131,6 @@ const resultContainerStyle: React.CSSProperties = {
   flexDirection: 'column',
   alignItems: 'center',
   gap: '1.5rem',
-};
-
-const dieResultStyle: React.CSSProperties = {
-  width: '120px',
-  height: '120px',
-  background: '#0d1220',
-  border: '2px solid #1a2440',
-  borderRadius: '12px',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-};
-
-const resultNumberStyle: React.CSSProperties = {
-  fontFamily: "'Cormorant Garamond', serif",
-  fontWeight: 700,
-  fontSize: '3rem',
-  transition: 'color 0.5s ease',
 };
 
 const thresholdStyle: React.CSSProperties = {
