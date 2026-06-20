@@ -249,7 +249,10 @@ export class GameEngine {
     }
 
     if (this.state.minigamesCompleted >= this.minigamesPerTurn) {
+      this.synthesizeAll();
+      this.buildRunRecord();
       this.state.screen = 'result';
+      this.saveToStorage();
     } else {
       const affinities = this.affinityEngine.getState();
       const gaps = this.readingPlanner.analyzeGaps(this.state.turnResults);

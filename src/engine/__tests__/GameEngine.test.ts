@@ -660,4 +660,72 @@ describe('GameEngine — new lifecycle', () => {
       expect(eff.sourceSlotIndex).toBe(2);
     }
   });
+
+  it('synthesizes reading when interaction fires on final minigame', () => {
+    // Regression: interactions on the last minigame caused
+    // completeMinigame to return early, and advanceInteractionQueue
+    // never called synthesizeAll(), leaving synthesis null.
+    //
+    // We inject a pending effect that matches the 3rd result's tags,
+    // which triggers the interaction queue on the final minigame
+    // and exercises the bug path.
+
+    engine.startTurn('self');
+
+    const makeResult = (tags: string[]): SlotResult => ({
+      type: 'd20',
+      result: 10,
+      threshold: 'neutral',
+      interpretation: 'Steady',
+      tags,
+      themes: ['harmony'],
+      dimensions: { favorability: 0.0, certainty: -1.0, volatility: 0.0 },
+      modifierRoles: ['effect'],
+    } as SlotResult);
+
+    // Inject a pending effect that will match the 3rd result
+    engine.injectPendingEffect({
+      id: 'test-mirror',
+      sourceRunId: 'test-run',
+      sourceCard: 'The Fool',
+      sourceSlotIndex: 0,
+      triggerTags: ['roll', 'trigger-test'],
+      action: 'flip',
+      description: 'Test interaction',
+      expiresAfter: 3,
+      turnsRemaining: 3,
+    });
+
+    // Complete 3 minigames — the 3rd one will trigger the pending effect
+    for (let i = 0; i < 3; i++) {
+      const methods = engine.getState().availableMethods;
+      const idx = methods.findIndex((m) => m !== 'happening');
+      if (idx === -1) return;
+      engine.selectMethod(idx);
+      if (engine.getState().screen !== 'minigame') {
+        if (engine.getState().screen === 'happening') {
+          engine.resolveHappening(0);
+          const m2 = engine.getState().availableMethods;
+          const ix2 = m2.findIndex((m) => m !== 'happening');
+          if (ix2 === -1) return;
+          engine.selectMethod(ix2);
+        }
+      }
+      // The 3rd result gets the tag that triggers the pending effect
+      engine.completeMinigame(makeResult(i === 2 ? ['roll', 'trigger-test'] : ['roll', 'numeric']));
+    }
+
+    // Drain the interaction queue — this is where the bug was:
+    // advanceInteractionQueue would set screen='result' without synthesizing
+    while (engine.getState().interactionQueue.length > 0) {
+      engine.advanceInteractionQueue();
+    }
+
+    const state = engine.getState();
+    expect(state.screen).toBe('result');
+    // This is the key assertion: synthesis must be non-null
+    expect(state.synthesis).toBeTruthy();
+    expect(state.synthesis!.headline.length).toBeGreaterThan(0);
+    expect(state.synthesis!.paragraphs.length).toBeGreaterThan(0);
+  });
 });
