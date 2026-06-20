@@ -3,6 +3,7 @@ import type {
   ModifierRole, InteractionEvent,
 } from './types';
 import { NARRATIVE_TEMPLATES } from '../data/narrative-templates';
+import { bandOf } from '../data/affinities';
 
 // Subject noun phrases per question type (for {subject} substitution)
 const SUBJECT_NOUNS: Record<QuestionType, string> = {
@@ -143,11 +144,14 @@ export class NarrativeAssembler {
       paragraphs.push(closing.replace('{dominantTheme}', aggregated.dominantTheme));
     }
 
-    // Affinity note (unchanged from current)
+    // Affinity note — elevated when Chaos/Order reach Ascendant or higher.
     let affinityNote: string | undefined;
-    if (affinities.chaos >= 0.5) {
+    const chaosBand = bandOf(affinities.chaos ?? 0);
+    const orderBand = bandOf(affinities.order ?? 0);
+    const isElevated = (b: string) => b === 'ascendant' || b === 'dominant';
+    if (isElevated(chaosBand)) {
       affinityNote = 'The currents of chaos run strong. Expect the unexpected — these readings carry extra volatility.';
-    } else if (affinities.order >= 0.5) {
+    } else if (isElevated(orderBand)) {
       affinityNote = 'Order shapes this reading with unusual clarity. The patterns are steady and reliable.';
     }
 
@@ -205,7 +209,9 @@ export class NarrativeAssembler {
     lines.push('## Atlas of Fate Reading');
     lines.push('');
     lines.push(`**Question type:** ${run.question}`);
-    lines.push(`**Affinity hints:** ${run.affinities.chaos >= 0.5 ? 'High Chaos - volatile and unpredictable' : run.affinities.order >= 0.5 ? 'High Order - steady and clear' : 'Balanced - neutral currents'}`);
+    const isElevatedChaos = (() => { const b = bandOf(run.affinities.chaos ?? 0); return b === 'ascendant' || b === 'dominant'; })();
+    const isElevatedOrder = (() => { const b = bandOf(run.affinities.order ?? 0); return b === 'ascendant' || b === 'dominant'; })();
+    lines.push(`**Affinity hints:** ${isElevatedChaos ? 'High Chaos - volatile and unpredictable' : isElevatedOrder ? 'High Order - steady and clear' : 'Balanced - neutral currents'}`);
     lines.push('');
 
     if (run.aggregated) {

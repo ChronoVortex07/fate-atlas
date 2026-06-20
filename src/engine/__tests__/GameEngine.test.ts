@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GameEngine } from '../GameEngine';
-import type { SlotResult } from '../types';
+import type { SlotResult, DiceResult } from '../types';
 
 describe('GameEngine — new lifecycle', () => {
   let engine: GameEngine;
@@ -727,5 +727,47 @@ describe('GameEngine — new lifecycle', () => {
     expect(state.synthesis).toBeTruthy();
     expect(state.synthesis!.headline.length).toBeGreaterThan(0);
     expect(state.synthesis!.paragraphs.length).toBeGreaterThan(0);
+  });
+});
+
+function diceResult(): DiceResult {
+  return {
+    type: 'd20', result: 11, threshold: 'neutral',
+    interpretation: '...', tags: ['roll', 'random', 'numeric', 'threshold', 'neutral'],
+    themes: ['harmony'], dimensions: { favorability: 0, certainty: -1, volatility: 0 }, modifierRoles: ['effect'],
+  };
+}
+
+describe('GameEngine — event-resolved Chaos effects', () => {
+  it('maybeWildSurge fires with probability 1 when debugForcedEffect names it, then clears the flag', () => {
+    const engine = new GameEngine();
+    engine.startTurn('decision');
+    engine.selectMethod(0);
+    // Force the flag via loadState (debug-only path)
+    engine.loadState({ debugForcedEffect: 'wild-surge' });
+    const before = engine.getState().turnResults.length;
+    const fired = engine.maybeWildSurge(diceResult());
+    expect(fired).toBe(true);
+    expect(engine.getState().turnResults.length).toBe(before + 1);
+    expect(engine.getState().debugForcedEffect).toBeNull();
+  });
+
+  it('maybeWildSurge does not fire when chaos is latent and unforced', () => {
+    const engine = new GameEngine();
+    engine.startTurn('decision');
+    engine.loadState({ affinities: { ...engine.getState().affinities, chaos: 10 } });
+    const orig = Math.random;
+    Math.random = () => 0.99; // above any base chance
+    const fired = engine.maybeWildSurge(diceResult());
+    Math.random = orig;
+    expect(fired).toBe(false);
+  });
+
+  it('maybeHappeningInterrupt fires with probability 1 when forced', () => {
+    const engine = new GameEngine();
+    engine.startTurn('decision');
+    engine.loadState({ debugForcedEffect: 'happening-interrupt' });
+    expect(engine.maybeHappeningInterrupt()).toBe(true);
+    expect(engine.getState().debugForcedEffect).toBeNull();
   });
 });

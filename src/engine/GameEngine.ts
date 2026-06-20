@@ -1,4 +1,4 @@
-import type { GameState, QuestionType, AffinityId, SlotResult, RunRecord, PendingEffect, InteractionEvent } from './types';
+import type { GameState, QuestionType, AffinityId, AffinityBand, SlotResult, RunRecord, PendingEffect, InteractionEvent } from './types';
 import { EventBus } from './EventBus';
 import { TagSystem } from './TagSystem';
 import { AffinityEngine } from './AffinityEngine';
@@ -6,7 +6,7 @@ import { TurnOrchestrator } from './TurnOrchestrator';
 import { InteractionResolver } from './InteractionResolver';
 import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
-import { CHAOS_AFFINITY, ORDER_AFFINITY } from '../data/affinities';
+import { AFFINITY_DEFINITIONS, defaultAffinityState, BAND_ORDER } from '../data/affinities';
 import { INTERACTION_RULES } from '../data/interactions';
 import { selectHappening } from '../data/happenings';
 import { loadScenario, SCENARIO_PRESETS } from './scenarios';
@@ -32,7 +32,7 @@ export class GameEngine {
     this.minigamesPerTurn = minigamesPerTurn;
     this.bus = new EventBus();
     this.tagSystem = new TagSystem();
-    this.affinityEngine = new AffinityEngine([CHAOS_AFFINITY, ORDER_AFFINITY]);
+    this.affinityEngine = new AffinityEngine(AFFINITY_DEFINITIONS);
     this.orchestrator = new TurnOrchestrator(this.bus);
     this.interactionResolver = new InteractionResolver(this.tagSystem, this.bus);
     this.readingPlanner = new ReadingPlanner();
@@ -46,7 +46,7 @@ export class GameEngine {
   private defaultState(): GameState {
     return {
       screen: 'title',
-      affinities: { chaos: 0.5, order: 0.5 },
+      affinities: defaultAffinityState(),
       questionType: null,
       availableMethods: [],
       selectedMethod: null,
@@ -66,6 +66,7 @@ export class GameEngine {
       eventLog: [],
       chainDepth: 0,
       debug: false,
+      debugForcedEffect: null,
     };
   }
 
@@ -79,6 +80,7 @@ export class GameEngine {
   // ---------- Turn lifecycle ----------
 
   startTurn(question: QuestionType): void {
+    this.affinityEngine.beginRun();
     const affinities = this.affinityEngine.getState();
     const availableMethods = this.orchestrator.generatePool(question, affinities);
 
@@ -133,9 +135,10 @@ export class GameEngine {
     const completed = this.state.minigamesCompleted + 1;
     this.state.minigamesCompleted = completed;
 
-    // Apply affinities from the result
+    // Apply affinities from the result (Chaos/Order tag feeds, routed through shift)
     if (result.type !== 'happening') {
-      this.affinityEngine.apply([result]);
+      this.affinityEngine.applyResultTags(result);
+      this.maybeWildSurge(result);
     }
 
     // Check pending effects against this result
@@ -190,8 +193,7 @@ export class GameEngine {
     } else {
       this.orchestrator.removeUsedMethod(result.type as 'tarot' | 'd20' | 'iching');
 
-      const chaos = this.affinityEngine.getState().chaos;
-      if (chaos >= 0.4 && Math.random() < chaos * 0.5) {
+      if (this.maybeHappeningInterrupt()) {
         this.triggerHappening();
         return;
       } else {
@@ -317,7 +319,7 @@ export class GameEngine {
         if (this.state.happening && this.state.happening.choices.length > 0) {
           const bonusChoice = {
             text: 'A hidden path emerges — ' + this.state.happening.choices[0].text,
-            affinityChanges: { chaos: 0.05 },
+            affinityChanges: { chaos: 5 },
           };
           this.state.happening = {
             ...this.state.happening,
@@ -411,15 +413,10 @@ export class GameEngine {
       throw new Error(`Choice ${choiceIndex} not found in happening`);
     }
 
-    // Apply affinity changes from chosen option
-    const current = this.affinityEngine.getState();
+    // Apply affinity changes from chosen option through the shift pipeline.
     for (const [id, delta] of Object.entries(choice.affinityChanges)) {
-      const key = id as AffinityId;
-      current[key] = Math.max(0, Math.min(1,
-        Math.round((current[key] + (delta as number)) * 100) / 100,
-      ));
+      this.affinityEngine.shift(id as AffinityId, delta as number, `happening:${this.state.happening.id}`);
     }
-    this.affinityEngine.setState(current);
 
     this.state.selectedHappeningChoice = choiceIndex;
     this.state.affinities = this.affinityEngine.getState();
@@ -441,6 +438,52 @@ export class GameEngine {
 
     this.saveToStorage();
     this.notify();
+  }
+
+  // ---------- Event-resolved affinity decisions ----------
+
+  // Returns true if the named effect should fire now: guaranteed when the debug
+  // flag names it (flag then clears), otherwise band-gated × base chance.
+  private forcedOrRoll(
+    effectId: string,
+    affinity: AffinityId,
+    minBand: AffinityBand,
+    baseChance: number,
+  ): boolean {
+    if (this.state.debugForcedEffect === effectId) {
+      this.state.debugForcedEffect = null;
+      return true;
+    }
+    const band = this.affinityEngine.resolveBand(affinity);
+    if (BAND_ORDER.indexOf(band) < BAND_ORDER.indexOf(minBand)) return false;
+    return Math.random() < baseChance;
+  }
+
+  // Chaos-Dominant wild surge: a committed result can spawn a second (Major, ~8%).
+  maybeWildSurge(result: SlotResult): boolean {
+    if (result.type === 'happening') return false;
+    if (!this.forcedOrRoll('wild-surge', 'chaos', 'dominant', 0.08)) return false;
+    const affinities = this.affinityEngine.getState();
+    const second = this.orchestrator.drawSingleResult(
+      result.type as 'tarot' | 'd20' | 'iching',
+      affinities,
+    );
+    this.state.turnResults = [...this.state.turnResults, second];
+    this.bus.emit('minigame-complete', { result: second, wildSurge: true });
+    this.notify(); // snapshot contract: surfacing the appended result + cleared flag
+    return true;
+  }
+
+  // Chaos-Dominant happening interrupt (Major); folds in the prior frequency roll.
+  maybeHappeningInterrupt(): boolean {
+    if (this.state.debugForcedEffect === 'happening-interrupt') {
+      this.state.debugForcedEffect = null;
+      this.notify(); // snapshot contract: surfacing the cleared flag
+      return true;
+    }
+    const chaos = this.affinityEngine.getState().chaos;
+    if (chaos < 40) return false;
+    return Math.random() < (chaos / 100) * 0.5;
   }
 
   // ---------- State access ----------
@@ -466,15 +509,17 @@ export class GameEngine {
   }
 
   loadScenarioById(presetId: string): boolean {
-    const success = loadScenario(presetId, this.state);
-    if (success) {
-      this.notify();
-    }
-    return success;
+    const patch = loadScenario(presetId, this.state);
+    if (patch === null) return false;
+    // Affinities must go through the engine BEFORE notify(), which overwrites
+    // state.affinities from the engine. Routing here fixes the old clobber bug.
+    this.affinityEngine.setState(patch);
+    this.notify();
+    return true;
   }
 
   getScenarioPresets() {
-    return SCENARIO_PRESETS.map((p) => ({ id: p.id, label: p.label }));
+    return SCENARIO_PRESETS.map((p) => ({ id: p.id, label: p.label, group: p.group }));
   }
 
   // ---------- Persistence ----------
@@ -590,8 +635,7 @@ export class GameEngine {
   }
 
   clearHistory(): void {
-    const defaultAffinities = { chaos: 0.5, order: 0.5 };
-    this.affinityEngine.setState(defaultAffinities);
+    this.affinityEngine.setState(defaultAffinityState());
     this.state = this.defaultState();
     this.state.affinities = this.affinityEngine.getState();
     this.usedHappeningIds = new Set();

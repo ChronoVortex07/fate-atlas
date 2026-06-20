@@ -1,9 +1,17 @@
 // ── Affinities ──
-export type AffinityId = 'chaos' | 'order';
+export type AffinityId =
+  | 'chaos'
+  | 'order'
+  | 'fate'
+  | 'will'
+  | 'light'
+  | 'shadow';
+
+export type AffinityBand = 'latent' | 'stirring' | 'ascendant' | 'dominant';
 
 export interface AffinityState {
   id: AffinityId;
-  value: number; // 0.0–1.0
+  value: number; // 0–100
 }
 
 // ── Tags ──
@@ -283,4 +291,5 @@ export interface GameState {
   eventLog: GameEvent[];
   chainDepth: number;
   debug: boolean;
+  debugForcedEffect: string | null;
 }

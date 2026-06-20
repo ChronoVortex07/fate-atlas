@@ -144,7 +144,7 @@ export const HEXAGRAMS: HexagramData[] = [
 export function castHexagram(affinities: Record<string, number>): IChingResult {
   const changingLines: number[] = [];
 
-  const changingBias = (affinities.chaos ?? 0) * 0.2;
+  const changingBias = ((affinities.chaos ?? 0) / 100) * 0.2;
 
   for (let line = 0; line < 6; line++) {
     let sum = 0;

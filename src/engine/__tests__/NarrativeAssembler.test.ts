@@ -47,21 +47,21 @@ describe('NarrativeAssembler', () => {
         effect: [makeSlot('iching')],
       },
     };
-    const result = assembler.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
+    const result = assembler.assemble(agg, [], 'decision', { chaos: 40, order: 50 });
     expect(result.headline).toBeTruthy();
     expect(result.paragraphs.length).toBeGreaterThan(0);
   });
 
   it('opening uses correct theme template', () => {
     const agg = { ...baseAggregated, dominantTheme: 'upheaval' as const };
-    const result = assembler.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
+    const result = assembler.assemble(agg, [], 'decision', { chaos: 40, order: 50 });
     expect(result.paragraphs[0]).toContain('upheaval');
   });
 
   it('opening falls back when no dominant theme', () => {
     // Use a theme not in the template set
     const agg = { ...baseAggregated, dominantTheme: 'unknown_theme' as unknown as AggregatedReading['dominantTheme'] };
-    const result = assembler.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
+    const result = assembler.assemble(agg, [], 'decision', { chaos: 40, order: 50 });
     // Should use fallback noDominantTheme template
     expect(result.paragraphs[0].length).toBeGreaterThan(0);
   });
@@ -71,7 +71,7 @@ describe('NarrativeAssembler', () => {
       ...baseAggregated,
       dimensionProfile: { favorability: 1.5, certainty: 1.5, volatility: 0.0 },
     };
-    const result = assembler.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
+    const result = assembler.assemble(agg, [], 'decision', { chaos: 40, order: 50 });
     // Should have an additional paragraph for dimensions (favorability + certainty bands fire)
     expect(result.paragraphs.length).toBeGreaterThanOrEqual(2);
   });
@@ -81,7 +81,7 @@ describe('NarrativeAssembler', () => {
       ...baseAggregated,
       dimensionProfile: { favorability: 0.0, certainty: 0.0, volatility: 0.0 },
     };
-    const result = assembler.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
+    const result = assembler.assemble(agg, [], 'decision', { chaos: 40, order: 50 });
     // Only favorability should fire (all bands speak for favorability)
     const dimParagraph = result.paragraphs.find((p) => p.includes('Fortune') || p.includes('signs'));
     expect(dimParagraph).toBeTruthy();
@@ -100,7 +100,7 @@ describe('NarrativeAssembler', () => {
         effect: [makeSlot('d20')],
       },
     };
-    const result = assembler.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
+    const result = assembler.assemble(agg, [], 'decision', { chaos: 40, order: 50 });
     // Should have paragraphs for subject, action (missing -> gap ack), effect
     const hasSubjectPara = result.paragraphs.some((p) => p.includes('The Fool'));
     expect(hasSubjectPara).toBe(true);
@@ -113,7 +113,7 @@ describe('NarrativeAssembler', () => {
       ...baseAggregated,
       modifierAssignments: { subject: [], action: [], effect: [] },
     };
-    const result = assembler.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
+    const result = assembler.assemble(agg, [], 'decision', { chaos: 40, order: 50 });
     const gapParagraphs = result.paragraphs.filter((p) => p.includes('remains veiled') || p.includes('not yet clear'));
     expect(gapParagraphs.length).toBe(3); // all three roles missing
   });
@@ -126,19 +126,19 @@ describe('NarrativeAssembler', () => {
       hasTension: true,
       tensionPair: ['upheaval', 'harmony'] as [AggregatedReading['dominantTheme'], AggregatedReading['dominantTheme']],
     };
-    const result = assembler.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
+    const result = assembler.assemble(agg, [], 'decision', { chaos: 40, order: 50 });
     expect(result.paragraphs.some((p) => p.includes('Upheaval') && p.includes('harmony'))).toBe(true);
   });
 
   it('no tension -> section absent', () => {
     const agg = { ...baseAggregated, hasTension: false };
-    const result = assembler.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
+    const result = assembler.assemble(agg, [], 'decision', { chaos: 40, order: 50 });
     expect(result.tensionNote).toBeUndefined();
   });
 
   it('closing uses correct question type template', () => {
     const agg = { ...baseAggregated };
-    const result = assembler.assemble(agg, [], 'self', { chaos: 0.4, order: 0.5 });
+    const result = assembler.assemble(agg, [], 'self', { chaos: 40, order: 50 });
     const closing = result.paragraphs[result.paragraphs.length - 1];
     expect(closing.length).toBeGreaterThan(0);
   });
@@ -155,9 +155,9 @@ describe('NarrativeAssembler', () => {
         effect: [makeSlot('iching')],
       },
     };
-    const result1 = assembler2.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
+    const result1 = assembler2.assemble(agg, [], 'decision', { chaos: 40, order: 50 });
     assembler2.resetRotation();
-    const result2 = assembler2.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
+    const result2 = assembler2.assemble(agg, [], 'decision', { chaos: 40, order: 50 });
     // With 2+ templates in the pool, same-seed rotation should produce the same first pick
     // (since we reset rotation in between). Without reset, they'd differ.
     expect(result1.paragraphs[0]).toBe(result2.paragraphs[0]); // same because rotation reset
@@ -175,9 +175,9 @@ describe('NarrativeAssembler', () => {
         effect: [makeSlot('iching')],
       },
     };
-    const result1 = assembler3.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
+    const result1 = assembler3.assemble(agg, [], 'decision', { chaos: 40, order: 50 });
     // Don't reset -- second call should use next index
-    const result2 = assembler3.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
+    const result2 = assembler3.assemble(agg, [], 'decision', { chaos: 40, order: 50 });
     // The opening paragraphs should differ (mystery has 2 templates, index 0 vs 1)
     expect(result1.paragraphs[0]).not.toBe(result2.paragraphs[0]);
   });
@@ -194,10 +194,10 @@ describe('NarrativeAssembler', () => {
         effect: [makeSlot('iching')],
       },
     };
-    const result1 = assembler4.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
-    assembler4.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
+    const result1 = assembler4.assemble(agg, [], 'decision', { chaos: 40, order: 50 });
+    assembler4.assemble(agg, [], 'decision', { chaos: 40, order: 50 });
     // Third call wraps back to index 0 (mystery has 2 openings)
-    const result3 = assembler4.assemble(agg, [], 'decision', { chaos: 0.4, order: 0.5 });
+    const result3 = assembler4.assemble(agg, [], 'decision', { chaos: 40, order: 50 });
     expect(result3.paragraphs[0]).toBe(result1.paragraphs[0]);
   });
 
@@ -206,7 +206,7 @@ describe('NarrativeAssembler', () => {
       question: 'decision' as QuestionType,
       slots: [makeSlot('tarot', { name: 'The Fool', themes: ['renewal'] })],
       interactions: [],
-      affinities: { chaos: 0.4, order: 0.5 },
+      affinities: { chaos: 40, order: 50 },
       aggregated: baseAggregated,
     });
     expect(prompt).toContain('Atlas of Fate');
@@ -216,13 +216,13 @@ describe('NarrativeAssembler', () => {
   });
 
   it('affinity note appears for high chaos', () => {
-    const result = assembler.assemble(baseAggregated, [], 'decision', { chaos: 0.7, order: 0.3 });
+    const result = assembler.assemble(baseAggregated, [], 'decision', { chaos: 70, order: 30 });
     expect(result.affinityNote).toBeTruthy();
     expect(result.affinityNote).toContain('chaos');
   });
 
   it('affinity note appears for high order', () => {
-    const result = assembler.assemble(baseAggregated, [], 'decision', { chaos: 0.3, order: 0.7 });
+    const result = assembler.assemble(baseAggregated, [], 'decision', { chaos: 30, order: 70 });
     expect(result.affinityNote).toContain('Order');
   });
 });
