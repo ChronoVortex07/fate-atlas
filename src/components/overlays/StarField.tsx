@@ -52,7 +52,7 @@ function generateMediumStars(seed: number, count: number): MediumStar[] {
     stars.push({
       cx: rng() * 100,
       cy: rng() * 100,
-      r: rng() * 0.18 + 0.12,
+      r: rng() * 0.09 + 0.06,
       opacity: rng() * 0.3 + 0.35,
       twinkleDuration: rng() * 4 + 2.5,
       twinkleDelay: rng() * 5,
@@ -73,11 +73,12 @@ export default function StarField() {
   }, [state.swirlActive, engine]);
 
   const swirlClass = state.swirlActive ? ' starfield--swirling' : '';
+  const dimmedClass = state.screen !== 'title' ? ' starfield--dimmed' : '';
 
   return (
     <div style={containerStyle}>
       <svg
-        className={`starfield${swirlClass}`}
+        className={`starfield${swirlClass}${dimmedClass}`}
         width="100%"
         height="100%"
         viewBox="0 0 100 100"
@@ -115,23 +116,23 @@ export default function StarField() {
             <feGaussianBlur stdDeviation="0.25" />
           </filter>
 
-          {/* 8-pointed star template (white) */}
+          {/* 8-pointed star template (white) — tiny, crisp */}
           <g id="cstar-white">
-            <circle cx="0" cy="0" r="2.0" fill="#c8d8f0" opacity="0.1" filter="url(#glow-outer)" />
-            <circle cx="0" cy="0" r="0.6" fill="#e8f0ff" opacity="0.3" filter="url(#glow-tight)" />
+            <circle cx="0" cy="0" r="0.8" fill="#c8d8f0" opacity="0.12" filter="url(#glow-tight)" />
+            <circle cx="0" cy="0" r="0.3" fill="#e8f0ff" opacity="0.35" filter="url(#glow-tight)" />
             <path
-              d="M 0,-0.35 L 0.046,-0.111 L 0.247,-0.247 L 0.111,-0.046 L 0.35,0 L 0.111,0.046 L 0.247,0.247 L 0.046,0.111 L 0,0.35 L -0.046,0.111 L -0.247,0.247 L -0.111,0.046 L -0.35,0 L -0.111,-0.046 L -0.247,-0.247 L -0.046,-0.111 Z"
+              d="M 0,-0.18 L 0.023,-0.055 L 0.127,-0.127 L 0.055,-0.023 L 0.18,0 L 0.055,0.023 L 0.127,0.127 L 0.023,0.055 L 0,0.18 L -0.023,0.055 L -0.127,0.127 L -0.055,0.023 L -0.18,0 L -0.055,-0.023 L -0.127,-0.127 L -0.023,-0.055 Z"
               fill="#e8f0ff"
               opacity="0.95"
             />
           </g>
 
-          {/* 8-pointed star template (gold) */}
+          {/* 8-pointed star template (gold) — tiny, crisp */}
           <g id="cstar-gold">
-            <circle cx="0" cy="0" r="2.0" fill="#d4a854" opacity="0.08" filter="url(#glow-outer)" />
-            <circle cx="0" cy="0" r="0.6" fill="#f0d878" opacity="0.25" filter="url(#glow-tight)" />
+            <circle cx="0" cy="0" r="0.8" fill="#d4a854" opacity="0.1" filter="url(#glow-tight)" />
+            <circle cx="0" cy="0" r="0.3" fill="#f0d878" opacity="0.3" filter="url(#glow-tight)" />
             <path
-              d="M 0,-0.35 L 0.046,-0.111 L 0.247,-0.247 L 0.111,-0.046 L 0.35,0 L 0.111,0.046 L 0.247,0.247 L 0.046,0.111 L 0,0.35 L -0.046,0.111 L -0.247,0.247 L -0.111,0.046 L -0.35,0 L -0.111,-0.046 L -0.247,-0.247 L -0.046,-0.111 Z"
+              d="M 0,-0.18 L 0.023,-0.055 L 0.127,-0.127 L 0.055,-0.023 L 0.18,0 L 0.055,0.023 L 0.127,0.127 L 0.023,0.055 L 0,0.18 L -0.023,0.055 L -0.127,0.127 L -0.055,0.023 L -0.18,0 L -0.055,-0.023 L -0.127,-0.127 L -0.023,-0.055 Z"
               fill="#f0d878"
               opacity="0.95"
             />
@@ -190,6 +191,14 @@ export default function StarField() {
             0% { opacity: 0; }
             50% { opacity: 0.15; }
             100% { opacity: 0; }
+          }
+
+          /* Dimming veil — title screen is brightest, gameplay dims the field */
+          .starfield__veil {
+            transition: opacity 1.2s ease;
+          }
+          .starfield--dimmed .starfield__veil {
+            opacity: 0.4;
           }
         `}</style>
 
@@ -251,8 +260,8 @@ export default function StarField() {
                     x2={to.x}
                     y2={to.y}
                     stroke={constellation.color === 'gold' ? '#d4a854' : '#c8d8f0'}
-                    strokeWidth="0.5"
-                    strokeOpacity="0.06"
+                    strokeWidth="1.2"
+                    strokeOpacity="0.12"
                     filter="url(#line-glow)"
                     vectorEffect="non-scaling-stroke"
                   />
@@ -272,8 +281,8 @@ export default function StarField() {
                     x2={to.x}
                     y2={to.y}
                     stroke={constellation.color === 'gold' ? '#d4a854' : '#e8f0ff'}
-                    strokeWidth="0.08"
-                    strokeOpacity="0.25"
+                    strokeWidth="0.15"
+                    strokeOpacity="0.4"
                     vectorEffect="non-scaling-stroke"
                   />
                 );
@@ -291,6 +300,9 @@ export default function StarField() {
             ))}
           </g>
         ))}
+
+        {/* Dimming veil — darkens the field during gameplay, lifts on title screen */}
+        <rect className="starfield__veil" x="0" y="0" width="100" height="100" fill="#070a12" opacity="0" />
 
         {/* Swirl flash overlay */}
         <use href="#swirl-flash" />
