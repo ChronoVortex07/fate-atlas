@@ -61,7 +61,6 @@ export class GameEngine {
       eventLog: [],
       chainDepth: 0,
       debug: false,
-      swirlActive: false,
     };
   }
 
@@ -97,7 +96,6 @@ export class GameEngine {
     this.state.happening = null;
     this.state.selectedHappeningChoice = null;
     this.state.chainDepth = 0;
-    this.state.swirlActive = false;
 
     this.bus.emit('turn-started', { question, availableMethods });
     this.notify();
@@ -150,7 +148,7 @@ export class GameEngine {
     const interactionEvents: InteractionEvent[] = matched.map((effect) => ({
       ruleId: effect.id,
       sourceSlotIndex: effect.sourceSlotIndex,
-      targetSlotIndex: 0,
+      targetSlotIndex: completed - 1,
       effect: effect.action,
       description: effect.description,
     }));
@@ -162,6 +160,7 @@ export class GameEngine {
       result,
       runId,
       INTERACTION_RULES,
+      completed - 1,
     );
     this.state.pendingEffects = [...this.state.pendingEffects, ...newEffects];
 
@@ -180,7 +179,7 @@ export class GameEngine {
         // InteractionLayer will clear and we need to go to result
         // We'll handle this in clearActiveInteraction
       } else {
-        this.state.swirlActive = true;
+        this.state.screen = 'result';
       }
     } else {
       // Always remove the used method from the pool (before refill or happening)
@@ -234,22 +233,11 @@ export class GameEngine {
     }
 
     if (this.state.minigamesCompleted >= this.minigamesPerTurn) {
-      this.state.swirlActive = true;
+      this.state.screen = 'result';
     } else {
       this.state.screen = 'method-select';
       this.state.selectedMethod = null;
     }
-    this.notify();
-  }
-
-  finishSwirl(): void {
-    this.state.swirlActive = false;
-    this.state.screen = 'result';
-    this.notify();
-  }
-
-  startDebugSwirl(): void {
-    this.state.swirlActive = true;
     this.notify();
   }
 
@@ -454,7 +442,6 @@ export class GameEngine {
     this.state.happening = null;
     this.state.selectedHappeningChoice = null;
     this.state.chainDepth = 0;
-    this.state.swirlActive = false;
     this.notify();
   }
 

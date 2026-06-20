@@ -172,7 +172,7 @@ describe('InteractionResolver — pending effects', () => {
       },
     ];
 
-    const effects = resolver.createPendingEffects(tarotResult, 'run-1', rules);
+    const effects = resolver.createPendingEffects(tarotResult, 'run-1', rules, 0);
 
     expect(effects).toHaveLength(1);
     expect(effects[0].action).toBe('reroll');
@@ -197,7 +197,7 @@ describe('InteractionResolver — pending effects', () => {
       },
     ];
 
-    const effects = resolver.createPendingEffects(nonTriggering, 'run-1', rules);
+    const effects = resolver.createPendingEffects(nonTriggering, 'run-1', rules, 0);
     expect(effects).toHaveLength(0);
   });
 });

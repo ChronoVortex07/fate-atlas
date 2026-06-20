@@ -145,6 +145,7 @@ export class InteractionResolver {
     result: SlotResult,
     runId: string,
     rules: InteractionRule[],
+    sourceIndex: number,
   ): PendingEffect[] {
     const effects: PendingEffect[] = [];
 
@@ -154,7 +155,7 @@ export class InteractionResolver {
           id: `${rule.id}-${runId}-${Date.now()}`,
           sourceRunId: runId,
           sourceCard: 'name' in result ? (result as { name: string }).name : result.type,
-          sourceSlotIndex: 0,
+          sourceSlotIndex: sourceIndex,
           triggerTags: [...rule.target.tags],
           action: rule.target.action,
           description: rule.display.description,
