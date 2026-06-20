@@ -158,6 +158,10 @@ export class GameEngine {
     // If any matched effects, set activeInteraction for the InteractionLayer
     if (interactionEvents.length > 0) {
       this.state.activeInteraction = interactionEvents[0];
+      // Screen stays 'minigame' — InteractionLayer handles the transition to result
+    } else {
+      // No interactions to show, go straight to result
+      this.state.screen = 'result';
     }
 
     // Synthesize

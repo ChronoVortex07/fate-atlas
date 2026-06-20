@@ -45,7 +45,10 @@ export class TurnOrchestrator {
       for (const entry of entries) {
         roll -= entry.weight;
         if (roll <= 0) {
-          this.availableMethods.push(entry.type);
+          // Avoid duplicate methods in the pool
+          if (!this.availableMethods.includes(entry.type)) {
+            this.availableMethods.push(entry.type);
+          }
           break;
         }
       }
