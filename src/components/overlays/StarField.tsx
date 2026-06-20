@@ -36,7 +36,7 @@ function generateDustStars(seed: number, count: number): DustStar[] {
     stars.push({
       cx: rng() * 100,
       cy: rng() * 100,
-      r: rng() * 0.12 + 0.06,
+      r: rng() * 0.14 + 0.08,
       opacity: rng() * 0.3 + 0.25,
       twinkleDuration: rng() * 4 + 2,
       twinkleDelay: rng() * 6,
@@ -52,7 +52,7 @@ function generateMediumStars(seed: number, count: number): MediumStar[] {
     stars.push({
       cx: rng() * 100,
       cy: rng() * 100,
-      r: rng() * 0.09 + 0.06,
+      r: rng() * 0.12 + 0.10,
       opacity: rng() * 0.3 + 0.35,
       twinkleDuration: rng() * 4 + 2.5,
       twinkleDelay: rng() * 5,
@@ -118,10 +118,10 @@ export default function StarField() {
 
           {/* 8-pointed star template (white) — tiny, crisp */}
           <g id="cstar-white">
-            <circle cx="0" cy="0" r="0.8" fill="#c8d8f0" opacity="0.12" filter="url(#glow-tight)" />
-            <circle cx="0" cy="0" r="0.3" fill="#e8f0ff" opacity="0.35" filter="url(#glow-tight)" />
+            <circle cx="0" cy="0" r="1.0" fill="#c8d8f0" opacity="0.12" filter="url(#glow-outer)" />
+            <circle cx="0" cy="0" r="0.4" fill="#e8f0ff" opacity="0.35" filter="url(#glow-tight)" />
             <path
-              d="M 0,-0.18 L 0.023,-0.055 L 0.127,-0.127 L 0.055,-0.023 L 0.18,0 L 0.055,0.023 L 0.127,0.127 L 0.023,0.055 L 0,0.18 L -0.023,0.055 L -0.127,0.127 L -0.055,0.023 L -0.18,0 L -0.055,-0.023 L -0.127,-0.127 L -0.023,-0.055 Z"
+              d="M 0,-0.22 L 0.031,-0.074 L 0.156,-0.156 L 0.074,-0.031 L 0.22,0 L 0.074,0.031 L 0.156,0.156 L 0.031,0.074 L 0,0.22 L -0.031,0.074 L -0.156,0.156 L -0.074,0.031 L -0.22,0 L -0.074,-0.031 L -0.156,-0.156 L -0.031,-0.074 Z"
               fill="#e8f0ff"
               opacity="0.95"
             />
@@ -129,10 +129,10 @@ export default function StarField() {
 
           {/* 8-pointed star template (gold) — tiny, crisp */}
           <g id="cstar-gold">
-            <circle cx="0" cy="0" r="0.8" fill="#d4a854" opacity="0.1" filter="url(#glow-tight)" />
-            <circle cx="0" cy="0" r="0.3" fill="#f0d878" opacity="0.3" filter="url(#glow-tight)" />
+            <circle cx="0" cy="0" r="1.0" fill="#d4a854" opacity="0.1" filter="url(#glow-outer)" />
+            <circle cx="0" cy="0" r="0.4" fill="#f0d878" opacity="0.3" filter="url(#glow-tight)" />
             <path
-              d="M 0,-0.18 L 0.023,-0.055 L 0.127,-0.127 L 0.055,-0.023 L 0.18,0 L 0.055,0.023 L 0.127,0.127 L 0.023,0.055 L 0,0.18 L -0.023,0.055 L -0.127,0.127 L -0.055,0.023 L -0.18,0 L -0.055,-0.023 L -0.127,-0.127 L -0.023,-0.055 Z"
+              d="M 0,-0.22 L 0.031,-0.074 L 0.156,-0.156 L 0.074,-0.031 L 0.22,0 L 0.074,0.031 L 0.156,0.156 L 0.031,0.074 L 0,0.22 L -0.031,0.074 L -0.156,0.156 L -0.074,0.031 L -0.22,0 L -0.074,-0.031 L -0.156,-0.156 L -0.031,-0.074 Z"
               fill="#f0d878"
               opacity="0.95"
             />
@@ -193,8 +193,9 @@ export default function StarField() {
             100% { opacity: 0; }
           }
 
-          /* Dimming veil — title screen is brightest, gameplay dims the field */
+          /* Dimming veil — darkens field during gameplay, lifts on title screen */
           .starfield__veil {
+            opacity: 0;
             transition: opacity 1.2s ease;
           }
           .starfield--dimmed .starfield__veil {
@@ -301,8 +302,8 @@ export default function StarField() {
           </g>
         ))}
 
-        {/* Dimming veil — darkens the field during gameplay, lifts on title screen */}
-        <rect className="starfield__veil" x="0" y="0" width="100" height="100" fill="#070a12" opacity="0" />
+        {/* Dimming veil — dark overlay during gameplay, transparent on title */}
+        <rect className="starfield__veil" x="0" y="0" width="100" height="100" fill="#070a12" />
 
         {/* Swirl flash overlay */}
         <use href="#swirl-flash" />

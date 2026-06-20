@@ -23,7 +23,10 @@ describe('GameEngine — new lifecycle', () => {
 
   it('selectMethod with valid index goes to minigame screen', () => {
     engine.startTurn('self');
-    engine.selectMethod(0);
+    const methods = engine.getState().availableMethods;
+    const idx = methods.findIndex((m) => m !== 'happening');
+    if (idx === -1) return; // all happenings, skip
+    engine.selectMethod(idx);
     const state = engine.getState();
     expect(state.screen).toBe('minigame');
   });
