@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
 import TitleScreen from './TitleScreen';
@@ -8,11 +9,12 @@ import DiceMinigame from './DiceMinigame';
 import IChingMinigame from './IChingMinigame';
 import HappeningScene from './HappeningScene';
 import ResultReading from './ResultReading';
-import HistoryTiles from '../overlays/HistoryTiles';
+import HistoryModal from '../overlays/HistoryModal';
 import InteractionLayer from '../overlays/InteractionLayer';
 
 export default function GameTable() {
   const { state } = useGameEngine();
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const renderCenter = () => {
     switch (state.screen) {
@@ -48,7 +50,16 @@ export default function GameTable() {
 
   return (
     <div style={hubStyle}>
-      <HistoryTiles />
+      {state.history.length > 0 && (
+        <button
+          type="button"
+          style={historyBtnStyle}
+          onClick={() => setHistoryOpen(true)}
+        >
+          Past Readings ({state.history.length})
+        </button>
+      )}
+      {historyOpen && <HistoryModal onClose={() => setHistoryOpen(false)} />}
       <div style={centerStyle}>
         <AnimatePresence mode="wait">
           {renderCenter()}
@@ -66,6 +77,25 @@ const hubStyle: React.CSSProperties = {
   flexDirection: 'column',
   zIndex: 1,
   overflow: 'hidden',
+};
+
+const historyBtnStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: '10px',
+  left: '50%',
+  transform: 'translateX(-50%)',
+  zIndex: 10,
+  fontFamily: "'Inter', sans-serif",
+  fontWeight: 300,
+  fontSize: '0.7rem',
+  color: '#7b9ec7',
+  background: '#0d1220',
+  border: '1px solid #1a2440',
+  borderRadius: '20px',
+  padding: '4px 16px',
+  cursor: 'pointer',
+  letterSpacing: '0.05em',
+  whiteSpace: 'nowrap',
 };
 
 const centerStyle: React.CSSProperties = {
