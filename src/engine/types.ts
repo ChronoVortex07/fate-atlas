@@ -53,6 +53,16 @@ export interface Taggable {
   tags: Tag[];
 }
 
+// ── Dice roll modifiers ──
+export type RollModifier = 'advantage' | 'disadvantage' | 'choice' | 'offer-reroll';
+export type RollMode = 'single' | 'advantage' | 'disadvantage' | 'choice';
+
+export interface RollPlan {
+  mode: RollMode;
+  offerReroll: boolean;
+  sources: string[]; // human-readable, for a caption e.g. "Light favors you"
+}
+
 // ── Question ──
 export type QuestionType = 'decision' | 'relationship' | 'future' | 'self';
 
@@ -259,7 +269,7 @@ export interface PendingEffect {
   sourceCard: string;
   sourceSlotIndex: number;
   triggerTags: string[];
-  action: 'reroll' | 'flip' | 'add-choice' | 'mirror' | 'second-result';
+  action: 'reroll' | 'flip' | 'add-choice' | 'mirror' | 'second-result' | 'advantage' | 'disadvantage' | 'choice';
   description: string;
   expiresAfter: number;
   turnsRemaining: number;

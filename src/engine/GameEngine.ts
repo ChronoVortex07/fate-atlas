@@ -1,4 +1,4 @@
-import type { GameState, QuestionType, AffinityId, AffinityBand, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, PendingEffect, InteractionEvent } from './types';
+import type { GameState, QuestionType, AffinityId, AffinityBand, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, PendingEffect, InteractionEvent, RollModifier, RollPlan } from './types';
 import { EventBus } from './EventBus';
 import { TagSystem } from './TagSystem';
 import { AffinityEngine } from './AffinityEngine';
@@ -6,12 +6,20 @@ import { TurnOrchestrator } from './TurnOrchestrator';
 import { InteractionResolver } from './InteractionResolver';
 import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
-import { AFFINITY_DEFINITIONS, defaultAffinityState, BAND_ORDER, BAND_POWER_STEP, TIER_BASE_CHANCE } from '../data/affinities';
+import { AFFINITY_DEFINITIONS, defaultAffinityState, BAND_ORDER, BAND_POWER_STEP, TIER_BASE_CHANCE, bandIndex } from '../data/affinities';
 import { INTERACTION_RULES } from '../data/interactions';
 import { selectHappening } from '../data/happenings';
 import { loadScenario, SCENARIO_PRESETS } from './scenarios';
+import { AFFINITY_ROLL_MODIFIERS, ROLL_MODIFIER_ACTIONS, DICE_PREROLL_TAGS, resolveRollMode } from '../data/dice-modifiers';
 
 const STORAGE_KEY = 'fate-atlas-save';
+
+// A pending effect whose action is a post-commit interaction effect (not a
+// pre-roll dice modifier). Used to keep roll-modifier actions out of the
+// interaction-event pipeline while satisfying the type checker.
+function isInteractionAction(action: PendingEffect['action']): action is InteractionEvent['effect'] {
+  return !(ROLL_MODIFIER_ACTIONS as readonly string[]).includes(action);
+}
 
 export class GameEngine {
   private bus: EventBus;
@@ -155,21 +163,32 @@ export class GameEngine {
       if (meta.viaReroll) this.affinityEngine.applyAction('take-reroll');
     }
 
-    // Check pending effects against this result
+    // Roll-modifier pending effects are pre-roll (consumed by planDiceRoll); keep
+    // them out of the post-commit interaction matcher so they never spawn a
+    // meta-event. Anything not consumed pre-roll is preserved untouched.
+    const rollMods = this.state.pendingEffects.filter(
+      (e) => ROLL_MODIFIER_ACTIONS.includes(e.action as RollModifier),
+    );
+    const checkable = this.state.pendingEffects.filter(
+      (e) => !ROLL_MODIFIER_ACTIONS.includes(e.action as RollModifier),
+    );
     const { matched, remaining } = this.interactionResolver.checkPendingEffects(
-      this.state.pendingEffects,
+      checkable,
       result,
     );
-    this.state.pendingEffects = remaining;
+    this.state.pendingEffects = [...rollMods, ...remaining];
 
-    // Build interaction events from matched pending effects
-    const interactionEvents: InteractionEvent[] = matched.map((effect) => ({
-      ruleId: effect.id,
-      sourceSlotIndex: effect.sourceSlotIndex,
-      targetSlotIndex: committedIndex,
-      effect: effect.action,
-      description: effect.description,
-    }));
+    // Build interaction events from matched pending effects (filter out pre-roll modifiers)
+    const interactionEvents: InteractionEvent[] = matched
+      .filter((effect): effect is PendingEffect & { action: InteractionEvent['effect'] } =>
+        isInteractionAction(effect.action))
+      .map((effect) => ({
+        ruleId: effect.id,
+        sourceSlotIndex: effect.sourceSlotIndex,
+        targetSlotIndex: committedIndex,
+        effect: effect.action,
+        description: effect.description,
+      }));
     this.state.interactions = [...this.state.interactions, ...interactionEvents];
 
     // Create new pending effects from this result's tags
@@ -564,6 +583,64 @@ export class GameEngine {
     this.notify();
   }
 
+  // Rolls two d20s for a two-dice mode. advantage/disadvantage auto-keep the
+  // higher/lower die (ties keep index 0); choice keeps neither (player picks).
+  rollDicePair(mode: 'advantage' | 'disadvantage' | 'choice'): { dice: [DiceResult, DiceResult]; keptIndex: 0 | 1 | null } {
+    const aff = this.affinityEngine.getState();
+    const a = this.orchestrator.drawSingleResult('d20', aff) as DiceResult;
+    const b = this.orchestrator.drawSingleResult('d20', aff) as DiceResult;
+    let keptIndex: 0 | 1 | null;
+    if (mode === 'choice') keptIndex = null;
+    else if (mode === 'advantage') keptIndex = a.result >= b.result ? 0 : 1;
+    else keptIndex = a.result <= b.result ? 0 : 1; // disadvantage
+    return { dice: [a, b], keptIndex };
+  }
+
+  // Resolves every active roll modifier (affinity table + interaction pending
+  // effects + the optional Will reroll) into one plan for the dice minigame.
+  // Consumes any matching roll-modifier pending effects and the forced-modifier
+  // debug flag. Affinity modifiers apply deterministically at/above their band.
+  planDiceRoll(): RollPlan {
+    const mods: RollModifier[] = [];
+    const sources: string[] = [];
+
+    // 1. Debug force (a single modifier), cleared on read.
+    const forced = this.state.debugForcedEffect;
+    if (forced === 'advantage' || forced === 'disadvantage' || forced === 'choice') {
+      this.state.debugForcedEffect = null;
+      mods.push(forced);
+      sources.push(`(debug) ${forced}`);
+    }
+
+    // 2. Affinity table — deterministic while in-band.
+    for (const rule of AFFINITY_ROLL_MODIFIERS) {
+      if (bandIndex(this.affinityEngine.bandOf(rule.affinity)) >= bandIndex(rule.minBand)) {
+        mods.push(rule.modifier);
+        sources.push(rule.source);
+      }
+    }
+
+    // 3. Interaction pending effects targeting the upcoming die — consume them.
+    const remaining: PendingEffect[] = [];
+    for (const effect of this.state.pendingEffects) {
+      const isRollMod = ROLL_MODIFIER_ACTIONS.includes(effect.action as RollModifier);
+      if (isRollMod && this.tagSystem.hasAllTags({ tags: DICE_PREROLL_TAGS }, effect.triggerTags)) {
+        mods.push(effect.action as RollModifier);
+        sources.push(effect.sourceCard);
+      } else {
+        remaining.push(effect);
+      }
+    }
+    this.state.pendingEffects = remaining;
+
+    // 4. Optional Will reroll (existing probabilistic path; honors offer/hollow debug flags).
+    if (this.offerReroll()) mods.push('offer-reroll');
+
+    const { mode, offerReroll } = resolveRollMode(mods);
+    this.notify();
+    return { mode, offerReroll, sources };
+  }
+
   // Fate: the card you pick may not be the one revealed (Ascendant: card-swap;
   // Dominant: the-hand-chooses). Returns the card to reveal and whether a swap occurred.
   resolveTarotPick(chosenIndex: number, hand: TarotResult[]): { card: TarotResult; swapped: boolean } {
@@ -590,18 +667,6 @@ export class GameEngine {
   setOrientation(_orientation: 'upright' | 'reversed'): void {
     this.affinityEngine.applyAction('set-orientation');
     this.notify();
-  }
-
-  // Will (Dominant): offer two candidate results; the player keeps one.
-  maybeKeepOneOfTwo(result: SlotResult): SlotResult[] | null {
-    if (result.type === 'happening') return null;
-    if (!this.forcedOrRoll('keep-one-of-two', 'will', 'dominant', TIER_BASE_CHANCE.major)) return null;
-    const affinities = this.affinityEngine.getState();
-    const alt = this.orchestrator.drawSingleResult(
-      result.type as 'tarot' | 'd20' | 'iching',
-      affinities,
-    );
-    return [result, alt];
   }
 
   // Will: swap the offered method set — re-rolls the pool. Feeds Will.
