@@ -106,6 +106,27 @@ Implementation sketch: `roll(c)` = Shadow at Stirring+ AND `c.rng() < 0.20`; `ap
 
 **Files:** extend `src/engine/__tests__/AffinityResponders.test.ts`, `InteractionResponders.test.ts`, `EngineDispatch.test.ts`.
 
+> **Note — "covered" here means the automated test suite, NOT the debug scenario list.** See A6: most of these responders also lack a debug-panel scenario.
+
+---
+
+### A6. Debug scenario list is incomplete — most responders can't be demoed in-game (MEDIUM)
+
+**Symptom:** The debug panel's scenario list only offers 6 presets; `critical-resonance`, `mirror`, and most affinity effects are absent, so you can't one-click force-and-watch them.
+
+**Root cause:** `DEBUG_SCENARIOS` (`src/engine/events/scenarios.ts:32-45`) defines only `will-widen-pool`, `shadow-shroud`, `fate-override-pick`, `chaos-second-result`, `fool-reroll`, `combo-widen-shroud`. The remaining ~10 responders have no preset.
+
+**Critical subtlety — forcing is not enough for precondition-gated effects.** The debug harness's `forced` bypasses only the probabilistic `roll()`, **never the structural `condition()`** (by design — see spec §6, so `apply` can't crash). Effects with non-trivial preconditions therefore *cannot* be demoed via the ad-hoc "Arm" panel alone; they need a scenario that **stages the precondition**:
+- `mirror` — needs **exactly two `reversible` items** in the spread (`condition` counts `reversibles(spread).length === 2`). Scenario must seed two reversible tarot cards into `slots`, at a `*:commit`.
+- `critical-resonance` — needs a **critical-low/high d20 in the spread** AND a **tarot commit at the matching orientation** (upright↔critical-low, reversed↔critical-high). Scenario must seed a critical die into `slots` and drop into a tarot minigame about to commit.
+- `iching-happening-boost` — needs an I Ching with a `changing-lines` tag in the spread, at `happening:start`.
+- `fate-hollow-reroll` — needs `event.previous` set (a reroll in progress), i.e. it only fires through the dice reroll flow.
+- The combine roll-mode effects (`light-advantage`, `shadow-disadvantage`, `will-choice`, `will-offer-reroll`) and `fate-thin-pool`, `fate-auto-orient`, `chaos-happening-interrupt` have light/no preconditions and just need the right affinities + screen staged.
+
+**Recommended approach:** Add a `DebugScenario` for every responder (and a few more combos), each `setup()` staging the precondition + affinities + screen so forcing reliably fires it. Reuse/extend the `FOOL`-style fixtures in `scenarios.ts` (e.g. add `criticalLowDie`, two `reversibleCard` fixtures). Group them in the panel by `group` (`Affinity` / `Interaction` / `Combination`). Aim for: one scenario per responder + the existing combos. This also gives A5 a set of ready-made integration fixtures (a scenario + a forced assertion is an end-to-end test).
+
+**Files:** `src/engine/events/scenarios.ts` (fixtures + presets); optionally surface a count/coverage hint in `src/components/debug/DebugPanel.tsx`.
+
 ---
 
 ## Part B — Deferred follow-ups (from the original build)
@@ -139,5 +160,5 @@ The migration mapped this to `fate-override-pick` on `select:pick`, but the meth
 2. **A1** + **B3** — the timing/freeze + fan-highlight rework go together and unblock A4.
 3. **A4** — builds on A1/B3.
 4. **A3 (mechanic half)** — progressive shroud count.
-5. **A5** — lock everything in with tests.
+5. **A6 + A5** — add the missing debug scenarios (staging preconditions), then lock everything in with tests (the scenarios double as integration fixtures).
 6. **B1, B2, B4, B5, B6** — as capacity allows.
