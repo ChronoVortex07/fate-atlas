@@ -137,3 +137,29 @@ describe('orientation + keep-one-of-two', () => {
     expect(pair!.length).toBe(2);
   });
 });
+
+describe('method control', () => {
+  it('Fate Ascendant trims the pool to 2 methods at startTurn', () => {
+    const e = new GameEngine();
+    // Seed Fate high before the turn; beginRun drifts 95→~80, still Ascendant.
+    e.loadState({ affinities: { ...e.getState().affinities, fate: 95 } });
+    e.startTurn('self');
+    expect(e.getState().availableMethods.length).toBe(2);
+  });
+
+  it('swapMethod feeds Will and yields a fresh pool', () => {
+    const e = new GameEngine();
+    e.startTurn('self');
+    const before = e.getState().affinities.will;
+    noJitter(() => e.swapMethod());
+    expect(e.getState().affinities.will).toBeGreaterThan(before);
+    expect(e.getState().availableMethods.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('maybeForceMethod fires with probability 1 when forced', () => {
+    const e = new GameEngine();
+    startMinigame(e);
+    e.loadState({ debugForcedEffect: 'force-method' });
+    expect(e.maybeForceMethod()).toBe(true);
+  });
+});

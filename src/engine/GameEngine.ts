@@ -87,7 +87,9 @@ export class GameEngine {
   startTurn(question: QuestionType): void {
     this.affinityEngine.beginRun();
     const affinities = this.affinityEngine.getState();
-    const availableMethods = this.orchestrator.generatePool(question, affinities);
+    const availableMethods = this.orchestrator.generatePool(
+      question, affinities, this.affinityEngine.getEffects().methodCount,
+    );
 
     // Decrement turnsRemaining on all pending effects; remove expired
     this.state.pendingEffects = this.state.pendingEffects
@@ -275,6 +277,7 @@ export class GameEngine {
         this.state.questionType!,
         affinities,
         bias,
+        this.affinityEngine.getEffects().methodCount,
       );
       this.state.screen = 'method-select';
       this.state.selectedMethod = null;
@@ -446,6 +449,8 @@ export class GameEngine {
     this.state.availableMethods = this.orchestrator.refillPool(
       this.state.questionType!,
       affinities,
+      {},
+      this.affinityEngine.getEffects().methodCount,
     );
 
     this.saveToStorage();
@@ -579,6 +584,22 @@ export class GameEngine {
       affinities,
     );
     return [result, alt];
+  }
+
+  // Will: swap the offered method set — re-rolls the pool. Feeds Will.
+  swapMethod(): void {
+    this.affinityEngine.applyAction('swap-method');
+    const affinities = this.affinityEngine.getState();
+    this.state.availableMethods = this.orchestrator.generatePool(
+      this.state.questionType!, affinities, this.affinityEngine.getEffects().methodCount,
+    );
+    this.state.selectedMethod = null;
+    this.notify();
+  }
+
+  // Fate (Dominant): the method may be forced on the player.
+  maybeForceMethod(): boolean {
+    return this.forcedOrRoll('force-method', 'fate', 'dominant', TIER_BASE_CHANCE.notable);
   }
 
   // ---------- State access ----------

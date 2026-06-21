@@ -17,6 +17,25 @@ describe('TurnOrchestrator', () => {
     expect(pool.every((t) => ['tarot', 'd20', 'iching'].includes(t))).toBe(true);
   });
 
+  it('generatePool returns `count` methods when fewer are requested (Fate methodCount)', () => {
+    const orchestrator = new TurnOrchestrator(bus);
+    const pool = orchestrator.generatePool('self', affinities, 2);
+    expect(pool.length).toBe(2);
+  });
+
+  it('generatePool terminates under a constant Math.random (no infinite loop)', () => {
+    const orig = Math.random;
+    Math.random = () => 0.5;
+    try {
+      const orchestrator = new TurnOrchestrator(bus);
+      const pool = orchestrator.generatePool('self', affinities);
+      expect(pool.length).toBe(3);
+      expect(new Set(pool).size).toBe(3); // distinct
+    } finally {
+      Math.random = orig;
+    }
+  });
+
   it('decision question favors d20', () => {
     let d20Count = 0;
     for (let i = 0; i < 100; i++) {
