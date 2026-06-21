@@ -38,9 +38,9 @@ export default function TarotMinigame() {
     setChosenIndex(actualIndex >= 0 ? actualIndex : index);
     setSwapped(didSwap);
     // Fate may also decide the orientation for you (skip the prompt).
-    const auto = engine.maybeAutoOrient();
+    const { orientation, auto } = engine.resolveOrientation(card);
     setTimeout(() => {
-      if (auto) { setAutoDecided(true); reveal(auto === 'reversed'); }
+      if (auto) { setAutoDecided(true); reveal(orientation === 'reversed'); }
       else setPhase('reversal-prompt');
     }, 600);
   }, [engine, faceDownCards, reveal]);

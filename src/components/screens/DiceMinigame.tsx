@@ -17,7 +17,6 @@ export default function DiceMinigame() {
   const { state, engine } = useGameEngine();
   const [thrown, setThrown] = useState(false);
   const [mode, setMode] = useState<RollMode>('single');
-  const [sources, setSources] = useState<string[]>([]);
   const [pair, setPair] = useState<[DiceResult, DiceResult] | null>(null);
   const [keptIndex, setKeptIndex] = useState<0 | 1 | null>(null);
   const [merged, setMerged] = useState(false);
@@ -36,7 +35,6 @@ export default function DiceMinigame() {
   const handleThrow = useCallback(() => {
     const plan = engine.planDiceRoll();
     setMode(plan.mode);
-    setSources(plan.sources);
     setThrown(true);
     if (plan.mode === 'single') {
       setLocalResult(rollD20(state.affinities));
@@ -107,7 +105,6 @@ export default function DiceMinigame() {
     (mode === 'choice' && !chose)
   );
 
-  const caption = sources.length > 0 ? sources.join(' · ') : null;
   const modeLabel =
     mode === 'advantage' ? 'Advantage — the higher die holds'
     : mode === 'disadvantage' ? 'Disadvantage — the lower die holds'
@@ -163,7 +160,6 @@ export default function DiceMinigame() {
                 );
               })}
             </div>
-            {caption && <p style={sourceCaptionStyle}>{caption}</p>}
           </motion.div>
         ) : (
           displayResult && (
@@ -181,7 +177,6 @@ export default function DiceMinigame() {
                   <p style={interpretationStyle}>{displayResult.interpretation}</p>
                 </motion.div>
               )}
-              {caption && (mode !== 'single') && <p style={sourceCaptionStyle}>{caption}</p>}
               {offered && !chose && (
                 <div style={rerollRowStyle}>
                   <motion.button style={rerollBtnStyle} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={handleReroll}>
@@ -305,9 +300,4 @@ const pairRowStyle: React.CSSProperties = {
 const pairDieStyle: React.CSSProperties = {
   background: 'transparent', border: '2px solid #1a2440', borderRadius: '12px',
   padding: '0.25rem', outline: 'none', transition: 'border-color 0.3s, opacity 0.4s',
-};
-
-const sourceCaptionStyle: React.CSSProperties = {
-  fontFamily: "'Inter', sans-serif", fontWeight: 300, fontSize: '0.7rem',
-  color: '#7b9ec7', letterSpacing: '0.08em', textAlign: 'center', margin: 0, fontStyle: 'italic',
 };
