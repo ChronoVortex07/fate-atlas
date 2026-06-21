@@ -575,6 +575,19 @@ export class GameEngine {
     this.notify();
   }
 
+  // Rolls two d20s for a two-dice mode. advantage/disadvantage auto-keep the
+  // higher/lower die (ties keep index 0); choice keeps neither (player picks).
+  rollDicePair(mode: 'advantage' | 'disadvantage' | 'choice'): { dice: [DiceResult, DiceResult]; keptIndex: 0 | 1 | null } {
+    const aff = this.affinityEngine.getState();
+    const a = this.orchestrator.drawSingleResult('d20', aff) as DiceResult;
+    const b = this.orchestrator.drawSingleResult('d20', aff) as DiceResult;
+    let keptIndex: 0 | 1 | null;
+    if (mode === 'choice') keptIndex = null;
+    else if (mode === 'advantage') keptIndex = a.result >= b.result ? 0 : 1;
+    else keptIndex = a.result <= b.result ? 0 : 1; // disadvantage
+    return { dice: [a, b], keptIndex };
+  }
+
   // Fate: the card you pick may not be the one revealed (Ascendant: card-swap;
   // Dominant: the-hand-chooses). Returns the card to reveal and whether a swap occurred.
   resolveTarotPick(chosenIndex: number, hand: TarotResult[]): { card: TarotResult; swapped: boolean } {
