@@ -511,6 +511,10 @@ export class GameEngine {
     return DEBUG_SCENARIOS.map((s) => ({ id: s.id, label: s.label, group: s.group }));
   }
 
+  getResponderIds(): string[] {
+    return this.responders.map((r) => r.id);
+  }
+
   // ---------- Persistence ----------
 
   saveToStorage(): void {
