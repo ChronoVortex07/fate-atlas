@@ -13,7 +13,7 @@ function report(id: string, label: string, description: string, animation: strin
 export function buildInteractionResponders(): Responder[] {
   return [
     {
-      id: 'fool-reroll', source: 'interaction', triggers: ['dice:roll'],
+      id: 'fool-reroll', source: 'interaction', triggers: ['dice:commit'],
       group: { kind: 'exclusive', band: 'MUTATE' }, weight: () => 1,
       condition: (c) => c.draft.outcome?.type === 'd20' && c.spread.some((s) => has(s, 'major-arcana', 'fool-archetype')),
       roll: () => true,

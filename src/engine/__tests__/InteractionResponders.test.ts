@@ -19,8 +19,8 @@ const noDebug = { forced: [], isolate: false };
 
 describe('interaction responders', () => {
   it('fool-reroll marks the die for redraw when The Fool is in the spread', () => {
-    const c = ctx({ trigger: 'dice:roll', slots: [fool], spread: [fool], draft: { outcome: { type: 'd20' } as any } });
-    dispatch('dice:roll', c, buildInteractionResponders(), noDebug);
+    const c = ctx({ trigger: 'dice:commit', slots: [fool], spread: [fool], draft: { outcome: { type: 'd20' } as any } });
+    dispatch('dice:commit', c, buildInteractionResponders(), noDebug);
     expect(c.draft.rerollOutcome).toBe(true);
   });
 

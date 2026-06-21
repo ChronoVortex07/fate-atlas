@@ -212,6 +212,17 @@ export class GameEngine {
       ];
     }
 
+    // Fool-reroll: The Fool intercepts a d20 commit — draw a fresh die and replace the slot.
+    if (draft.rerollOutcome === true && result.type === 'd20') {
+      const affinities = this.affinityEngine.getState();
+      const rerolled = this.orchestrator.drawSingleResult('d20', affinities);
+      this.state.turnResults = [
+        ...this.state.turnResults.slice(0, committedIndex),
+        rerolled,
+        ...this.state.turnResults.slice(committedIndex + 1),
+      ];
+    }
+
     // Chaos surge: spawn a second result of the same type.
     if (typeof draft.spawnSecond === 'string') {
       const affinities = this.affinityEngine.getState();

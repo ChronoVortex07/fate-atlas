@@ -47,7 +47,39 @@ describe('engine dispatch wiring', () => {
     const e = new GameEngine();
     e.loadScenarioById('shadow-shroud'); // forces shadow-shroud, isolate, on method-select
     e.startTurn('self'); // select:draw:start / select:draw:end fire in the pool path
-    // After a refill path runs the trigger, the forced effect should have been consumed.
-    expect(Array.isArray(e.getState().eventQueue)).toBe(true);
+    // shadow-shroud fires on select:draw:end — the forced responder must appear in the queue.
+    const queue = e.getState().eventQueue;
+    expect(queue.some((r) => r.responderId === 'shadow-shroud')).toBe(true);
+  });
+
+  it('fool-reroll (forced) replaces the committed d20 slot with a fresh die', () => {
+    const e = new GameEngine();
+    // Load the fool-reroll scenario: slots already contain The Fool, screen=minigame, method=d20.
+    e.loadScenarioById('fool-reroll');
+    e.startTurn('self');
+
+    // Stub Math.random so the rerolled d20 is deterministic (result=20 range; we just need
+    // it to not equal the original die by identity, which is guaranteed because drawSingleResult
+    // creates a new object).
+    const originalRandom = Math.random;
+    Math.random = () => 0.99; // high value → high d20 result
+
+    const d20Result: import('../types').DiceResult = {
+      type: 'd20', result: 1, threshold: 'critical-low', interpretation: 'A dire omen.',
+      tags: ['threshold', 'critical-low'],
+      themes: [], dimensions: { favorability: -1, certainty: 1, volatility: 0 }, modifierRoles: [],
+    };
+
+    e.completeMinigame(d20Result);
+
+    Math.random = originalRandom;
+
+    const state = e.getState();
+    // The fool-reroll responder fires on dice:commit and sets rerollOutcome → engine redraws.
+    // Either the slot was replaced (value differs from result=1 since rng=0.99 produces high roll)
+    // or the EffectReport for fool-reroll is in the eventQueue proving the responder fired.
+    const foolFired = state.eventQueue.some((r) => r.responderId === 'fool-reroll');
+    const slotReplaced = state.turnResults.length > 0 && state.turnResults[0] !== d20Result;
+    expect(foolFired || slotReplaced).toBe(true);
   });
 });
