@@ -584,6 +584,7 @@ export class GameEngine {
     this.state.screen = 'question';
     this.state.questionType = null;
     this.state.availableMethods = [];
+    this.state.shroudedMethods = [];
     this.state.selectedMethod = null;
     this.state.turnResults = [];
     this.state.minigamesCompleted = 0;
