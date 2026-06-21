@@ -180,10 +180,9 @@ export const SCENARIO_PRESETS: ScenarioPreset[] = [
     },
   },
   {
-    id: 'will-keep-one-of-two', label: 'Keep One of Two — Will Dominant', group: 'Fate / Will',
+    id: 'dice-choice', label: 'Keep One of Two — Will Dominant', group: 'Fate / Will',
     apply: (state) => {
       state.selectedMethod = 'd20'; state.screen = 'minigame';
-      state.debugForcedEffect = 'keep-one-of-two';
       return { will: 92, fate: 12 };
     },
   },
@@ -224,6 +223,31 @@ export const SCENARIO_PRESETS: ScenarioPreset[] = [
       state.turnResults = [foolTarotResult()]; state.minigamesCompleted = 3;
       state.screen = 'result';
       return { shadow: 92, light: 12 };
+    },
+  },
+
+  // ── Dice roll modifiers ──
+  {
+    id: 'dice-advantage', label: 'Advantage — Light Ascendant', group: 'Dice Modifiers',
+    apply: (state) => {
+      state.selectedMethod = 'd20'; state.screen = 'minigame';
+      return { light: 75, will: 20 }; // Will latent → no reroll-offer noise
+    },
+  },
+  {
+    id: 'dice-disadvantage', label: 'Disadvantage — Shadow Ascendant', group: 'Dice Modifiers',
+    apply: (state) => {
+      state.selectedMethod = 'd20'; state.screen = 'minigame';
+      return { shadow: 75, will: 20 };
+    },
+  },
+  {
+    id: 'dice-disadvantage-interaction', label: 'Disadvantage — from an Interaction', group: 'Dice Modifiers',
+    apply: (state) => {
+      state.selectedMethod = 'd20'; state.screen = 'minigame';
+      state.pendingEffects = [
+        base('The Tower', 'disadvantage', ['roll'], "The Tower's omen drags the cast downward."),
+      ];
     },
   },
 ];

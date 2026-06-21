@@ -87,3 +87,29 @@ describe('scenario turn baseline', () => {
     expect(s.availableMethods.length).toBeLessThan(3); // Fate Ascendant → 2 methods
   });
 });
+
+describe('dice roll-modifier scenarios', () => {
+  it('dice-advantage loads into a d20 minigame with Light Ascendant', () => {
+    const e = new GameEngine();
+    expect(e.loadScenarioById('dice-advantage')).toBe(true);
+    const s = e.getState();
+    expect(s.screen).toBe('minigame');
+    expect(s.selectedMethod).toBe('d20');
+    expect(s.affinities.light).toBeGreaterThanOrEqual(60);
+  });
+
+  it('dice-choice replaces keep-one-of-two and sets Will Dominant', () => {
+    const e = new GameEngine();
+    expect(e.loadScenarioById('dice-choice')).toBe(true);
+    expect(e.getState().affinities.will).toBeGreaterThanOrEqual(82);
+    expect(e.loadScenarioById('will-keep-one-of-two')).toBe(false); // removed
+  });
+
+  it('dice-disadvantage-interaction seeds a disadvantage pending effect on a die', () => {
+    const e = new GameEngine();
+    expect(e.loadScenarioById('dice-disadvantage-interaction')).toBe(true);
+    const eff = e.getState().pendingEffects.find((p) => p.action === 'disadvantage');
+    expect(eff).toBeTruthy();
+    expect(eff!.triggerTags).toContain('roll');
+  });
+});
