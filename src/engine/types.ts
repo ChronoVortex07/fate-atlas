@@ -14,6 +14,38 @@ export interface AffinityState {
   value: number; // 0–100
 }
 
+// Player actions that feed agency/information affinities (Phase 2/3).
+export type AffinityAction =
+  | 'reveal-as-drawn'  // accept what's given        → Fate
+  | 'keep-roll'        // keep the first roll         → Fate
+  | 'decline-reroll'   // decline an offered reroll   → Fate
+  | 'reverse'          // assert control (reverse)    → Will (+ Chaos)
+  | 'take-reroll'      // take a reroll               → Will
+  | 'swap-method'      // swap divination method      → Will
+  | 'set-orientation'  // set orientation yourself    → Will
+  | 'use-peek'         // seek clarity (foresight)    → Light
+  | 'seek-pattern'     // seek the pattern            → Light
+  | 'decline-peek'     // embrace the unknown         → Shadow
+  | 'embrace-mystery'; // concealment / mystery       → Shadow
+
+// Per-completion context the component reports so the engine can feed affinities.
+export interface MinigameMeta {
+  revealedAsDrawn?: boolean; // Fate
+  reversed?: boolean;        // Will + Chaos
+  viaReroll?: boolean;       // Will (player took a reroll to land here)
+  peeked?: boolean;          // Light (already fed at peek time; informational)
+}
+
+// Static, band-derived modifiers components render directly (no per-event roll).
+export interface AffinityEffects {
+  handSize: number;       // tarot cards offered (base 3; Will raises)
+  methodCount: number;    // methods offered in the pool (base 3; Fate lowers)
+  hintClarity: number;    // -2 near-opaque .. 0 normal .. +2 names the forces
+  readingDetail: number;  // -1 terse .. 0 normal .. +1 rich
+  poolPreview: 'none' | 'theme' | 'full' | 'hidden';
+  peekAvailable: boolean; // Light Ascendant+ and not locked out this run
+}
+
 // ── Tags ──
 export type Tag = string;
 
@@ -292,4 +324,5 @@ export interface GameState {
   chainDepth: number;
   debug: boolean;
   debugForcedEffect: string | null;
+  affinityEffects: AffinityEffects;
 }

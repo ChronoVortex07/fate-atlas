@@ -1,29 +1,47 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
 import { rollD20 } from '../../data/dice';
-import type { DiceResult } from '../../engine/types';
+import type { DiceResult, MinigameMeta } from '../../engine/types';
 import DiceThrowAnimation, { THRESHOLD_COLORS } from './DiceThrowAnimation';
 
 export default function DiceMinigame() {
   const { state, engine } = useGameEngine();
   const [thrown, setThrown] = useState(false);
   const [localResult, setLocalResult] = useState<DiceResult | null>(null);
+  const [offered, setOffered] = useState(false);
+  const committedRef = useRef(false);
+  const veiled = state.affinityEffects.poolPreview === 'hidden';
+
+  const commit = useCallback((result: DiceResult, meta: MinigameMeta) => {
+    if (committedRef.current) return;
+    committedRef.current = true;
+    engine.completeMinigame(result, meta);
+  }, [engine]);
 
   const handleThrow = useCallback(() => {
     setThrown(true);
     setLocalResult(rollD20(state.affinities));
-  }, [state.affinities]);
+    setOffered(engine.offerReroll()); // Will may offer a reroll
+  }, [state.affinities, engine]);
 
-  // Commit after a beat so the player sees the initial roll before any
-  // interaction sequence begins.
+  // Auto-commit (keeping the first roll → Fate) after a beat — unless Will is
+  // offering a reroll, in which case we wait for the player's choice.
   useEffect(() => {
-    if (!localResult || !thrown) return;
-    const timer = setTimeout(() => {
-      engine.completeMinigame(localResult);
-    }, 1500);
+    if (!localResult || !thrown || offered) return;
+    const timer = setTimeout(() => commit(localResult, { revealedAsDrawn: true }), 1500);
     return () => clearTimeout(timer);
-  }, [localResult, thrown, engine]);
+  }, [localResult, thrown, offered, commit]);
+
+  const handleKeep = useCallback(() => {
+    if (localResult) commit(localResult, { revealedAsDrawn: true }); // accept → Fate
+  }, [localResult, commit]);
+
+  const handleReroll = useCallback(() => {
+    const next = rollD20(state.affinities);
+    setLocalResult(next);
+    commit(next, { viaReroll: true }); // assert control → Will
+  }, [state.affinities, commit]);
 
   // Once committed, the engine owns this slot — display from it so interaction
   // effects (e.g. Fool's Reroll) are reflected. Before commit, use local roll.
@@ -60,12 +78,27 @@ export default function DiceMinigame() {
             <motion.div style={resultContainerStyle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
               {/* key on the value so a reroll remounts and replays the throw */}
               <DiceThrowAnimation key={displayResult.result} value={displayResult.result} threshold={displayResult.threshold} />
-              <motion.div style={thresholdStyle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
-                <span style={{ ...thresholdBadgeStyle, color: THRESHOLD_COLORS[displayResult.threshold], borderColor: THRESHOLD_COLORS[displayResult.threshold] }}>
-                  {displayResult.threshold.replace(/-/g, ' ').toUpperCase()}
-                </span>
-                <p style={interpretationStyle}>{displayResult.interpretation}</p>
-              </motion.div>
+              {/* Shadow (veiled): the threshold/meaning stays hidden until commit. */}
+              {veiled && !committedRef.current ? (
+                <p style={interpretationStyle}>The die rests, its meaning shrouded...</p>
+              ) : (
+                <motion.div style={thresholdStyle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
+                  <span style={{ ...thresholdBadgeStyle, color: THRESHOLD_COLORS[displayResult.threshold], borderColor: THRESHOLD_COLORS[displayResult.threshold] }}>
+                    {displayResult.threshold.replace(/-/g, ' ').toUpperCase()}
+                  </span>
+                  <p style={interpretationStyle}>{displayResult.interpretation}</p>
+                </motion.div>
+              )}
+              {offered && !committedRef.current && (
+                <div style={rerollRowStyle}>
+                  <motion.button style={rerollBtnStyle} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={handleReroll}>
+                    ↺ Reroll?
+                  </motion.button>
+                  <motion.button style={rerollBtnStyle} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={handleKeep}>
+                    Keep it
+                  </motion.button>
+                </div>
+              )}
             </motion.div>
           )
         )}
@@ -159,4 +192,15 @@ const interpretationStyle: React.CSSProperties = {
   textAlign: 'center',
   margin: 0,
   maxWidth: '300px',
+};
+
+const rerollRowStyle: React.CSSProperties = {
+  display: 'flex', gap: '0.6rem', marginTop: '0.25rem',
+};
+
+const rerollBtnStyle: React.CSSProperties = {
+  fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontSize: '0.85rem',
+  letterSpacing: '0.08em', color: '#c8d8f0', background: '#0d1220',
+  border: '1px solid #1a2440', padding: '0.45rem 1.1rem', borderRadius: '4px',
+  cursor: 'pointer', outline: 'none',
 };

@@ -1,4 +1,4 @@
-import type { GameState, QuestionType, AffinityId, AffinityBand, SlotResult, RunRecord, PendingEffect, InteractionEvent } from './types';
+import type { GameState, QuestionType, AffinityId, AffinityBand, MinigameMeta, SlotResult, TarotResult, RunRecord, PendingEffect, InteractionEvent } from './types';
 import { EventBus } from './EventBus';
 import { TagSystem } from './TagSystem';
 import { AffinityEngine } from './AffinityEngine';
@@ -6,7 +6,7 @@ import { TurnOrchestrator } from './TurnOrchestrator';
 import { InteractionResolver } from './InteractionResolver';
 import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
-import { AFFINITY_DEFINITIONS, defaultAffinityState, BAND_ORDER } from '../data/affinities';
+import { AFFINITY_DEFINITIONS, defaultAffinityState, BAND_ORDER, BAND_POWER_STEP, TIER_BASE_CHANCE } from '../data/affinities';
 import { INTERACTION_RULES } from '../data/interactions';
 import { selectHappening } from '../data/happenings';
 import { loadScenario, SCENARIO_PRESETS } from './scenarios';
@@ -67,11 +67,16 @@ export class GameEngine {
       chainDepth: 0,
       debug: false,
       debugForcedEffect: null,
+      affinityEffects: {
+        handSize: 3, methodCount: 3, hintClarity: 0,
+        readingDetail: 0, poolPreview: 'none', peekAvailable: false,
+      },
     };
   }
 
   private notify(): void {
     this.state.affinities = this.affinityEngine.getState();
+    this.state.affinityEffects = this.affinityEngine.getEffects();
     this.state.eventLog = this.bus.getHistory();
     this.cachedSnapshot = JSON.parse(JSON.stringify(this.state)) as GameState;
     this.listeners.forEach((fn) => fn(this.cachedSnapshot));
@@ -82,7 +87,9 @@ export class GameEngine {
   startTurn(question: QuestionType): void {
     this.affinityEngine.beginRun();
     const affinities = this.affinityEngine.getState();
-    const availableMethods = this.orchestrator.generatePool(question, affinities);
+    const availableMethods = this.orchestrator.generatePool(
+      question, affinities, this.affinityEngine.getEffects().methodCount,
+    );
 
     // Decrement turnsRemaining on all pending effects; remove expired
     this.state.pendingEffects = this.state.pendingEffects
@@ -125,7 +132,7 @@ export class GameEngine {
     this.notify();
   }
 
-  completeMinigame(result: SlotResult): void {
+  completeMinigame(result: SlotResult, meta?: MinigameMeta): void {
     // Add result to the turn's results array
     this.state.turnResults = [...this.state.turnResults, result];
     // Canonical index of the just-committed result. NOTE: not `completed - 1`,
@@ -139,6 +146,13 @@ export class GameEngine {
     if (result.type !== 'happening') {
       this.affinityEngine.applyResultTags(result);
       this.maybeWildSurge(result);
+    }
+
+    // Player-action feeds derived from how this result was reached.
+    if (meta) {
+      if (meta.reversed) this.affinityEngine.applyAction('reverse');
+      else if (meta.revealedAsDrawn) this.affinityEngine.applyAction('reveal-as-drawn');
+      if (meta.viaReroll) this.affinityEngine.applyAction('take-reroll');
     }
 
     // Check pending effects against this result
@@ -263,6 +277,7 @@ export class GameEngine {
         this.state.questionType!,
         affinities,
         bias,
+        this.affinityEngine.getEffects().methodCount,
       );
       this.state.screen = 'method-select';
       this.state.selectedMethod = null;
@@ -374,6 +389,7 @@ export class GameEngine {
       results,
       question,
       affinities,
+      this.affinityEngine.getEffects(),
     );
 
     this.state.synthesis = synthesisResult;
@@ -434,6 +450,8 @@ export class GameEngine {
     this.state.availableMethods = this.orchestrator.refillPool(
       this.state.questionType!,
       affinities,
+      {},
+      this.affinityEngine.getEffects().methodCount,
     );
 
     this.saveToStorage();
@@ -455,8 +473,11 @@ export class GameEngine {
       return true;
     }
     const band = this.affinityEngine.resolveBand(affinity);
-    if (BAND_ORDER.indexOf(band) < BAND_ORDER.indexOf(minBand)) return false;
-    return Math.random() < baseChance;
+    const idx = BAND_ORDER.indexOf(band);
+    const minIdx = BAND_ORDER.indexOf(minBand);
+    if (idx < minIdx) return false;
+    const scaled = baseChance * (1 + (idx - minIdx) * BAND_POWER_STEP);
+    return Math.random() < Math.min(1, scaled);
   }
 
   // Chaos-Dominant wild surge: a committed result can spawn a second (Major, ~8%).
@@ -486,10 +507,139 @@ export class GameEngine {
     return Math.random() < (chaos / 100) * 0.5;
   }
 
+  // ---------- Agency (Fate/Will) decisions ----------
+
+  // Will-gated: should a "Reroll?" prompt be offered after the player's action?
+  offerReroll(): boolean {
+    return this.forcedOrRoll('offer-reroll', 'will', 'stirring', TIER_BASE_CHANCE.notable);
+  }
+
+  // Player takes an offered reroll. Feeds Will. Fate may make it hollow (same result).
+  takeReroll(): { hollow: boolean } {
+    this.affinityEngine.applyAction('take-reroll');
+    const idx = this.state.activeSlotIndex;
+    if (idx === null) { this.notify(); return { hollow: false }; }
+    const target = this.state.turnResults[idx];
+    if (!target || target.type === 'happening') { this.notify(); return { hollow: false }; }
+
+    const hollow = this.forcedOrRoll('hollow-reroll', 'fate', 'ascendant', TIER_BASE_CHANCE.major);
+    if (hollow) {
+      this.notify(); // snapshot contract: cleared forced flag / Will feed surfaced
+      return { hollow: true };
+    }
+    const affinities = this.affinityEngine.getState();
+    const fresh = this.orchestrator.drawSingleResult(
+      target.type as 'tarot' | 'd20' | 'iching',
+      affinities,
+    );
+    this.state.turnResults = [
+      ...this.state.turnResults.slice(0, idx),
+      fresh,
+      ...this.state.turnResults.slice(idx + 1),
+    ];
+    this.notify();
+    return { hollow: false };
+  }
+
+  // Player declines an offered reroll → accepts what's given (Fate).
+  declineReroll(): void {
+    this.affinityEngine.applyAction('decline-reroll');
+    this.notify();
+  }
+
+  // Fate: the card you pick may not be the one revealed (Ascendant: card-swap;
+  // Dominant: the-hand-chooses). Returns the card to reveal and whether a swap occurred.
+  resolveTarotPick(chosenIndex: number, hand: TarotResult[]): { card: TarotResult; swapped: boolean } {
+    const chosen = hand[chosenIndex];
+    if (hand.length < 2) return { card: chosen, swapped: false };
+
+    const swap =
+      this.forcedOrRoll('the-hand-chooses', 'fate', 'dominant', TIER_BASE_CHANCE.major) ||
+      this.forcedOrRoll('card-swap', 'fate', 'ascendant', TIER_BASE_CHANCE.major);
+    if (!swap) return { card: chosen, swapped: false };
+
+    const others = hand.map((_, i) => i).filter((i) => i !== chosenIndex);
+    const pick = others[Math.floor(Math.random() * others.length)];
+    return { card: hand[pick], swapped: true };
+  }
+
+  // Fate: a coin-flip detail (orientation) may be decided for the player.
+  maybeAutoOrient(): 'upright' | 'reversed' | null {
+    if (!this.forcedOrRoll('auto-orient', 'fate', 'stirring', TIER_BASE_CHANCE.notable)) return null;
+    return Math.random() < 0.5 ? 'upright' : 'reversed';
+  }
+
+  // Will: the player exercises a free orientation choice.
+  setOrientation(_orientation: 'upright' | 'reversed'): void {
+    this.affinityEngine.applyAction('set-orientation');
+    this.notify();
+  }
+
+  // Will (Dominant): offer two candidate results; the player keeps one.
+  maybeKeepOneOfTwo(result: SlotResult): SlotResult[] | null {
+    if (result.type === 'happening') return null;
+    if (!this.forcedOrRoll('keep-one-of-two', 'will', 'dominant', TIER_BASE_CHANCE.major)) return null;
+    const affinities = this.affinityEngine.getState();
+    const alt = this.orchestrator.drawSingleResult(
+      result.type as 'tarot' | 'd20' | 'iching',
+      affinities,
+    );
+    return [result, alt];
+  }
+
+  // Will: swap the offered method set — re-rolls the pool. Feeds Will.
+  swapMethod(): void {
+    this.affinityEngine.applyAction('swap-method');
+    const affinities = this.affinityEngine.getState();
+    this.state.availableMethods = this.orchestrator.generatePool(
+      this.state.questionType!, affinities, this.affinityEngine.getEffects().methodCount,
+    );
+    this.state.selectedMethod = null;
+    this.notify();
+  }
+
+  // Fate (Dominant): the method may be forced on the player.
+  maybeForceMethod(): boolean {
+    return this.forcedOrRoll('force-method', 'fate', 'dominant', TIER_BASE_CHANCE.notable);
+  }
+
+  // ---------- Information (Light/Shadow) decisions ----------
+
+  // Light foresight. Delegates escalation/penalty to AffinityEngine; derives a
+  // vague leaning from the previewed result. The player never sees exact values.
+  usePeek(preview?: SlotResult): { failed: boolean; leaning: string } {
+    const { failed } = this.affinityEngine.usePeek();
+    if (failed) {
+      this.notify();
+      return { failed: true, leaning: 'The vision clouds over — nothing is revealed.' };
+    }
+    const leaning = this.describeLeaning(preview);
+    this.notify();
+    return { failed: false, leaning };
+  }
+
+  // Player declines a peek → embraces the unknown (Shadow).
+  declinePeek(): void {
+    this.affinityEngine.applyAction('decline-peek');
+    this.notify();
+  }
+
+  private describeLeaning(preview?: SlotResult): string {
+    if (!preview || preview.type === 'happening') return 'A faint shape stirs beyond the veil...';
+    const fav = preview.dimensions.favorability;
+    if (fav >= 1) return 'The current leans toward fortune...';
+    if (fav <= -1) return 'The current leans toward hardship...';
+    return 'The current holds in uneasy balance...';
+  }
+
   // ---------- State access ----------
 
   getState(): GameState {
     return this.cachedSnapshot;
+  }
+
+  getAffinityEffects() {
+    return this.affinityEngine.getEffects();
   }
 
   loadState(json: Partial<GameState>): void {

@@ -226,3 +226,27 @@ describe('NarrativeAssembler', () => {
     expect(result.affinityNote).toContain('Order');
   });
 });
+
+describe('NarrativeAssembler — reading detail/clarity (Light/Shadow)', () => {
+  const fx = (over: Partial<import('../types').AffinityEffects>): import('../types').AffinityEffects => ({
+    handSize: 3, methodCount: 3, hintClarity: 0, readingDetail: 0, poolPreview: 'none', peekAvailable: false, ...over,
+  });
+
+  it('rich reading (readingDetail>0) has at least as many paragraphs as terse', () => {
+    const na = new NarrativeAssembler();
+    na.resetRotation();
+    const rich = na.assemble(baseAggregated, [], 'self', { light: 90, shadow: 10 }, fx({ readingDetail: 1, hintClarity: 2 }));
+    na.resetRotation();
+    const terse = na.assemble(baseAggregated, [], 'self', { light: 10, shadow: 90 }, fx({ readingDetail: -1, hintClarity: -2 }));
+    expect(rich.paragraphs.length).toBeGreaterThanOrEqual(terse.paragraphs.length);
+  });
+
+  it('clarity >= 2 names the forces in the affinity note when one is present', () => {
+    const na = new NarrativeAssembler();
+    na.resetRotation();
+    // chaos elevated → affinityNote is set; clarity 2 should prefix the naming line.
+    const r = na.assemble(baseAggregated, [], 'self', { chaos: 70, order: 30 }, fx({ hintClarity: 2 }));
+    expect(r.affinityNote).toBeTruthy();
+    expect(r.affinityNote).toContain('name themselves');
+  });
+});

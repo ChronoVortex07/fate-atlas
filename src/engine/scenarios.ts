@@ -119,6 +119,113 @@ export const SCENARIO_PRESETS: ScenarioPreset[] = [
       return { order: 75, chaos: 25 };
     },
   },
+
+  // ── Fate / Will ──
+  {
+    id: 'fate-auto-orient', label: 'Auto-Orient — Fate Stirring', group: 'Fate / Will',
+    apply: (state) => {
+      state.selectedMethod = 'tarot'; state.screen = 'minigame';
+      state.debugForcedEffect = 'auto-orient';
+      return { fate: 55, will: 45 };
+    },
+  },
+  {
+    id: 'fate-card-swap', label: 'Card-Swap — Fate Ascendant', group: 'Fate / Will',
+    apply: (state) => {
+      state.selectedMethod = 'tarot'; state.screen = 'minigame';
+      state.debugForcedEffect = 'card-swap';
+      return { fate: 75, will: 25 };
+    },
+  },
+  {
+    id: 'fate-hollow-reroll', label: 'Hollow Reroll — Fate Ascendant', group: 'Fate / Will',
+    apply: (state) => {
+      state.turnResults = [foolTarotResult()]; state.minigamesCompleted = 1;
+      state.activeSlotIndex = 0;
+      state.selectedMethod = 'd20'; state.screen = 'minigame';
+      state.debugForcedEffect = 'hollow-reroll';
+      return { fate: 75, will: 25 };
+    },
+  },
+  {
+    id: 'fate-hand-chooses', label: 'The Hand Chooses — Fate Dominant', group: 'Fate / Will',
+    apply: (state) => {
+      state.selectedMethod = 'tarot'; state.screen = 'minigame';
+      state.debugForcedEffect = 'the-hand-chooses';
+      return { fate: 92, will: 12 };
+    },
+  },
+  {
+    id: 'fate-fewer-methods', label: 'Fewer Methods — Fate Ascendant (static)', group: 'Fate / Will',
+    apply: (state) => {
+      state.screen = 'method-select';
+      return { fate: 75, will: 25 };
+    },
+  },
+  {
+    id: 'will-offer-reroll', label: 'Offered Reroll — Will Stirring', group: 'Fate / Will',
+    apply: (state) => {
+      state.turnResults = [foolTarotResult()]; state.minigamesCompleted = 1;
+      state.activeSlotIndex = 0;
+      state.selectedMethod = 'd20'; state.screen = 'minigame';
+      state.debugForcedEffect = 'offer-reroll';
+      return { will: 55, fate: 45 };
+    },
+  },
+  {
+    id: 'will-big-hand', label: 'Larger Hand — Will Dominant (static)', group: 'Fate / Will',
+    apply: (state) => {
+      state.selectedMethod = 'tarot'; state.screen = 'minigame';
+      return { will: 92, fate: 12 };
+    },
+  },
+  {
+    id: 'will-keep-one-of-two', label: 'Keep One of Two — Will Dominant', group: 'Fate / Will',
+    apply: (state) => {
+      state.selectedMethod = 'd20'; state.screen = 'minigame';
+      state.debugForcedEffect = 'keep-one-of-two';
+      return { will: 92, fate: 12 };
+    },
+  },
+
+  // ── Light / Shadow ──
+  {
+    id: 'light-peek', label: 'Foresight Available — Light Ascendant (static)', group: 'Light / Shadow',
+    apply: (state) => {
+      state.selectedMethod = 'tarot'; state.screen = 'minigame';
+      return { light: 75, shadow: 25 };
+    },
+  },
+  {
+    id: 'light-peek-failure', label: 'Peek Failure — Light', group: 'Light / Shadow',
+    apply: (state) => {
+      state.selectedMethod = 'tarot'; state.screen = 'minigame';
+      return { light: 75, shadow: 25 };
+    },
+  },
+  {
+    id: 'light-illumination', label: 'Illumination — Light Dominant (static)', group: 'Light / Shadow',
+    apply: (state) => {
+      state.turnResults = [foolTarotResult()]; state.minigamesCompleted = 3;
+      state.screen = 'result';
+      return { light: 92, shadow: 12 };
+    },
+  },
+  {
+    id: 'shadow-veiled', label: 'Veiled Results — Shadow Ascendant (static)', group: 'Light / Shadow',
+    apply: (state) => {
+      state.selectedMethod = 'd20'; state.screen = 'minigame';
+      return { shadow: 75, light: 25 };
+    },
+  },
+  {
+    id: 'shadow-eclipse', label: 'Eclipse — Shadow Dominant (static)', group: 'Light / Shadow',
+    apply: (state) => {
+      state.turnResults = [foolTarotResult()]; state.minigamesCompleted = 3;
+      state.screen = 'result';
+      return { shadow: 92, light: 12 };
+    },
+  },
 ];
 
 // Returns the affinity patch to route through the engine, or null if id unknown.

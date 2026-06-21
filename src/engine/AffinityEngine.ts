@@ -1,4 +1,4 @@
-import type { AffinityId, AffinityBand, Taggable } from './types';
+import type { AffinityId, AffinityBand, AffinityAction, AffinityEffects, Taggable } from './types';
 import type { AffinityDefinition } from '../data/affinities';
 import {
   AFFINITY_IDS,
@@ -6,6 +6,7 @@ import {
   BASELINE,
   BAND_ORDER,
   bandOf,
+  bandIndex,
   REACH_UP_CHANCE,
   COUPLING_OPPOSITE,
   COUPLING_OTHER,
@@ -15,11 +16,16 @@ import {
   JITTER_MAX,
   RUN_DRIFT,
   FEED_PER_MATCH,
+  FEED_PER_ACTION,
+  SECONDARY_FEED_FACTOR,
+  ACTION_FEEDS,
 } from '../data/affinities';
 
 export class AffinityEngine {
   private state: Record<AffinityId, number>;
   private feedsThisRun: Record<AffinityId, number>;
+  private peeksThisRun = 0;
+  private peekLocked = false;
   private definitions: AffinityDefinition[];
   private defById: Record<string, AffinityDefinition>;
 
@@ -72,12 +78,69 @@ export class AffinityEngine {
     }
   }
 
+  // Player-action feeds → Fate/Will/Light/Shadow (and Chaos as a secondary).
+  applyAction(action: AffinityAction): void {
+    const feed = ACTION_FEEDS[action];
+    if (!feed) return;
+    this.shift(feed.primary, FEED_PER_ACTION, `action:${action}`);
+    if (feed.secondary) {
+      this.shift(feed.secondary, FEED_PER_ACTION * SECONDARY_FEED_FACTOR, `action:${action}`);
+    }
+  }
+
+  // ── Peek (Light-only foresight) ──
+  peekAvailable(): boolean {
+    if (this.peekLocked) return false;
+    return BAND_ORDER.indexOf(bandOf(this.state.light)) >= BAND_ORDER.indexOf('ascendant');
+  }
+
+  // Resolves a peek attempt: escalating fail chance, lockout + Light penalty on failure,
+  // a small Light feed on success. Caller supplies the player-facing leaning text.
+  usePeek(): { failed: boolean } {
+    const failChance = Math.min(0.9, 0.18 * this.peeksThisRun);
+    this.peeksThisRun += 1;
+    if (Math.random() < failChance) {
+      this.peekLocked = true;
+      this.shift('light', -12, 'peek-fail'); // direct subtraction, no fan-out
+      return { failed: true };
+    }
+    this.applyAction('use-peek'); // seeking clarity feeds Light
+    return { failed: false };
+  }
+
+  // Static, band-derived modifiers (no per-event roll). Carried in the snapshot.
+  getEffects(): AffinityEffects {
+    const willIdx   = bandIndex(bandOf(this.state.will));
+    const fateIdx   = bandIndex(bandOf(this.state.fate));
+    const lightIdx  = bandIndex(bandOf(this.state.light));
+    const shadowIdx = bandIndex(bandOf(this.state.shadow));
+
+    const info = lightIdx - shadowIdx; // -3..3
+    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+    let poolPreview: AffinityEffects['poolPreview'] = 'none';
+    if (shadowIdx >= 2) poolPreview = 'hidden';
+    else if (lightIdx >= 2) poolPreview = 'full';
+    else if (lightIdx >= 1 && lightIdx > shadowIdx) poolPreview = 'theme';
+
+    return {
+      handSize: 3 + clamp(willIdx - 1, 0, 2),   // latent/stirring 3, ascendant 4, dominant 5
+      methodCount: fateIdx >= 2 ? 2 : 3,          // Fate Ascendant+ → fewer methods
+      hintClarity: clamp(info, -2, 2),
+      readingDetail: clamp(info, -1, 1),
+      poolPreview,
+      peekAvailable: this.peekAvailable(),
+    };
+  }
+
   // Run boundary: drift toward baseline, reset per-run counters. Reshuffle hook.
   beginRun(): void {
     for (const id of AFFINITY_IDS) {
       this.state[id] = this.clamp(this.state[id] + (BASELINE - this.state[id]) * RUN_DRIFT);
       this.feedsThisRun[id] = 0;
     }
+    this.peeksThisRun = 0;
+    this.peekLocked = false;
   }
 
   bandOf(id: AffinityId): AffinityBand {
@@ -95,12 +158,16 @@ export class AffinityEngine {
   }
 
   // Top 1–2 forces only, keyed to each one's current band hint pool.
-  getActiveHints(max = 2): string[] {
+  // Light (clarity >= 2) names the force; Shadow (clarity <= -2) renders it opaque.
+  getActiveHints(max = 2, clarity = 0): string[] {
     const sorted = [...AFFINITY_IDS].sort((a, b) => this.state[b] - this.state[a]);
     const hints: string[] = [];
     for (const id of sorted.slice(0, max)) {
-      const hint = this.getHint(id);
-      if (hint) hints.push(hint);
+      const base = this.getHint(id);
+      if (!base) continue;
+      if (clarity >= 2) hints.push(`${this.defById[id]?.name ?? id}: ${base}`);
+      else if (clarity <= -2) hints.push('…');
+      else hints.push(base);
     }
     return hints;
   }

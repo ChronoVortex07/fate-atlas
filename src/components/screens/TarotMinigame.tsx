@@ -11,22 +11,39 @@ type Phase = 'pick' | 'reversal-prompt' | 'revealed';
 export default function TarotMinigame() {
   const { state, engine } = useGameEngine();
   const [phase, setPhase] = useState<Phase>('pick');
+  const handSize = useState(() => state.affinityEffects.handSize)[0];
   const faceDownCards = useState<TarotResult[]>(() =>
-    Array.from({ length: 3 }, () => drawTarotCard(state.affinities))
+    Array.from({ length: handSize }, () => drawTarotCard(state.affinities))
   )[0];
   const [chosenIndex, setChosenIndex] = useState<number | null>(null);
   const [willReverse, setWillReverse] = useState(false);
+  const [swapped, setSwapped] = useState(false);
+  const [autoDecided, setAutoDecided] = useState(false);
 
-  const handlePickCard = useCallback((index: number) => {
-    setChosenIndex(index);
-    // Small delay so the burn animation plays before reversal prompt
-    setTimeout(() => setPhase('reversal-prompt'), 600);
-  }, []);
-
-  const handleReveal = useCallback((reverse: boolean) => {
+  const reveal = useCallback((reverse: boolean) => {
     setWillReverse(reverse);
     setPhase('revealed');
   }, []);
+
+  // Player-driven choice at the reversal prompt (feeds via completeMinigame meta).
+  const handleReveal = useCallback((reverse: boolean) => {
+    setAutoDecided(false);
+    reveal(reverse);
+  }, [reveal]);
+
+  const handlePickCard = useCallback((index: number) => {
+    // Fate may swap the card you picked for another in the hand.
+    const { card, swapped: didSwap } = engine.resolveTarotPick(index, faceDownCards);
+    const actualIndex = faceDownCards.indexOf(card);
+    setChosenIndex(actualIndex >= 0 ? actualIndex : index);
+    setSwapped(didSwap);
+    // Fate may also decide the orientation for you (skip the prompt).
+    const auto = engine.maybeAutoOrient();
+    setTimeout(() => {
+      if (auto) { setAutoDecided(true); reveal(auto === 'reversed'); }
+      else setPhase('reversal-prompt');
+    }, 600);
+  }, [engine, faceDownCards, reveal]);
 
   useEffect(() => {
     if (phase !== 'revealed' || chosenIndex === null) return;
@@ -40,13 +57,19 @@ export default function TarotMinigame() {
         }
       : card;
 
-    // Small delay for the flip animation, then complete
+    // Small delay for the flip animation, then complete.
+    // Player choice feeds an affinity; a Fate auto-decided orientation does not.
+    const meta = autoDecided
+      ? {}
+      : willReverse
+        ? { reversed: true }
+        : { revealedAsDrawn: true };
     const timer = setTimeout(() => {
-      engine.completeMinigame(finalResult);
+      engine.completeMinigame(finalResult, meta);
     }, 1200);
 
     return () => clearTimeout(timer);
-  }, [phase, chosenIndex, willReverse, faceDownCards, engine]);
+  }, [phase, chosenIndex, willReverse, autoDecided, faceDownCards, engine]);
 
   // Once committed, the engine owns this slot. Prefer it so flip/mirror are
   // reflected; fall back to the locally chosen card before commit.
@@ -106,6 +129,12 @@ export default function TarotMinigame() {
               <span style={cardBackSymbolStyle}>✧</span>
             </motion.div>
             <p style={promptTextStyle}>Reveal as drawn, or reverse its course?</p>
+            {state.affinityEffects.peekAvailable && chosenIndex !== null && (
+              <PeekControl
+                onPeek={() => engine.usePeek(faceDownCards[chosenIndex])}
+                onDecline={() => engine.declinePeek()}
+              />
+            )}
             <div style={choiceRowStyle}>
               <motion.button style={choiceBtnStyle} whileHover={{ borderColor: '#d4a854', scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={() => handleReveal(false)}>
                 ▲ Reveal as Drawn
@@ -130,10 +159,39 @@ export default function TarotMinigame() {
             <div style={{ ...revealedOrientStyle, color: displayOrientation === 'reversed' ? '#d4a854' : '#7b9ec7' }}>
               {displayOrientation === 'reversed' ? '▼ Reversed' : '▲ Upright'}
             </div>
+            {swapped && (
+              <motion.div
+                style={{ ...revealedOrientStyle, color: '#9b6bb0', marginTop: '0.4rem' }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0, 1, 0.7] }}
+                transition={{ duration: 1.6 }}
+              >
+                ✶ your hand moved of its own accord
+              </motion.div>
+            )}
           </motion.div>
         )}
       </div>
     </motion.div>
+  );
+}
+
+// Light foresight: glimpse the chosen card's leaning, or embrace the unknown (Shadow).
+function PeekControl({ onPeek, onDecline }: {
+  onPeek: () => { failed: boolean; leaning: string };
+  onDecline: () => void;
+}) {
+  const [line, setLine] = useState<string | null>(null);
+  if (line) return <p style={{ ...promptTextStyle, color: '#7b9ec7', fontStyle: 'italic' }}>{line}</p>;
+  return (
+    <div style={choiceRowStyle}>
+      <motion.button style={{ ...choiceBtnStyle, borderColor: '#d4c068' }} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={() => setLine(onPeek().leaning)}>
+        ✦ Seek a glimpse
+      </motion.button>
+      <motion.button style={choiceBtnStyle} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={() => { onDecline(); setLine('You let the mystery stand.'); }}>
+        Embrace the unknown
+      </motion.button>
+    </div>
   );
 }
 

@@ -81,6 +81,12 @@ export default function ResultReading() {
         <RunicBand opacity={0.3} />
         <h1 style={titleStyle}>Your Reading</h1>
         <div style={questionStyle}>{questionLabel}</div>
+        {state.affinityEffects.readingDetail > 0 && (
+          <div style={{ ...questionStyle, color: '#d4c068' }}>✦ illuminated</div>
+        )}
+        {state.affinityEffects.readingDetail < 0 && (
+          <div style={{ ...questionStyle, color: '#5b6680' }}>☾ eclipsed</div>
+        )}
         <OrnamentalBorder margin="0.25rem 0" />
 
         {/* Divination Results */}
