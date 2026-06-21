@@ -48,6 +48,7 @@ export class GameEngine {
       affinities: defaultAffinityState(),
       questionType: null,
       availableMethods: [],
+      shroudedMethods: [],
       selectedMethod: null,
       turnResults: [],
       minigamesCompleted: 0,
@@ -135,7 +136,11 @@ export class GameEngine {
 
     // Render the drawn pool through the end-of-draw trigger (shrouding, etc.).
     const poolResults = pool.map((m) => ({ tags: [], type: m } as unknown as SlotResult));
-    this.dispatchAt('select:draw:end', { pool: poolResults });
+    const { draft: endDraftPool } = this.dispatchAt('select:draw:end', { pool: poolResults });
+    // Persist any shrouded indices from the shadow-shroud responder.
+    this.state.shroudedMethods = Array.isArray(endDraftPool.shrouded)
+      ? (endDraftPool.shrouded as number[])
+      : [];
   }
 
   // ---------- Turn lifecycle ----------
@@ -496,11 +501,11 @@ export class GameEngine {
     this.state.debugConfig = { forced: scenario.forced, isolate: scenario.isolate };
 
     if (this.state.screen === 'method-select') {
-      this.state.availableMethods = this.orchestrator.generatePool(
-        this.state.questionType,
-        this.affinityEngine.getState(),
-        this.affinityEngine.getEffects().methodCount,
-      );
+      // Use buildPool so select:draw triggers fire (shrouding, etc.) and shroudedMethods is set.
+      // buildPool may consume forced IDs via dispatchAt; restore the scenario config afterward so
+      // the debug panel always reflects the full forced list the scenario declared.
+      this.buildPool();
+      this.state.debugConfig = { forced: scenario.forced, isolate: scenario.isolate };
     }
 
     this.notify();

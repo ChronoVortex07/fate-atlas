@@ -48,6 +48,8 @@ export function buildInteractionResponders(): Responder[] {
       roll: (c) => c.rng() < 0.85,
       apply: (c) => {
         for (const s of reversibles(c.spread)) {
+          // Only tarot carries a meaningful orientation field; skip non-tarot even if reversible-tagged.
+          if (s.type !== 'tarot') continue;
           const card = s as TarotResult;
           card.orientation = card.orientation === 'upright' ? 'reversed' : 'upright';
         }

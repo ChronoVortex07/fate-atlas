@@ -48,7 +48,9 @@ export function buildAffinityResponders(): Responder[] {
       },
     },
     {
-      id: 'fate-override-pick', source: 'affinity', triggers: ['select:pick', 'tarot:pick'],
+      // 'select:pick' is never dispatched and the method pool is DivinationType[] (not SlotResult[]).
+      // "Fate forces the method" is a deferred follow-up requiring a method-shaped override effect.
+      id: 'fate-override-pick', source: 'affinity', triggers: ['tarot:pick'],
       group: { kind: 'exclusive', band: 'OVERRIDE' }, weight: w('fate'),
       condition: (c) => !!c.hand && c.hand.length >= 2 && !!c.draft.outcome,
       roll: (c) => bandRoll(c, 'fate', 'ascendant', T.major),

@@ -318,6 +318,7 @@ export interface GameState {
   affinities: Record<AffinityId, number>;
   questionType: QuestionType | null;
   availableMethods: DivinationType[];
+  shroudedMethods: number[];
   selectedMethod: DivinationType | null;
   turnResults: SlotResult[];
   minigamesCompleted: number;

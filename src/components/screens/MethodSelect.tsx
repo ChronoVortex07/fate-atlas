@@ -55,23 +55,31 @@ export default function MethodSelect() {
         <motion.div style={gridStyle} variants={containerVariants} initial="hidden" animate="visible">
           {state.availableMethods.map((method, i) => {
             const card = METHOD_CARDS[method];
+            const isShrouded = state.shroudedMethods.includes(i);
+            const isHidden = state.affinityEffects.poolPreview === 'hidden';
             return (
               <motion.button
                 key={i}
-                style={{ ...cardStyle, borderColor: card.color + '40' }}
+                style={isShrouded
+                  ? { ...cardStyle, ...shroudedCardStyle }
+                  : { ...cardStyle, borderColor: card.color + '40' }}
                 variants={cardVariants}
-                whileHover={{ borderColor: card.color, boxShadow: `0 0 20px ${card.color}20`, scale: 1.02 }}
+                whileHover={isShrouded
+                  ? { borderColor: '#4a3a6060', scale: 1.02 }
+                  : { borderColor: card.color, boxShadow: `0 0 20px ${card.color}20`, scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => handleSelect(i)}
               >
-                <div style={{ ...cardSymbolStyle, color: card.color }}>
-                  {state.affinityEffects.poolPreview === 'hidden' ? '?' : card.symbol}
+                <div style={{ ...cardSymbolStyle, color: isShrouded ? '#4a5a7a' : card.color }}>
+                  {isShrouded || isHidden ? '?' : card.symbol}
                 </div>
                 <div style={cardTitleStyle}>
-                  {state.affinityEffects.poolPreview === 'hidden' ? '???' : card.title}
+                  {isShrouded || isHidden ? '???' : card.title}
                 </div>
                 <div style={cardDescStyle}>
-                  {state.affinityEffects.poolPreview === 'hidden'
+                  {isShrouded
+                    ? 'Shadow conceals this path — its nature is hidden.'
+                    : isHidden
                     ? 'An unmarked path awaits.'
                     : card.description}
                 </div>
@@ -182,6 +190,13 @@ const cardStyle: React.CSSProperties = {
   transition: 'border-color 0.3s ease, box-shadow 0.3s ease',
   outline: 'none',
   width: '100%',
+};
+
+// Face-down / veiled style for shadow-shrouded method cards.
+const shroudedCardStyle: React.CSSProperties = {
+  background: '#08090f',
+  border: '1px solid #1a1e30',
+  opacity: 0.75,
 };
 
 const cardSymbolStyle: React.CSSProperties = {

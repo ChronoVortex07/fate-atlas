@@ -52,6 +52,7 @@ export function dispatch(
   for (const r of eligible) if (r.group.kind === 'combine') channels.add(r.group.channel);
   for (const channel of channels) {
     for (const r of eligible) {
+      // Combine-group responders contribute via ctx.draft and return null; the channel reducer produces the report.
       if (r.group.kind === 'combine' && r.group.channel === channel) r.apply(ctx);
     }
     const reducer = REDUCERS[channel];

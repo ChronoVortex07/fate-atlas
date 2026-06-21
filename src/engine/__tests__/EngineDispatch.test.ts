@@ -52,6 +52,19 @@ describe('engine dispatch wiring', () => {
     expect(queue.some((r) => r.responderId === 'shadow-shroud')).toBe(true);
   });
 
+  it('shadow-shroud (forced) populates shroudedMethods after startTurn', () => {
+    const e = new GameEngine();
+    e.forceEffects(['shadow-shroud'], true);
+    e.startTurn('self');
+    const s = e.getState();
+    expect(s.shroudedMethods.length).toBeGreaterThanOrEqual(1);
+    // Shrouded indices must be valid pool indices.
+    for (const idx of s.shroudedMethods) {
+      expect(idx).toBeGreaterThanOrEqual(0);
+      expect(idx).toBeLessThan(s.availableMethods.length);
+    }
+  });
+
   it('fool-reroll (forced) replaces the committed d20 slot with a fresh die', () => {
     const e = new GameEngine();
     // Load the fool-reroll scenario: slots already contain The Fool, screen=minigame, method=d20.
