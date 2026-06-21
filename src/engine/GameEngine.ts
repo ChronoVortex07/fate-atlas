@@ -14,6 +14,13 @@ import { ROLL_MODIFIER_ACTIONS } from '../data/dice-modifiers';
 
 const STORAGE_KEY = 'fate-atlas-save';
 
+// A pending effect whose action is a post-commit interaction effect (not a
+// pre-roll dice modifier). Used to keep roll-modifier actions out of the
+// interaction-event pipeline while satisfying the type checker.
+function isInteractionAction(action: PendingEffect['action']): action is InteractionEvent['effect'] {
+  return !(ROLL_MODIFIER_ACTIONS as readonly string[]).includes(action);
+}
+
 export class GameEngine {
   private bus: EventBus;
   private tagSystem: TagSystem;
@@ -165,12 +172,13 @@ export class GameEngine {
 
     // Build interaction events from matched pending effects (filter out pre-roll modifiers)
     const interactionEvents: InteractionEvent[] = matched
-      .filter((effect) => !(ROLL_MODIFIER_ACTIONS as string[]).includes(effect.action))
+      .filter((effect): effect is PendingEffect & { action: InteractionEvent['effect'] } =>
+        isInteractionAction(effect.action))
       .map((effect) => ({
         ruleId: effect.id,
         sourceSlotIndex: effect.sourceSlotIndex,
         targetSlotIndex: committedIndex,
-        effect: effect.action as InteractionEvent['effect'],
+        effect: effect.action,
         description: effect.description,
       }));
     this.state.interactions = [...this.state.interactions, ...interactionEvents];
