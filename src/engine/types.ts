@@ -1,3 +1,5 @@
+import type { EffectReport, DebugConfig } from './events/types';
+
 // ── Affinities ──
 export type AffinityId =
   | 'chaos'
@@ -320,19 +322,19 @@ export interface GameState {
   turnResults: SlotResult[];
   minigamesCompleted: number;
   activeSlotIndex: number | null;
-  interactionApplied: boolean;
   minigameState: MinigameState | null;
-  pendingEffects: PendingEffect[];
-  interactionQueue: InteractionEvent[];
-  pendingHappening: boolean; // interaction was shown before a between-minigame happening
   interactions: InteractionEvent[];
   synthesis: SynthesisResult | null;
   happening: HappeningResult | null;
   selectedHappeningChoice: number | null;
   history: RunRecord[];
   eventLog: GameEvent[];
-  chainDepth: number;
   debug: boolean;
   debugForcedEffect: string | null;
   affinityEffects: AffinityEffects;
+  eventQueue: EffectReport[];
+  debugConfig: DebugConfig;
 }
+
+// Re-export event-system types for engine consumers.
+export type { EffectReport, DebugConfig, PhaseContext, PhaseDraft, TriggerPoint, Responder } from './events/types';

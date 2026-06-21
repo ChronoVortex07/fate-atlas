@@ -8,9 +8,6 @@ describe('rollDicePair', () => {
   // so the two dice land on distinct, predictable values.
   function withRolls(values: number[], fn: () => void) {
     let i = 0;
-    // rollD20 uses Math.floor(random*20)+1 for the base roll, then a couple of
-    // affinity gates. Returning 0 for the gate calls keeps the base roll intact
-    // only when chaos/order are at baseline; at baseline (50) influences are low.
     vi.spyOn(Math, 'random').mockImplementation(() => {
       const v = values[Math.min(i, values.length - 1)];
       i += 1;
@@ -21,7 +18,6 @@ describe('rollDicePair', () => {
 
   it('advantage keeps the higher die', () => {
     const e = new GameEngine();
-    // base rolls: first ~ (0.90*20)+1=19, gate rolls high (no influence), second ~ (0.10*20)+1=3
     withRolls([0.90, 0.99, 0.99, 0.10, 0.99, 0.99], () => {
       const { dice, keptIndex } = e.rollDicePair('advantage');
       expect(keptIndex).not.toBeNull();
@@ -46,73 +42,61 @@ describe('rollDicePair', () => {
   });
 });
 
-describe('planDiceRoll', () => {
+describe('planDiceRoll (dispatch-driven roll-mode)', () => {
   it('defaults to single mode at baseline affinities', () => {
     const e = new GameEngine();
     e.startTurn('self');
-    // Stub RNG high so the probabilistic offerReroll() does not fire.
-    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // no probabilistic responder fires
     expect(e.planDiceRoll().mode).toBe('single');
   });
 
-  it('Light Ascendant confers advantage', () => {
+  it('a forced light-advantage responder confers advantage', () => {
     const e = new GameEngine();
-    e.loadState({ affinities: { ...e.getState().affinities, light: 75 } });
+    e.startTurn('self');
+    e.forceEffects(['light-advantage'], false);
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
-    const plan = e.planDiceRoll();
-    expect(plan.mode).toBe('advantage');
-    expect(plan.sources).toContain('Light favors you');
+    expect(e.planDiceRoll().mode).toBe('advantage');
   });
 
-  it('Shadow Ascendant confers disadvantage', () => {
+  it('a forced shadow-disadvantage responder confers disadvantage', () => {
     const e = new GameEngine();
-    e.loadState({ affinities: { ...e.getState().affinities, shadow: 75 } });
+    e.startTurn('self');
+    e.forceEffects(['shadow-disadvantage'], false);
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     expect(e.planDiceRoll().mode).toBe('disadvantage');
   });
 
-  it('Will Dominant confers choice', () => {
+  it('a forced will-choice responder confers choice', () => {
     const e = new GameEngine();
-    e.loadState({ affinities: { ...e.getState().affinities, will: 92 } });
+    e.startTurn('self');
+    e.forceEffects(['will-choice'], false);
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     expect(e.planDiceRoll().mode).toBe('choice');
   });
 
-  it('a forced modifier via debugForcedEffect overrides affinities and clears the flag', () => {
+  it('a forced effect is consumed from the debug config after firing', () => {
     const e = new GameEngine();
-    e.loadState({ debugForcedEffect: 'disadvantage' });
+    e.startTurn('self');
+    e.forceEffects(['shadow-disadvantage'], false);
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
-    expect(e.planDiceRoll().mode).toBe('disadvantage');
-    expect(e.getState().debugForcedEffect).toBeNull();
+    e.planDiceRoll();
+    expect(e.getState().debugConfig.forced).not.toContain('shadow-disadvantage');
   });
 
-  it('a matching pending effect confers its modifier and is consumed', () => {
+  it('forced advantage + disadvantage cancel to single', () => {
     const e = new GameEngine();
-    e.loadState({
-      pendingEffects: [{
-        id: 'x', sourceRunId: 'r', sourceCard: 'The Tower', sourceSlotIndex: 0,
-        triggerTags: ['roll'], action: 'disadvantage', description: 'd',
-        expiresAfter: 3, turnsRemaining: 3,
-      }],
-    });
-    vi.spyOn(Math, 'random').mockReturnValue(0.99);
-    const plan = e.planDiceRoll();
-    expect(plan.mode).toBe('disadvantage');
-    expect(plan.sources).toContain('The Tower');
-    expect(e.getState().pendingEffects).toHaveLength(0); // consumed
-  });
-
-  it('Light advantage and a card disadvantage cancel to single', () => {
-    const e = new GameEngine();
-    e.loadState({
-      affinities: { ...e.getState().affinities, light: 75 },
-      pendingEffects: [{
-        id: 'x', sourceRunId: 'r', sourceCard: 'The Tower', sourceSlotIndex: 0,
-        triggerTags: ['roll'], action: 'disadvantage', description: 'd',
-        expiresAfter: 3, turnsRemaining: 3,
-      }],
-    });
+    e.startTurn('self');
+    e.forceEffects(['light-advantage', 'shadow-disadvantage'], false);
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     expect(e.planDiceRoll().mode).toBe('single');
+  });
+
+  it('a forced roll-mode effect emits a report into the queue', () => {
+    const e = new GameEngine();
+    e.startTurn('self');
+    e.forceEffects(['will-choice'], false);
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const plan = e.planDiceRoll();
+    expect(plan.reports.some((r) => r.responderId === 'roll-mode')).toBe(true);
   });
 });

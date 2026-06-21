@@ -1,6 +1,5 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { GameEngine } from '../GameEngine';
-import { drawTarotCard } from '../../data/tarot';
 
 describe('debug scenarios', () => {
   it('exposes a group for every preset', () => {
@@ -14,102 +13,60 @@ describe('debug scenarios', () => {
     const engine = new GameEngine();
     let snapshot = engine.getState();
     const unsub = engine.subscribe((s) => { snapshot = s; });
-    const ok = engine.loadScenarioById('chaos-wild-surge');
+    const ok = engine.loadScenarioById('chaos-second-result');
     expect(ok).toBe(true);
-    // chaos-wild-surge sets Chaos to Dominant (>= 82); it must NOT be clobbered by notify()
+    // chaos-second-result sets Chaos high (90); it must NOT be clobbered by notify()
     expect(snapshot.affinities.chaos).toBeGreaterThanOrEqual(82);
     unsub();
   });
 
-  it('event-resolved scenarios set debugForcedEffect', () => {
+  it('scenarios set the forced debug config', () => {
     const engine = new GameEngine();
-    engine.loadScenarioById('chaos-wild-surge');
-    expect(engine.getState().debugForcedEffect).toBe('wild-surge');
+    engine.loadScenarioById('shadow-shroud');
+    expect(engine.getState().debugConfig.forced).toEqual(['shadow-shroud']);
+    expect(engine.getState().debugConfig.isolate).toBe(true);
   });
-});
 
-describe('Phase 2/3 scenarios', () => {
-  it('includes Fate/Will and Light/Shadow groups', () => {
+  it('includes Affinity, Interaction and Combination groups', () => {
     const engine = new GameEngine();
     const groups = new Set(engine.getScenarioPresets().map((p) => p.group));
-    expect(groups.has('Fate / Will')).toBe(true);
-    expect(groups.has('Light / Shadow')).toBe(true);
+    expect(groups.has('Affinity')).toBe(true);
+    expect(groups.has('Interaction')).toBe(true);
+    expect(groups.has('Combination')).toBe(true);
   });
 
-  it('card-swap scenario sets Fate Ascendant and forces the effect', () => {
+  it('fate-override-pick scenario sets Fate Ascendant and forces the effect', () => {
     const engine = new GameEngine();
-    const ok = engine.loadScenarioById('fate-card-swap');
+    const ok = engine.loadScenarioById('fate-override-pick');
     expect(ok).toBe(true);
     expect(engine.getState().affinities.fate).toBeGreaterThanOrEqual(60);
-    expect(engine.getState().debugForcedEffect).toBe('card-swap');
+    expect(engine.getState().debugConfig.forced).toEqual(['fate-override-pick']);
   });
 
-  it('peek-failure scenario sets Light Ascendant', () => {
+  it('every preset loads without error', () => {
     const engine = new GameEngine();
-    engine.loadScenarioById('light-peek-failure');
-    expect(engine.getState().affinities.light).toBeGreaterThanOrEqual(60);
-  });
-
-  it('every Phase 2/3 preset loads without error', () => {
-    const engine = new GameEngine();
-    const ids = engine.getScenarioPresets()
-      .filter((p) => p.group === 'Fate / Will' || p.group === 'Light / Shadow')
-      .map((p) => p.id);
-    expect(ids.length).toBeGreaterThanOrEqual(10);
+    const ids = engine.getScenarioPresets().map((p) => p.id);
+    expect(ids.length).toBeGreaterThan(0);
     for (const id of ids) expect(engine.loadScenarioById(id)).toBe(true);
   });
-});
 
-describe('scenario turn baseline', () => {
-  afterEach(() => vi.restoreAllMocks());
-
-  // Scenarios jump straight into a minigame, bypassing startTurn — which is the
-  // only place questionType is normally set. Completing the minigame triggers
-  // refillPool(questionType), which crashed on QUESTION_WEIGHTS[null].
-  it('a minigame scenario sets questionType so completing it does not crash', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.99); // avoid happening-interrupt / wild-surge branches
+  it('a method-select scenario populates a non-empty method pool', () => {
     const engine = new GameEngine();
-    engine.loadScenarioById('will-big-hand'); // tarot minigame, 0 completed
-    expect(engine.getState().questionType).not.toBeNull();
-
-    const card = drawTarotCard(engine.getState().affinities);
-    expect(() => engine.completeMinigame(card, { revealedAsDrawn: true })).not.toThrow();
-  });
-
-  // fate-fewer-methods drops onto method-select; MethodSelect renders from
-  // availableMethods, which the preset left empty → no cards shown.
-  it('fewer-methods scenario populates a reduced, non-empty method pool', () => {
-    const engine = new GameEngine();
-    engine.loadScenarioById('fate-fewer-methods');
+    engine.loadScenarioById('will-widen-pool');
     const s = engine.getState();
     expect(s.screen).toBe('method-select');
     expect(s.availableMethods.length).toBeGreaterThan(0);
-    expect(s.availableMethods.length).toBeLessThan(3); // Fate Ascendant → 2 methods
-  });
-});
-
-describe('dice roll-modifier scenarios', () => {
-  it('dice-advantage loads into a d20 minigame with Light Ascendant', () => {
-    const e = new GameEngine();
-    expect(e.loadScenarioById('dice-advantage')).toBe(true);
-    const s = e.getState();
-    expect(s.screen).toBe('minigame');
-    expect(s.selectedMethod).toBe('d20');
-    expect(s.affinities.light).toBeGreaterThanOrEqual(60);
   });
 
-  it('dice-choice replaces keep-one-of-two and sets Will Dominant', () => {
-    const e = new GameEngine();
-    expect(e.loadScenarioById('dice-choice')).toBe(true);
-    expect(e.getState().affinities.will).toBeGreaterThanOrEqual(82);
-    expect(e.loadScenarioById('will-keep-one-of-two')).toBe(false); // removed
+  it('the combination scenario forces two effects', () => {
+    const engine = new GameEngine();
+    engine.loadScenarioById('combo-widen-shroud');
+    expect(engine.getState().debugConfig.forced).toEqual(['will-widen-pool', 'shadow-shroud']);
   });
 
-  it('dice-disadvantage-interaction seeds a disadvantage pending effect on a die', () => {
-    const e = new GameEngine();
-    expect(e.loadScenarioById('dice-disadvantage-interaction')).toBe(true);
-    const eff = e.getState().pendingEffects.find((p) => p.action === 'disadvantage');
-    expect(eff).toBeTruthy();
-    expect(eff!.triggerTags).toContain('roll');
+  it('returns false for an unknown id', () => {
+    const engine = new GameEngine();
+    expect(engine.loadScenarioById('will-keep-one-of-two')).toBe(false);
+    expect(engine.loadScenarioById('nonexistent')).toBe(false);
   });
 });

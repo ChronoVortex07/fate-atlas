@@ -23,6 +23,12 @@ function noJitter<T>(fn: () => T): T {
   try { return fn(); } finally { Math.random = orig; }
 }
 
+const dice = (result: number): DiceResult => ({
+  type: 'd20', result, threshold: result <= 9 ? 'low' : 'neutral', interpretation: 'x',
+  tags: ['roll', 'numeric'], themes: ['stagnation'],
+  dimensions: { favorability: -1, certainty: 0, volatility: 0.5 }, modifierRoles: ['effect'],
+} as DiceResult);
+
 describe('completeMinigame meta feeds', () => {
   it('reveal-as-drawn meta feeds Fate', () => {
     const e = new GameEngine();
@@ -41,50 +47,9 @@ describe('completeMinigame meta feeds', () => {
   });
 });
 
-const dice = (result: number): DiceResult => ({
-  type: 'd20', result, threshold: result <= 9 ? 'low' : 'neutral', interpretation: 'x',
-  tags: ['roll', 'numeric'], themes: ['stagnation'],
-  dimensions: { favorability: -1, certainty: 0, volatility: 0.5 }, modifierRoles: ['effect'],
-} as DiceResult);
-
-describe('reroll system', () => {
-  it('offerReroll fires with probability 1 when forced', () => {
-    const e = new GameEngine();
-    startMinigame(e);
-    e.loadState({ debugForcedEffect: 'offer-reroll' });
-    expect(e.offerReroll()).toBe(true);
-  });
-
-  it('takeReroll feeds Will and redraws the active dice slot when not hollow', () => {
-    const e = new GameEngine();
-    startMinigame(e);
-    noJitter(() => e.completeMinigame(dice(5)));
-    while (e.getState().interactionQueue.length > 0) e.advanceInteractionQueue();
-    const beforeWill = e.getState().affinities.will;
-    // Fate is at baseline (stirring < ascendant) so hollow can't fire unforced; stub RNG high.
-    const orig = Math.random; Math.random = () => 0.99;
-    const { hollow } = e.takeReroll();
-    Math.random = orig;
-    expect(hollow).toBe(false);
-    expect(e.getState().affinities.will).toBeGreaterThan(beforeWill);
-  });
-
-  it('takeReroll is hollow (same result kept) when hollow-reroll is forced', () => {
-    const e = new GameEngine();
-    startMinigame(e);
-    noJitter(() => e.completeMinigame(dice(5)));
-    while (e.getState().interactionQueue.length > 0) e.advanceInteractionQueue();
-    const idx = e.getState().activeSlotIndex!;
-    e.loadState({ debugForcedEffect: 'hollow-reroll' });
-    const { hollow } = e.takeReroll();
-    expect(hollow).toBe(true);
-    expect((e.getState().turnResults[idx] as { result: number }).result).toBe(5); // unchanged
-  });
-});
-
-// Pre-commit reroll used by the dice minigame's Will-offered prompt. Unlike
-// takeReroll (post-commit, mutates the active slot), resolveReroll returns the
-// next result for the component to commit, and surfaces Fate's hollow outcome.
+// Pre-commit reroll used by the dice minigame's reroll prompt. resolveReroll
+// returns the next result for the component to commit; Fate (via the
+// fate-hollow-reroll responder) may make it hollow (same value returned).
 describe('resolveReroll (pre-commit dice reroll)', () => {
   it('returns a fresh result (not hollow) at baseline Fate', () => {
     const e = new GameEngine();
@@ -95,29 +60,17 @@ describe('resolveReroll (pre-commit dice reroll)', () => {
     expect(hollow).toBe(false);
   });
 
-  it('returns the same result (hollow) when hollow-reroll is forced', () => {
+  it('returns the same result (hollow) when fate-hollow-reroll is forced', () => {
     const e = new GameEngine();
     startMinigame(e);
-    e.loadState({ debugForcedEffect: 'hollow-reroll' });
+    e.forceEffects(['fate-hollow-reroll'], false);
     const { result, hollow } = e.resolveReroll(dice(5));
     expect(hollow).toBe(true);
     expect((result as { result: number }).result).toBe(5);
   });
-
-  // A forced hollow reroll implies the offer was presented — otherwise the player
-  // could never trigger it. offerReroll must surface it without consuming the flag,
-  // so the subsequent resolveReroll can still read it.
-  it('offerReroll fires for a forced hollow-reroll and leaves the flag for resolveReroll', () => {
-    const e = new GameEngine();
-    startMinigame(e);
-    e.loadState({ debugForcedEffect: 'hollow-reroll' });
-    expect(e.offerReroll()).toBe(true);
-    expect(e.getState().debugForcedEffect).toBe('hollow-reroll'); // not consumed
-    expect(e.resolveReroll(dice(7)).hollow).toBe(true);
-  });
 });
 
-describe('resolveTarotPick (Fate card-swap)', () => {
+describe('resolveTarotPick (Fate override)', () => {
   const hand = [
     tarot('upright'),
     { ...tarot('reversed'), id: 'the-star', name: 'The Star' },
@@ -134,25 +87,25 @@ describe('resolveTarotPick (Fate card-swap)', () => {
     expect(card.id).toBe('the-fool');
   });
 
-  it('returns a different card when card-swap is forced', () => {
+  it('returns a different card when fate-override-pick is forced', () => {
     const e = new GameEngine();
     startMinigame(e);
-    e.loadState({ debugForcedEffect: 'card-swap' });
+    e.forceEffects(['fate-override-pick'], false);
     const { card, swapped } = e.resolveTarotPick(0, hand);
     expect(swapped).toBe(true);
     expect(card.id).not.toBe('the-fool');
   });
 });
 
-describe('orientation + keep-one-of-two', () => {
-  it('maybeAutoOrient returns an orientation when forced, else null at baseline', () => {
+describe('orientation', () => {
+  it('resolveOrientation auto-sets when fate-auto-orient is forced', () => {
     const e = new GameEngine();
     startMinigame(e);
-    const orig = Math.random; Math.random = () => 0.99;
-    expect(e.maybeAutoOrient()).toBeNull();
+    e.forceEffects(['fate-auto-orient'], false);
+    const orig = Math.random; Math.random = () => 0.0; // force upright deterministically
+    const { orientation } = e.resolveOrientation(tarot('reversed'));
     Math.random = orig;
-    e.loadState({ debugForcedEffect: 'auto-orient' });
-    expect(['upright', 'reversed']).toContain(e.maybeAutoOrient());
+    expect(['upright', 'reversed']).toContain(orientation);
   });
 
   it('setOrientation feeds Will', () => {
@@ -162,7 +115,35 @@ describe('orientation + keep-one-of-two', () => {
     noJitter(() => e.setOrientation('reversed'));
     expect(e.getState().affinities.will).toBeGreaterThan(before);
   });
+});
 
+describe('dice pair (advantage/disadvantage/choice)', () => {
+  it('rollDicePair returns two dice and keeps the higher on advantage', () => {
+    const e = new GameEngine();
+    startMinigame(e);
+    const { dice: pair, keptIndex } = e.rollDicePair('advantage');
+    expect(pair).toHaveLength(2);
+    if (keptIndex !== null) {
+      expect(pair[keptIndex].result).toBeGreaterThanOrEqual(pair[keptIndex === 0 ? 1 : 0].result);
+    }
+  });
+
+  it('rollDicePair keeps neither on choice', () => {
+    const e = new GameEngine();
+    startMinigame(e);
+    const { keptIndex } = e.rollDicePair('choice');
+    expect(keptIndex).toBeNull();
+  });
+});
+
+describe('planDiceRoll', () => {
+  it('returns a valid mode and reports array', () => {
+    const e = new GameEngine();
+    startMinigame(e);
+    const plan = e.planDiceRoll();
+    expect(['single', 'advantage', 'disadvantage', 'choice']).toContain(plan.mode);
+    expect(Array.isArray(plan.reports)).toBe(true);
+  });
 });
 
 describe('method control', () => {
@@ -181,13 +162,6 @@ describe('method control', () => {
     noJitter(() => e.swapMethod());
     expect(e.getState().affinities.will).toBeGreaterThan(before);
     expect(e.getState().availableMethods.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('maybeForceMethod fires with probability 1 when forced', () => {
-    const e = new GameEngine();
-    startMinigame(e);
-    e.loadState({ debugForcedEffect: 'force-method' });
-    expect(e.maybeForceMethod()).toBe(true);
   });
 });
 

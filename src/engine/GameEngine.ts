@@ -1,34 +1,26 @@
-import type { GameState, QuestionType, AffinityId, AffinityBand, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, PendingEffect, InteractionEvent, RollModifier, RollPlan } from './types';
+import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, RollMode, DivinationType } from './types';
 import { EventBus } from './EventBus';
-import { TagSystem } from './TagSystem';
 import { AffinityEngine } from './AffinityEngine';
 import { TurnOrchestrator } from './TurnOrchestrator';
-import { InteractionResolver } from './InteractionResolver';
 import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
-import { AFFINITY_DEFINITIONS, defaultAffinityState, BAND_ORDER, BAND_POWER_STEP, TIER_BASE_CHANCE, bandIndex } from '../data/affinities';
-import { INTERACTION_RULES } from '../data/interactions';
+import { AFFINITY_DEFINITIONS, defaultAffinityState } from '../data/affinities';
 import { selectHappening } from '../data/happenings';
-import { loadScenario, SCENARIO_PRESETS } from './scenarios';
-import { AFFINITY_ROLL_MODIFIERS, ROLL_MODIFIER_ACTIONS, DICE_PREROLL_TAGS, resolveRollMode } from '../data/dice-modifiers';
+import { dispatch } from './events/EventDispatcher';
+import { buildAffinityResponders } from './responders/affinity';
+import { buildInteractionResponders } from './responders/interactions';
+import { findScenario, freshStage, DEBUG_SCENARIOS } from './events/scenarios';
+import type { Responder, PhaseContext, PhaseDraft, EffectReport } from './events/types';
 
 const STORAGE_KEY = 'fate-atlas-save';
 
-// A pending effect whose action is a post-commit interaction effect (not a
-// pre-roll dice modifier). Used to keep roll-modifier actions out of the
-// interaction-event pipeline while satisfying the type checker.
-function isInteractionAction(action: PendingEffect['action']): action is InteractionEvent['effect'] {
-  return !(ROLL_MODIFIER_ACTIONS as readonly string[]).includes(action);
-}
-
 export class GameEngine {
   private bus: EventBus;
-  private tagSystem: TagSystem;
   private affinityEngine: AffinityEngine;
   private orchestrator: TurnOrchestrator;
-  private interactionResolver: InteractionResolver;
   private readingPlanner: ReadingPlanner;
   private narrativeAssembler: NarrativeAssembler;
+  private responders: Responder[];
 
   private state: GameState;
   private cachedSnapshot: GameState;
@@ -39,12 +31,11 @@ export class GameEngine {
   constructor(minigamesPerTurn = 3) {
     this.minigamesPerTurn = minigamesPerTurn;
     this.bus = new EventBus();
-    this.tagSystem = new TagSystem();
     this.affinityEngine = new AffinityEngine(AFFINITY_DEFINITIONS);
     this.orchestrator = new TurnOrchestrator(this.bus);
-    this.interactionResolver = new InteractionResolver(this.tagSystem, this.bus);
     this.readingPlanner = new ReadingPlanner();
     this.narrativeAssembler = new NarrativeAssembler();
+    this.responders = [...buildAffinityResponders(), ...buildInteractionResponders()];
     this.state = this.defaultState();
     this.cachedSnapshot = JSON.parse(JSON.stringify(this.state)) as GameState;
   }
@@ -61,24 +52,21 @@ export class GameEngine {
       turnResults: [],
       minigamesCompleted: 0,
       activeSlotIndex: null,
-      interactionApplied: false,
       minigameState: null,
-      pendingEffects: [],
-      interactionQueue: [],
-      pendingHappening: false,
       interactions: [],
       synthesis: null,
       happening: null,
       selectedHappeningChoice: null,
       history: [],
       eventLog: [],
-      chainDepth: 0,
       debug: false,
       debugForcedEffect: null,
       affinityEffects: {
         handSize: 3, methodCount: 3, hintClarity: 0,
         readingDetail: 0, poolPreview: 'none', peekAvailable: false,
       },
+      eventQueue: [],
+      debugConfig: { forced: [], isolate: false },
     };
   }
 
@@ -90,40 +78,89 @@ export class GameEngine {
     this.listeners.forEach((fn) => fn(this.cachedSnapshot));
   }
 
+  // ---------- Dispatch wiring ----------
+
+  private buildContext(trigger: string, draft: PhaseDraft, payload?: unknown): PhaseContext {
+    const slots = this.state.turnResults;
+    const hand = (draft.pool as SlotResult[] | undefined) ?? null;
+    return {
+      trigger,
+      affinities: this.affinityEngine.getState(),
+      slots,
+      hand,
+      spread: hand ? [...slots, ...hand] : slots,
+      minigame: this.state.minigameState,
+      event: payload ?? null,
+      draft,
+      rng: Math.random,
+    };
+  }
+
+  private dispatchAt(trigger: string, draft: PhaseDraft, payload?: unknown): { draft: PhaseDraft; reports: EffectReport[] } {
+    const ctx = this.buildContext(trigger, draft, payload);
+    const { reports, forcedConsumed } = dispatch(trigger, ctx, this.responders, this.state.debugConfig);
+    if (forcedConsumed.length > 0) {
+      this.state.debugConfig = {
+        ...this.state.debugConfig,
+        forced: this.state.debugConfig.forced.filter((id) => !forcedConsumed.includes(id)),
+      };
+    }
+    if (reports.length > 0) this.state.eventQueue = [...this.state.eventQueue, ...reports];
+    return { draft: ctx.draft, reports };
+  }
+
+  forceEffects(ids: string[], isolate: boolean): void {
+    this.state.debugConfig = { forced: ids, isolate };
+    this.notify();
+  }
+
+  clearEventQueue(): void {
+    this.state.eventQueue = [];
+    this.notify();
+  }
+
+  // Refills/generates the pool, routing it through the select draw triggers so
+  // pool-shaping (will-widen/fate-thin) and shrouding effects participate.
+  private buildPool(bias: Partial<Record<DivinationType, number>> = {}, refill = false): void {
+    const baseCount = this.affinityEngine.getEffects().methodCount;
+    const startDraft: PhaseDraft = { poolTarget: baseCount };
+    this.dispatchAt('select:draw:start', startDraft);
+    const target = (startDraft.poolTarget as number) ?? baseCount;
+
+    const affinities = this.affinityEngine.getState();
+    const pool = refill
+      ? this.orchestrator.refillPool(this.state.questionType!, affinities, bias, target)
+      : this.orchestrator.generatePool(this.state.questionType!, affinities, target);
+    this.state.availableMethods = pool;
+
+    // Render the drawn pool through the end-of-draw trigger (shrouding, etc.).
+    const poolResults = pool.map((m) => ({ tags: [], type: m } as unknown as SlotResult));
+    this.dispatchAt('select:draw:end', { pool: poolResults });
+  }
+
   // ---------- Turn lifecycle ----------
 
   startTurn(question: QuestionType): void {
     this.affinityEngine.beginRun();
-    const affinities = this.affinityEngine.getState();
-    const availableMethods = this.orchestrator.generatePool(
-      question, affinities, this.affinityEngine.getEffects().methodCount,
-    );
-
-    // Decrement turnsRemaining on all pending effects; remove expired
-    this.state.pendingEffects = this.state.pendingEffects
-      .map((e) => ({ ...e, turnsRemaining: e.turnsRemaining - 1 }))
-      .filter((e) => e.turnsRemaining > 0);
 
     this.state.screen = 'method-select';
     this.state.questionType = question;
-    this.state.availableMethods = availableMethods;
     this.state.selectedMethod = null;
     this.state.turnResults = [];
     this.state.minigamesCompleted = 0;
     this.state.activeSlotIndex = null;
-    this.state.interactionApplied = false;
     this.state.minigameState = null;
-    this.state.interactionQueue = [];
-    this.state.pendingHappening = false;
     this.state.interactions = [];
     this.state.synthesis = null;
     this.state.happening = null;
     this.state.selectedHappeningChoice = null;
-    this.state.chainDepth = 0;
+    this.state.eventQueue = [];
 
     this.narrativeAssembler.resetRotation();
 
-    this.bus.emit('turn-started', { question, availableMethods });
+    this.buildPool();
+
+    this.bus.emit('turn-started', { question, availableMethods: this.state.availableMethods });
     this.notify();
   }
 
@@ -134,7 +171,6 @@ export class GameEngine {
     }
 
     this.state.selectedMethod = methodType;
-
     this.state.activeSlotIndex = null;
     this.state.screen = 'minigame';
     this.notify();
@@ -143,8 +179,6 @@ export class GameEngine {
   completeMinigame(result: SlotResult, meta?: MinigameMeta): void {
     // Add result to the turn's results array
     this.state.turnResults = [...this.state.turnResults, result];
-    // Canonical index of the just-committed result. NOTE: not `completed - 1`,
-    // which diverges from the array index after a `second-result` append.
     const committedIndex = this.state.turnResults.length - 1;
     this.state.activeSlotIndex = committedIndex;
     const completed = this.state.minigamesCompleted + 1;
@@ -153,7 +187,6 @@ export class GameEngine {
     // Apply affinities from the result (Chaos/Order tag feeds, routed through shift)
     if (result.type !== 'happening') {
       this.affinityEngine.applyResultTags(result);
-      this.maybeWildSurge(result);
     }
 
     // Player-action feeds derived from how this result was reached.
@@ -163,219 +196,62 @@ export class GameEngine {
       if (meta.viaReroll) this.affinityEngine.applyAction('take-reroll');
     }
 
-    // Roll-modifier pending effects are pre-roll (consumed by planDiceRoll); keep
-    // them out of the post-commit interaction matcher so they never spawn a
-    // meta-event. Anything not consumed pre-roll is preserved untouched.
-    const rollMods = this.state.pendingEffects.filter(
-      (e) => ROLL_MODIFIER_ACTIONS.includes(e.action as RollModifier),
-    );
-    const checkable = this.state.pendingEffects.filter(
-      (e) => !ROLL_MODIFIER_ACTIONS.includes(e.action as RollModifier),
-    );
-    const { matched, remaining } = this.interactionResolver.checkPendingEffects(
-      checkable,
-      result,
-    );
-    this.state.pendingEffects = [...rollMods, ...remaining];
+    // Post-commit dispatch: interaction matchers + chaos second-result responders.
+    // Responders namespace dice as 'dice', not the data-layer 'd20' type.
+    const commitFamily = result.type === 'd20' ? 'dice' : result.type;
+    const commitTrigger = `${commitFamily}:commit`;
+    const { draft } = this.dispatchAt(commitTrigger, { outcome: result });
 
-    // Build interaction events from matched pending effects (filter out pre-roll modifiers)
-    const interactionEvents: InteractionEvent[] = matched
-      .filter((effect): effect is PendingEffect & { action: InteractionEvent['effect'] } =>
-        isInteractionAction(effect.action))
-      .map((effect) => ({
-        ruleId: effect.id,
-        sourceSlotIndex: effect.sourceSlotIndex,
-        targetSlotIndex: committedIndex,
-        effect: effect.action,
-        description: effect.description,
-      }));
-    this.state.interactions = [...this.state.interactions, ...interactionEvents];
-
-    // Create new pending effects from this result's tags
-    const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const newEffects = this.interactionResolver.createPendingEffects(
-      result,
-      runId,
-      INTERACTION_RULES,
-      committedIndex,
-    );
-    this.state.pendingEffects = [...this.state.pendingEffects, ...newEffects];
-
-    // Push interaction events onto the queue
-    if (interactionEvents.length > 0) {
-      this.state.interactionQueue = [
-        ...this.state.interactionQueue,
-        ...interactionEvents,
+    // Mutating responders (mirror/critical-resonance) operate in place on the
+    // spread, so the committed slot reflects any orientation flip.
+    if (draft.outcome && draft.outcome !== result) {
+      this.state.turnResults = [
+        ...this.state.turnResults.slice(0, committedIndex),
+        draft.outcome,
+        ...this.state.turnResults.slice(committedIndex + 1),
       ];
     }
 
-    // If queue is non-empty, freeze current screen — sequencer overlays on top
-    // and handles advancing. The minigame stays mounted so dice/cards remain visible.
-    if (this.state.interactionQueue.length > 0) {
-      this.bus.emit('minigame-complete', { result, completed, interactions: interactionEvents });
-      this.notify();
-      return;
+    // Chaos surge: spawn a second result of the same type.
+    if (typeof draft.spawnSecond === 'string') {
+      const affinities = this.affinityEngine.getState();
+      const second = this.orchestrator.drawSingleResult(
+        draft.spawnSecond as 'tarot' | 'd20' | 'iching',
+        affinities,
+      );
+      this.state.turnResults = [...this.state.turnResults, second];
     }
 
-    // No interactions queued — proceed with normal screen transition
+    this.bus.emit('minigame-complete', { result, completed });
+
+    // Final reading?
     if (completed >= this.minigamesPerTurn) {
       this.synthesizeAll();
       this.buildRunRecord();
       this.state.screen = 'result';
       this.saveToStorage();
-    } else {
-      this.orchestrator.removeUsedMethod(result.type as 'tarot' | 'd20' | 'iching');
-
-      if (this.maybeHappeningInterrupt()) {
-        this.triggerHappening();
-        return;
-      } else {
-        const affinities = this.affinityEngine.getState();
-        const gaps = this.readingPlanner.analyzeGaps(this.state.turnResults);
-        const bias = this.readingPlanner.getBiasForRefill(gaps);
-        this.state.availableMethods = this.orchestrator.refillPool(
-          this.state.questionType!,
-          affinities,
-          bias,
-        );
-        this.state.screen = 'method-select';
-        this.state.selectedMethod = null;
-      }
-    }
-
-    this.bus.emit('minigame-complete', { result, completed, interactions: interactionEvents });
-    this.notify();
-  }
-
-  // Apply the head interaction's effect while the minigame is still mounted
-  // (called by the sequencer at its reveal step). Does not dequeue or change
-  // the screen; the guard makes repeat calls safe.
-  applyHeadInteraction(): void {
-    if (this.state.interactionQueue.length === 0) return;
-    if (this.state.interactionApplied) return;
-    this.executeEffect(this.state.interactionQueue[0]);
-    this.state.interactionApplied = true;
-    this.notify();
-  }
-
-  advanceInteractionQueue(): void {
-    if (this.state.interactionQueue.length === 0) return;
-
-    const completed = this.state.interactionQueue[0];
-    // The effect is normally applied earlier at the sequencer's reveal step;
-    // apply here only if that didn't happen (e.g. a fast tap skipped the beat).
-    if (!this.state.interactionApplied) {
-      this.executeEffect(completed);
-    }
-    this.state.interactionApplied = false;
-    this.state.interactionQueue = this.state.interactionQueue.slice(1);
-
-    if (this.state.interactionQueue.length > 0) {
-      // More interactions waiting — stay frozen, sequencer plays next
       this.notify();
       return;
     }
 
-    // Queue drained — resolve pending screen transition
-    if (this.state.pendingHappening) {
-      this.state.pendingHappening = false;
+    // Between-minigame transition. Ask the minigame:end trigger whether a
+    // happening interrupts the flow.
+    this.orchestrator.removeUsedMethod(result.type as 'tarot' | 'd20' | 'iching');
+    const { draft: endDraft } = this.dispatchAt('minigame:end', {
+      lastReading: completed >= this.minigamesPerTurn,
+    });
+
+    if (endDraft.interruptHappening === true) {
       this.triggerHappening();
       return;
     }
 
-    if (this.state.minigamesCompleted >= this.minigamesPerTurn) {
-      this.synthesizeAll();
-      this.buildRunRecord();
-      this.state.screen = 'result';
-      this.saveToStorage();
-    } else {
-      const affinities = this.affinityEngine.getState();
-      const gaps = this.readingPlanner.analyzeGaps(this.state.turnResults);
-      const bias = this.readingPlanner.getBiasForRefill(gaps);
-      this.state.availableMethods = this.orchestrator.refillPool(
-        this.state.questionType!,
-        affinities,
-        bias,
-        this.affinityEngine.getEffects().methodCount,
-      );
-      this.state.screen = 'method-select';
-      this.state.selectedMethod = null;
-    }
+    const gaps = this.readingPlanner.analyzeGaps(this.state.turnResults);
+    const bias = this.readingPlanner.getBiasForRefill(gaps);
+    this.buildPool(bias, true);
+    this.state.screen = 'method-select';
+    this.state.selectedMethod = null;
     this.notify();
-  }
-
-  private executeEffect(event: InteractionEvent): void {
-    const targetIndex = event.targetSlotIndex;
-    const target = this.state.turnResults[targetIndex];
-    if (!target) return;
-
-    const affinities = this.affinityEngine.getState();
-
-    switch (event.effect) {
-      case 'reroll': {
-        if (target.type === 'd20') {
-          const newResult = this.orchestrator.drawSingleResult('d20', affinities);
-          this.state.turnResults = [
-            ...this.state.turnResults.slice(0, targetIndex),
-            newResult,
-            ...this.state.turnResults.slice(targetIndex + 1),
-          ];
-        }
-        break;
-      }
-      case 'flip': {
-        if (target.type === 'tarot') {
-          this.state.turnResults = this.state.turnResults.map((r, i) =>
-            i === targetIndex && r.type === 'tarot'
-              ? {
-                  ...r,
-                  orientation: r.orientation === 'upright' ? 'reversed' as const : 'upright' as const,
-                }
-              : r,
-          );
-        }
-        break;
-      }
-      case 'mirror': {
-        const sourceIndex = event.sourceSlotIndex;
-        this.state.turnResults = this.state.turnResults.map((r, i) => {
-          if ((i === targetIndex || i === sourceIndex) && r.type === 'tarot') {
-            return {
-              ...r,
-              orientation: r.orientation === 'upright' ? 'reversed' as const : 'upright' as const,
-            };
-          }
-          return r;
-        });
-        break;
-      }
-      case 'add-choice': {
-        if (this.state.happening && this.state.happening.choices.length > 0) {
-          const bonusChoice = {
-            text: 'A hidden path emerges — ' + this.state.happening.choices[0].text,
-            affinityChanges: { chaos: 5 },
-          };
-          this.state.happening = {
-            ...this.state.happening,
-            choices: [...this.state.happening.choices, bonusChoice],
-          };
-        }
-        break;
-      }
-      case 'second-result': {
-        if (target.type !== 'happening') {
-          const secondResult = this.orchestrator.drawSingleResult(
-            target.type as 'tarot' | 'd20' | 'iching',
-            affinities,
-          );
-          this.state.turnResults = [...this.state.turnResults, secondResult];
-        }
-        break;
-      }
-      default:
-        // Unknown effect type — should not happen with proper typing
-        break;
-    }
   }
 
   private buildRunRecord(): void {
@@ -398,11 +274,8 @@ export class GameEngine {
 
     const question = this.state.questionType!;
     const affinities = this.affinityEngine.getState();
-
-    // Aggregate all results
     const aggregated = this.readingPlanner.aggregate(results, question);
 
-    // Assemble narrative
     const synthesisResult = this.narrativeAssembler.assemble(
       aggregated,
       results,
@@ -435,6 +308,19 @@ export class GameEngine {
     };
     this.state.screen = 'happening';
 
+    // I Ching changing-lines may add a hidden branch (happening:start trigger).
+    const { draft } = this.dispatchAt('happening:start', {});
+    if (draft.addChoice === true && this.state.happening.choices.length > 0) {
+      const bonusChoice = {
+        text: 'A hidden path emerges — ' + this.state.happening.choices[0].text,
+        affinityChanges: { chaos: 5 } as Partial<Record<AffinityId, number>>,
+      };
+      this.state.happening = {
+        ...this.state.happening,
+        choices: [...this.state.happening.choices, bonusChoice],
+      };
+    }
+
     this.bus.emit('happening-triggered', { happening: this.state.happening });
     this.notify();
   }
@@ -448,7 +334,6 @@ export class GameEngine {
       throw new Error(`Choice ${choiceIndex} not found in happening`);
     }
 
-    // Apply affinity changes from chosen option through the shift pipeline.
     for (const [id, delta] of Object.entries(choice.affinityChanges)) {
       this.affinityEngine.shift(id as AffinityId, delta as number, `happening:${this.state.happening.id}`);
     }
@@ -456,7 +341,6 @@ export class GameEngine {
     this.state.selectedHappeningChoice = choiceIndex;
     this.state.affinities = this.affinityEngine.getState();
 
-    // Happening resolved — return to method select for the next minigame
     this.state.screen = 'method-select';
     this.state.selectedMethod = null;
     this.state.happening = null;
@@ -465,121 +349,51 @@ export class GameEngine {
     this.bus.emit('happening-resolved', { choiceIndex });
 
     // Refill pool for next minigame (the used method was already removed)
-    const affinities = this.affinityEngine.getState();
-    this.state.availableMethods = this.orchestrator.refillPool(
-      this.state.questionType!,
-      affinities,
-      {},
-      this.affinityEngine.getEffects().methodCount,
-    );
+    this.buildPool({}, true);
 
     this.saveToStorage();
     this.notify();
   }
 
-  // ---------- Event-resolved affinity decisions ----------
+  // ---------- Dispatch-driven action methods ----------
 
-  // Returns true if the named effect should fire now: guaranteed when the debug
-  // flag names it (flag then clears), otherwise band-gated × base chance.
-  private forcedOrRoll(
-    effectId: string,
-    affinity: AffinityId,
-    minBand: AffinityBand,
-    baseChance: number,
-  ): boolean {
-    if (this.state.debugForcedEffect === effectId) {
-      this.state.debugForcedEffect = null;
-      return true;
-    }
-    const band = this.affinityEngine.resolveBand(affinity);
-    const idx = BAND_ORDER.indexOf(band);
-    const minIdx = BAND_ORDER.indexOf(minBand);
-    if (idx < minIdx) return false;
-    const scaled = baseChance * (1 + (idx - minIdx) * BAND_POWER_STEP);
-    return Math.random() < Math.min(1, scaled);
-  }
-
-  // Chaos-Dominant wild surge: a committed result can spawn a second (Major, ~8%).
-  maybeWildSurge(result: SlotResult): boolean {
-    if (result.type === 'happening') return false;
-    if (!this.forcedOrRoll('wild-surge', 'chaos', 'dominant', 0.08)) return false;
-    const affinities = this.affinityEngine.getState();
-    const second = this.orchestrator.drawSingleResult(
-      result.type as 'tarot' | 'd20' | 'iching',
-      affinities,
-    );
-    this.state.turnResults = [...this.state.turnResults, second];
-    this.bus.emit('minigame-complete', { result: second, wildSurge: true });
-    this.notify(); // snapshot contract: surfacing the appended result + cleared flag
-    return true;
-  }
-
-  // Chaos-Dominant happening interrupt (Major); folds in the prior frequency roll.
-  maybeHappeningInterrupt(): boolean {
-    if (this.state.debugForcedEffect === 'happening-interrupt') {
-      this.state.debugForcedEffect = null;
-      this.notify(); // snapshot contract: surfacing the cleared flag
-      return true;
-    }
-    const chaos = this.affinityEngine.getState().chaos;
-    if (chaos < 40) return false;
-    return Math.random() < (chaos / 100) * 0.5;
-  }
-
-  // ---------- Agency (Fate/Will) decisions ----------
-
-  // Will-gated: should a "Reroll?" prompt be offered after the player's action?
-  // A forced hollow-reroll implies the offer too — the player can only reach a
-  // hollow outcome by taking a reroll — so surface it here without consuming the
-  // flag (resolveReroll reads it). This keeps the hollow-reroll debug scenario
-  // demonstrable even when Will is too low to offer one on its own.
-  offerReroll(): boolean {
-    if (this.state.debugForcedEffect === 'hollow-reroll') return true;
-    return this.forcedOrRoll('offer-reroll', 'will', 'stirring', TIER_BASE_CHANCE.notable);
-  }
-
-  // Pre-commit reroll for the dice minigame's Will-offered prompt. Fate
-  // (Ascendant+) may make it hollow — the die returns the same value. Returns the
-  // result for the component to commit (with viaReroll meta, which feeds Will);
-  // this method neither feeds affinity nor mutates committed slots. Cf. takeReroll,
-  // the post-commit variant that redraws an already-recorded slot in place.
-  resolveReroll(current: DiceResult): { result: DiceResult; hollow: boolean } {
-    const hollow = this.forcedOrRoll('hollow-reroll', 'fate', 'ascendant', TIER_BASE_CHANCE.major);
-    if (hollow) return { result: current, hollow: true };
-    const fresh = this.orchestrator.drawSingleResult('d20', this.affinityEngine.getState()) as DiceResult;
-    return { result: fresh, hollow: false };
-  }
-
-  // Player takes an offered reroll. Feeds Will. Fate may make it hollow (same result).
-  takeReroll(): { hollow: boolean } {
-    this.affinityEngine.applyAction('take-reroll');
-    const idx = this.state.activeSlotIndex;
-    if (idx === null) { this.notify(); return { hollow: false }; }
-    const target = this.state.turnResults[idx];
-    if (!target || target.type === 'happening') { this.notify(); return { hollow: false }; }
-
-    const hollow = this.forcedOrRoll('hollow-reroll', 'fate', 'ascendant', TIER_BASE_CHANCE.major);
-    if (hollow) {
-      this.notify(); // snapshot contract: cleared forced flag / Will feed surfaced
-      return { hollow: true };
-    }
-    const affinities = this.affinityEngine.getState();
-    const fresh = this.orchestrator.drawSingleResult(
-      target.type as 'tarot' | 'd20' | 'iching',
-      affinities,
-    );
-    this.state.turnResults = [
-      ...this.state.turnResults.slice(0, idx),
-      fresh,
-      ...this.state.turnResults.slice(idx + 1),
-    ];
+  // Resolves every active roll modifier into one plan for the dice minigame.
+  planDiceRoll(): { mode: RollMode; offerReroll: boolean; reports: EffectReport[] } {
+    const { draft, reports } = this.dispatchAt('dice:roll', { rollMods: [], outcome: undefined });
     this.notify();
-    return { hollow: false };
+    return { mode: draft.rollMode ?? 'single', offerReroll: draft.offerReroll ?? false, reports };
   }
 
-  // Player declines an offered reroll → accepts what's given (Fate).
-  declineReroll(): void {
-    this.affinityEngine.applyAction('decline-reroll');
+  // Fate may intercept the pick (OVERRIDE band) and substitute another card.
+  resolveTarotPick(chosenIndex: number, hand: TarotResult[]): { card: TarotResult; swapped: boolean } {
+    const chosen = hand[chosenIndex];
+    const { draft } = this.dispatchAt('tarot:pick', { outcome: chosen, pool: hand as unknown as SlotResult[] });
+    const card = (draft.outcome as TarotResult) ?? chosen;
+    this.notify();
+    return { card, swapped: card !== chosen };
+  }
+
+  // Fate may decide the orientation for the player.
+  resolveOrientation(card: TarotResult): { orientation: 'upright' | 'reversed'; auto: boolean } {
+    const { draft } = this.dispatchAt('tarot:orient', { outcome: card });
+    const out = draft.outcome as TarotResult | undefined;
+    const auto = !!out && out.orientation !== card.orientation;
+    this.notify();
+    return { orientation: out?.orientation ?? card.orientation, auto };
+  }
+
+  // Pre-commit dice reroll. Fate (Ascendant+) may make it hollow (same face).
+  resolveReroll(current: DiceResult): { result: DiceResult; hollow: boolean } {
+    const fresh = this.orchestrator.drawSingleResult('d20', this.affinityEngine.getState()) as DiceResult;
+    const { draft } = this.dispatchAt('dice:reroll', { outcome: fresh }, { previous: current });
+    const result = (draft.outcome as DiceResult) ?? fresh;
+    this.notify();
+    return { result, hollow: result === current };
+  }
+
+  // Will: the player exercises a free orientation choice.
+  setOrientation(_orientation: 'upright' | 'reversed'): void {
+    this.affinityEngine.applyAction('set-orientation');
     this.notify();
   }
 
@@ -596,99 +410,16 @@ export class GameEngine {
     return { dice: [a, b], keptIndex };
   }
 
-  // Resolves every active roll modifier (affinity table + interaction pending
-  // effects + the optional Will reroll) into one plan for the dice minigame.
-  // Consumes any matching roll-modifier pending effects and the forced-modifier
-  // debug flag. Affinity modifiers apply deterministically at/above their band.
-  planDiceRoll(): RollPlan {
-    const mods: RollModifier[] = [];
-    const sources: string[] = [];
-
-    // 1. Debug force (a single modifier), cleared on read.
-    const forced = this.state.debugForcedEffect;
-    if (forced === 'advantage' || forced === 'disadvantage' || forced === 'choice') {
-      this.state.debugForcedEffect = null;
-      mods.push(forced);
-      sources.push(`(debug) ${forced}`);
-    }
-
-    // 2. Affinity table — deterministic while in-band.
-    for (const rule of AFFINITY_ROLL_MODIFIERS) {
-      if (bandIndex(this.affinityEngine.bandOf(rule.affinity)) >= bandIndex(rule.minBand)) {
-        mods.push(rule.modifier);
-        sources.push(rule.source);
-      }
-    }
-
-    // 3. Interaction pending effects targeting the upcoming die — consume them.
-    const remaining: PendingEffect[] = [];
-    for (const effect of this.state.pendingEffects) {
-      const isRollMod = ROLL_MODIFIER_ACTIONS.includes(effect.action as RollModifier);
-      if (isRollMod && this.tagSystem.hasAllTags({ tags: DICE_PREROLL_TAGS }, effect.triggerTags)) {
-        mods.push(effect.action as RollModifier);
-        sources.push(effect.sourceCard);
-      } else {
-        remaining.push(effect);
-      }
-    }
-    this.state.pendingEffects = remaining;
-
-    // 4. Optional Will reroll (existing probabilistic path; honors offer/hollow debug flags).
-    if (this.offerReroll()) mods.push('offer-reroll');
-
-    const { mode, offerReroll } = resolveRollMode(mods);
-    this.notify();
-    return { mode, offerReroll, sources };
-  }
-
-  // Fate: the card you pick may not be the one revealed (Ascendant: card-swap;
-  // Dominant: the-hand-chooses). Returns the card to reveal and whether a swap occurred.
-  resolveTarotPick(chosenIndex: number, hand: TarotResult[]): { card: TarotResult; swapped: boolean } {
-    const chosen = hand[chosenIndex];
-    if (hand.length < 2) return { card: chosen, swapped: false };
-
-    const swap =
-      this.forcedOrRoll('the-hand-chooses', 'fate', 'dominant', TIER_BASE_CHANCE.major) ||
-      this.forcedOrRoll('card-swap', 'fate', 'ascendant', TIER_BASE_CHANCE.major);
-    if (!swap) return { card: chosen, swapped: false };
-
-    const others = hand.map((_, i) => i).filter((i) => i !== chosenIndex);
-    const pick = others[Math.floor(Math.random() * others.length)];
-    return { card: hand[pick], swapped: true };
-  }
-
-  // Fate: a coin-flip detail (orientation) may be decided for the player.
-  maybeAutoOrient(): 'upright' | 'reversed' | null {
-    if (!this.forcedOrRoll('auto-orient', 'fate', 'stirring', TIER_BASE_CHANCE.notable)) return null;
-    return Math.random() < 0.5 ? 'upright' : 'reversed';
-  }
-
-  // Will: the player exercises a free orientation choice.
-  setOrientation(_orientation: 'upright' | 'reversed'): void {
-    this.affinityEngine.applyAction('set-orientation');
-    this.notify();
-  }
-
   // Will: swap the offered method set — re-rolls the pool. Feeds Will.
   swapMethod(): void {
     this.affinityEngine.applyAction('swap-method');
-    const affinities = this.affinityEngine.getState();
-    this.state.availableMethods = this.orchestrator.generatePool(
-      this.state.questionType!, affinities, this.affinityEngine.getEffects().methodCount,
-    );
+    this.buildPool();
     this.state.selectedMethod = null;
     this.notify();
   }
 
-  // Fate (Dominant): the method may be forced on the player.
-  maybeForceMethod(): boolean {
-    return this.forcedOrRoll('force-method', 'fate', 'dominant', TIER_BASE_CHANCE.notable);
-  }
-
   // ---------- Information (Light/Shadow) decisions ----------
 
-  // Light foresight. Delegates escalation/penalty to AffinityEngine; derives a
-  // vague leaning from the previewed result. The player never sees exact values.
   usePeek(preview?: SlotResult): { failed: boolean; leaning: string } {
     const { failed } = this.affinityEngine.usePeek();
     if (failed) {
@@ -700,7 +431,6 @@ export class GameEngine {
     return { failed: false, leaning };
   }
 
-  // Player declines a peek → embraces the unknown (Shadow).
   declinePeek(): void {
     this.affinityEngine.applyAction('decline-peek');
     this.notify();
@@ -733,31 +463,28 @@ export class GameEngine {
     this.notify();
   }
 
-  // ---------- Debug ----------
+  // ---------- Debug / Scenarios ----------
 
-  injectPendingEffect(effect: PendingEffect): void {
-    this.state.pendingEffects = [...this.state.pendingEffects, effect];
-    this.notify();
-  }
+  loadScenarioById(id: string): boolean {
+    const scenario = findScenario(id);
+    if (!scenario) return false;
 
-  loadScenarioById(presetId: string): boolean {
-    const patch = loadScenario(presetId, this.state);
-    if (patch === null) return false;
-    // Affinities must go through the engine BEFORE notify(), which overwrites
-    // state.affinities from the engine. Routing here fixes the old clobber bug.
-    this.affinityEngine.setState(patch);
+    // Reset to a fresh game, then stage the scenario.
+    this.affinityEngine.setState(defaultAffinityState());
+    this.state = this.defaultState();
 
-    // Scenarios drop straight into a mid-turn screen, bypassing startTurn — the
-    // only place that establishes the turn baseline. Backfill what downstream
-    // code assumes so it doesn't crash or render empty:
-    //  - questionType: refillPool() indexes QUESTION_WEIGHTS[questionType]; null → TypeError.
-    //  - availableMethods: MethodSelect renders from it; an empty pool shows no cards.
-    // Pool generation runs AFTER the affinity patch so it reflects the scenario's
-    // methodCount (e.g. Fate Ascendant → fewer methods).
-    if (this.state.questionType === null) {
-      this.state.questionType = 'self';
-    }
-    if (this.state.screen === 'method-select' && this.state.availableMethods.length === 0) {
+    const stage = freshStage();
+    scenario.setup(stage);
+
+    this.affinityEngine.setState(stage.affinities);
+    this.state.affinities = this.affinityEngine.getState();
+    this.state.screen = stage.screen as GameState['screen'];
+    this.state.selectedMethod = stage.selectedMethod as GameState['selectedMethod'];
+    this.state.turnResults = stage.slots;
+    this.state.questionType = this.state.questionType ?? 'self';
+    this.state.debugConfig = { forced: scenario.forced, isolate: scenario.isolate };
+
+    if (this.state.screen === 'method-select') {
       this.state.availableMethods = this.orchestrator.generatePool(
         this.state.questionType,
         this.affinityEngine.getState(),
@@ -770,7 +497,7 @@ export class GameEngine {
   }
 
   getScenarioPresets() {
-    return SCENARIO_PRESETS.map((p) => ({ id: p.id, label: p.label, group: p.group }));
+    return DEBUG_SCENARIOS.map((s) => ({ id: s.id, label: s.label, group: s.group }));
   }
 
   // ---------- Persistence ----------
@@ -811,8 +538,6 @@ export class GameEngine {
     if (results.length === 0) return '';
     const question = this.state.questionType!;
     const affinities = this.affinityEngine.getState();
-
-    // Re-aggregate for the prompt
     const aggregated = this.readingPlanner.aggregate(results, question);
 
     return this.narrativeAssembler.generateLLMPrompt({
@@ -843,15 +568,12 @@ export class GameEngine {
     this.state.turnResults = [];
     this.state.minigamesCompleted = 0;
     this.state.activeSlotIndex = null;
-    this.state.interactionApplied = false;
     this.state.minigameState = null;
-    this.state.interactionQueue = [];
-    this.state.pendingHappening = false;
     this.state.interactions = [];
     this.state.synthesis = null;
     this.state.happening = null;
     this.state.selectedHappeningChoice = null;
-    this.state.chainDepth = 0;
+    this.state.eventQueue = [];
     this.notify();
   }
 
