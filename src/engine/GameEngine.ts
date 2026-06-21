@@ -10,6 +10,7 @@ import { AFFINITY_DEFINITIONS, defaultAffinityState, BAND_ORDER, BAND_POWER_STEP
 import { INTERACTION_RULES } from '../data/interactions';
 import { selectHappening } from '../data/happenings';
 import { loadScenario, SCENARIO_PRESETS } from './scenarios';
+import { ROLL_MODIFIER_ACTIONS } from '../data/dice-modifiers';
 
 const STORAGE_KEY = 'fate-atlas-save';
 
@@ -162,14 +163,16 @@ export class GameEngine {
     );
     this.state.pendingEffects = remaining;
 
-    // Build interaction events from matched pending effects
-    const interactionEvents: InteractionEvent[] = matched.map((effect) => ({
-      ruleId: effect.id,
-      sourceSlotIndex: effect.sourceSlotIndex,
-      targetSlotIndex: committedIndex,
-      effect: effect.action,
-      description: effect.description,
-    }));
+    // Build interaction events from matched pending effects (filter out pre-roll modifiers)
+    const interactionEvents: InteractionEvent[] = matched
+      .filter((effect) => !(ROLL_MODIFIER_ACTIONS as string[]).includes(effect.action))
+      .map((effect) => ({
+        ruleId: effect.id,
+        sourceSlotIndex: effect.sourceSlotIndex,
+        targetSlotIndex: committedIndex,
+        effect: effect.action as InteractionEvent['effect'],
+        description: effect.description,
+      }));
     this.state.interactions = [...this.state.interactions, ...interactionEvents];
 
     // Create new pending effects from this result's tags
