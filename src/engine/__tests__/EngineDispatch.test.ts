@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { GameEngine } from '../GameEngine';
 
 describe('engine dispatch wiring', () => {
@@ -55,14 +55,13 @@ describe('engine dispatch wiring', () => {
   it('fool-reroll (forced) replaces the committed d20 slot with a fresh die', () => {
     const e = new GameEngine();
     // Load the fool-reroll scenario: slots already contain The Fool, screen=minigame, method=d20.
+    // Do NOT call startTurn() — it clears turnResults. The scenario is pre-staged at minigame.
     e.loadScenarioById('fool-reroll');
-    e.startTurn('self');
 
     // Stub Math.random so the rerolled d20 is deterministic (result=20 range; we just need
     // it to not equal the original die by identity, which is guaranteed because drawSingleResult
     // creates a new object).
-    const originalRandom = Math.random;
-    Math.random = () => 0.99; // high value → high d20 result
+    const mockRandom = vi.spyOn(Math, 'random').mockReturnValue(0.99); // high value → high d20 result
 
     const d20Result: import('../types').DiceResult = {
       type: 'd20', result: 1, threshold: 'critical-low', interpretation: 'A dire omen.',
@@ -72,14 +71,12 @@ describe('engine dispatch wiring', () => {
 
     e.completeMinigame(d20Result);
 
-    Math.random = originalRandom;
+    mockRandom.mockRestore();
 
     const state = e.getState();
-    // The fool-reroll responder fires on dice:commit and sets rerollOutcome → engine redraws.
-    // Either the slot was replaced (value differs from result=1 since rng=0.99 produces high roll)
-    // or the EffectReport for fool-reroll is in the eventQueue proving the responder fired.
+    // The fool-reroll responder must fire on dice:commit AND the slot must be actually replaced.
     const foolFired = state.eventQueue.some((r) => r.responderId === 'fool-reroll');
-    const slotReplaced = state.turnResults.length > 0 && state.turnResults[0] !== d20Result;
-    expect(foolFired || slotReplaced).toBe(true);
+    expect(foolFired).toBe(true);
+    expect(state.turnResults[0]).not.toBe(d20Result); // committed slot was replaced by a fresh die
   });
 });
