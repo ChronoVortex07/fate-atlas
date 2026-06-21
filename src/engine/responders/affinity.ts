@@ -55,6 +55,7 @@ export function buildAffinityResponders(): Responder[] {
       apply: (c) => {
         const hand = c.hand as SlotResult[];
         const others = hand.filter((h) => h !== c.draft.outcome);
+        if (others.length === 0) return null;
         c.draft.outcome = others[Math.floor(c.rng() * others.length)];
         return report('fate-override-pick', 'Fate', 'The weave moves your hand — another is chosen for you.', 'override');
       },

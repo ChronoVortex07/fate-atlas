@@ -38,6 +38,36 @@ describe('affinity responders via dispatch', () => {
     expect(c.draft.shrouded!.length).toBe(1);
   });
 
+  it('fate-override-pick: no reassignment when all hand entries are reference-equal to outcome', () => {
+    const card = { type: 'tarot', id: 'fool' } as any;
+    const c = ctx({
+      trigger: 'tarot:pick',
+      hand: [card, card],
+      draft: { outcome: card },
+      affinities: { ...defaultAffinityState(), fate: 100 },
+      rng: () => 0,
+    });
+    const { reports } = dispatch('tarot:pick', c, buildAffinityResponders(), { forced: ['fate-override-pick'], isolate: true });
+    expect(c.draft.outcome).toBe(card);
+    expect(reports).toHaveLength(0);
+  });
+
+  it('fate-override-pick: replaces outcome with a distinct hand card when candidates exist', () => {
+    const original = { type: 'tarot', id: 'fool' } as any;
+    const other = { type: 'tarot', id: 'tower' } as any;
+    const c = ctx({
+      trigger: 'tarot:pick',
+      hand: [original, other],
+      draft: { outcome: original },
+      affinities: { ...defaultAffinityState(), fate: 100 },
+      rng: () => 0,
+    });
+    const { reports } = dispatch('tarot:pick', c, buildAffinityResponders(), { forced: ['fate-override-pick'], isolate: true });
+    expect(c.draft.outcome).toBe(other);
+    expect(reports).toHaveLength(1);
+    expect(reports[0].responderId).toBe('fate-override-pick');
+  });
+
   it('light-advantage + shadow-disadvantage cancel to single', () => {
     const c = ctx({
       trigger: 'dice:roll',
