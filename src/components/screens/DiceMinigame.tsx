@@ -5,11 +5,17 @@ import { rollD20 } from '../../data/dice';
 import type { DiceResult, MinigameMeta } from '../../engine/types';
 import DiceThrowAnimation, { THRESHOLD_COLORS } from './DiceThrowAnimation';
 
+// Beat that lets a thrown die's reveal animation finish before completeMinigame
+// transitions the screen. Matches the auto-commit delay so a reroll's replayed
+// throw gets the same time on screen as the first one.
+const REVEAL_DELAY_MS = 1500;
+
 export default function DiceMinigame() {
   const { state, engine } = useGameEngine();
   const [thrown, setThrown] = useState(false);
   const [localResult, setLocalResult] = useState<DiceResult | null>(null);
   const [offered, setOffered] = useState(false);
+  const [chose, setChose] = useState(false);
   const committedRef = useRef(false);
   const veiled = state.affinityEffects.poolPreview === 'hidden';
 
@@ -29,18 +35,23 @@ export default function DiceMinigame() {
   // offering a reroll, in which case we wait for the player's choice.
   useEffect(() => {
     if (!localResult || !thrown || offered) return;
-    const timer = setTimeout(() => commit(localResult, { revealedAsDrawn: true }), 1500);
+    const timer = setTimeout(() => commit(localResult, { revealedAsDrawn: true }), REVEAL_DELAY_MS);
     return () => clearTimeout(timer);
   }, [localResult, thrown, offered, commit]);
 
   const handleKeep = useCallback(() => {
+    setChose(true); // hide the offer; the shown die already animated
     if (localResult) commit(localResult, { revealedAsDrawn: true }); // accept → Fate
   }, [localResult, commit]);
 
   const handleReroll = useCallback(() => {
     const next = rollD20(state.affinities);
-    setLocalResult(next);
-    commit(next, { viaReroll: true }); // assert control → Will
+    setChose(true);        // hide the offer so it can't fire twice
+    setLocalResult(next);  // remounts DiceThrowAnimation (key=value) → replays the throw
+    // Let the replayed throw play out before committing, which transitions the
+    // screen. Committing immediately cut the animation off (→ result page early).
+    // commit() is idempotent (committedRef), so a late fire after unmount is safe.
+    setTimeout(() => commit(next, { viaReroll: true }), REVEAL_DELAY_MS); // assert control → Will
   }, [state.affinities, commit]);
 
   // Once committed, the engine owns this slot — display from it so interaction
@@ -89,7 +100,7 @@ export default function DiceMinigame() {
                   <p style={interpretationStyle}>{displayResult.interpretation}</p>
                 </motion.div>
               )}
-              {offered && !committedRef.current && (
+              {offered && !chose && (
                 <div style={rerollRowStyle}>
                   <motion.button style={rerollBtnStyle} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={handleReroll}>
                     ↺ Reroll?

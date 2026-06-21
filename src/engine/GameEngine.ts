@@ -1,4 +1,4 @@
-import type { GameState, QuestionType, AffinityId, AffinityBand, MinigameMeta, SlotResult, TarotResult, RunRecord, PendingEffect, InteractionEvent } from './types';
+import type { GameState, QuestionType, AffinityId, AffinityBand, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, PendingEffect, InteractionEvent } from './types';
 import { EventBus } from './EventBus';
 import { TagSystem } from './TagSystem';
 import { AffinityEngine } from './AffinityEngine';
@@ -510,8 +510,25 @@ export class GameEngine {
   // ---------- Agency (Fate/Will) decisions ----------
 
   // Will-gated: should a "Reroll?" prompt be offered after the player's action?
+  // A forced hollow-reroll implies the offer too — the player can only reach a
+  // hollow outcome by taking a reroll — so surface it here without consuming the
+  // flag (resolveReroll reads it). This keeps the hollow-reroll debug scenario
+  // demonstrable even when Will is too low to offer one on its own.
   offerReroll(): boolean {
+    if (this.state.debugForcedEffect === 'hollow-reroll') return true;
     return this.forcedOrRoll('offer-reroll', 'will', 'stirring', TIER_BASE_CHANCE.notable);
+  }
+
+  // Pre-commit reroll for the dice minigame's Will-offered prompt. Fate
+  // (Ascendant+) may make it hollow — the die returns the same value. Returns the
+  // result for the component to commit (with viaReroll meta, which feeds Will);
+  // this method neither feeds affinity nor mutates committed slots. Cf. takeReroll,
+  // the post-commit variant that redraws an already-recorded slot in place.
+  resolveReroll(current: DiceResult): { result: DiceResult; hollow: boolean } {
+    const hollow = this.forcedOrRoll('hollow-reroll', 'fate', 'ascendant', TIER_BASE_CHANCE.major);
+    if (hollow) return { result: current, hollow: true };
+    const fresh = this.orchestrator.drawSingleResult('d20', this.affinityEngine.getState()) as DiceResult;
+    return { result: fresh, hollow: false };
   }
 
   // Player takes an offered reroll. Feeds Will. Fate may make it hollow (same result).
@@ -664,6 +681,25 @@ export class GameEngine {
     // Affinities must go through the engine BEFORE notify(), which overwrites
     // state.affinities from the engine. Routing here fixes the old clobber bug.
     this.affinityEngine.setState(patch);
+
+    // Scenarios drop straight into a mid-turn screen, bypassing startTurn — the
+    // only place that establishes the turn baseline. Backfill what downstream
+    // code assumes so it doesn't crash or render empty:
+    //  - questionType: refillPool() indexes QUESTION_WEIGHTS[questionType]; null → TypeError.
+    //  - availableMethods: MethodSelect renders from it; an empty pool shows no cards.
+    // Pool generation runs AFTER the affinity patch so it reflects the scenario's
+    // methodCount (e.g. Fate Ascendant → fewer methods).
+    if (this.state.questionType === null) {
+      this.state.questionType = 'self';
+    }
+    if (this.state.screen === 'method-select' && this.state.availableMethods.length === 0) {
+      this.state.availableMethods = this.orchestrator.generatePool(
+        this.state.questionType,
+        this.affinityEngine.getState(),
+        this.affinityEngine.getEffects().methodCount,
+      );
+    }
+
     this.notify();
     return true;
   }

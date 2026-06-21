@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { GameEngine } from '../GameEngine';
-import type { SlotResult, TarotResult } from '../types';
+import type { TarotResult, DiceResult } from '../types';
 
 const tarot = (orientation: 'upright' | 'reversed'): TarotResult => ({
   type: 'tarot', id: 'the-fool', name: 'The Fool', number: 0, orientation, symbol: '☉',
@@ -41,11 +41,11 @@ describe('completeMinigame meta feeds', () => {
   });
 });
 
-const dice = (result: number): SlotResult => ({
+const dice = (result: number): DiceResult => ({
   type: 'd20', result, threshold: result <= 9 ? 'low' : 'neutral', interpretation: 'x',
   tags: ['roll', 'numeric'], themes: ['stagnation'],
   dimensions: { favorability: -1, certainty: 0, volatility: 0.5 }, modifierRoles: ['effect'],
-} as SlotResult);
+} as DiceResult);
 
 describe('reroll system', () => {
   it('offerReroll fires with probability 1 when forced', () => {
@@ -79,6 +79,41 @@ describe('reroll system', () => {
     const { hollow } = e.takeReroll();
     expect(hollow).toBe(true);
     expect((e.getState().turnResults[idx] as { result: number }).result).toBe(5); // unchanged
+  });
+});
+
+// Pre-commit reroll used by the dice minigame's Will-offered prompt. Unlike
+// takeReroll (post-commit, mutates the active slot), resolveReroll returns the
+// next result for the component to commit, and surfaces Fate's hollow outcome.
+describe('resolveReroll (pre-commit dice reroll)', () => {
+  it('returns a fresh result (not hollow) at baseline Fate', () => {
+    const e = new GameEngine();
+    startMinigame(e);
+    const orig = Math.random; Math.random = () => 0.99; // baseline Fate < ascendant → never hollow
+    const { hollow } = e.resolveReroll(dice(5));
+    Math.random = orig;
+    expect(hollow).toBe(false);
+  });
+
+  it('returns the same result (hollow) when hollow-reroll is forced', () => {
+    const e = new GameEngine();
+    startMinigame(e);
+    e.loadState({ debugForcedEffect: 'hollow-reroll' });
+    const { result, hollow } = e.resolveReroll(dice(5));
+    expect(hollow).toBe(true);
+    expect((result as { result: number }).result).toBe(5);
+  });
+
+  // A forced hollow reroll implies the offer was presented — otherwise the player
+  // could never trigger it. offerReroll must surface it without consuming the flag,
+  // so the subsequent resolveReroll can still read it.
+  it('offerReroll fires for a forced hollow-reroll and leaves the flag for resolveReroll', () => {
+    const e = new GameEngine();
+    startMinigame(e);
+    e.loadState({ debugForcedEffect: 'hollow-reroll' });
+    expect(e.offerReroll()).toBe(true);
+    expect(e.getState().debugForcedEffect).toBe('hollow-reroll'); // not consumed
+    expect(e.resolveReroll(dice(7)).hollow).toBe(true);
   });
 });
 

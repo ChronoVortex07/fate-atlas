@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { GameEngine } from '../GameEngine';
+import { drawTarotCard } from '../../data/tarot';
 
 describe('debug scenarios', () => {
   it('exposes a group for every preset', () => {
@@ -56,5 +57,33 @@ describe('Phase 2/3 scenarios', () => {
       .map((p) => p.id);
     expect(ids.length).toBeGreaterThanOrEqual(10);
     for (const id of ids) expect(engine.loadScenarioById(id)).toBe(true);
+  });
+});
+
+describe('scenario turn baseline', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  // Scenarios jump straight into a minigame, bypassing startTurn — which is the
+  // only place questionType is normally set. Completing the minigame triggers
+  // refillPool(questionType), which crashed on QUESTION_WEIGHTS[null].
+  it('a minigame scenario sets questionType so completing it does not crash', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // avoid happening-interrupt / wild-surge branches
+    const engine = new GameEngine();
+    engine.loadScenarioById('will-big-hand'); // tarot minigame, 0 completed
+    expect(engine.getState().questionType).not.toBeNull();
+
+    const card = drawTarotCard(engine.getState().affinities);
+    expect(() => engine.completeMinigame(card, { revealedAsDrawn: true })).not.toThrow();
+  });
+
+  // fate-fewer-methods drops onto method-select; MethodSelect renders from
+  // availableMethods, which the preset left empty → no cards shown.
+  it('fewer-methods scenario populates a reduced, non-empty method pool', () => {
+    const engine = new GameEngine();
+    engine.loadScenarioById('fate-fewer-methods');
+    const s = engine.getState();
+    expect(s.screen).toBe('method-select');
+    expect(s.availableMethods.length).toBeGreaterThan(0);
+    expect(s.availableMethods.length).toBeLessThan(3); // Fate Ascendant → 2 methods
   });
 });
