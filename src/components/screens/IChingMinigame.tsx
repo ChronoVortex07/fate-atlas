@@ -26,7 +26,7 @@ export default function IChingMinigame() {
   useEffect(() => {
     if (!done || !hexagramResult) return;
     const timer = setTimeout(() => {
-      engine.completeMinigame(hexagramResult);
+      engine.completeMinigame(hexagramResult, { revealedAsDrawn: true });
     }, 2000);
     return () => clearTimeout(timer);
   }, [done, hexagramResult, engine]);
@@ -72,7 +72,8 @@ export default function IChingMinigame() {
             <div style={hexagramNameStyle}>{displayHex?.name}</div>
             <div style={hexagramNumberStyle}>Hexagram #{displayHex?.hexagramNumber}</div>
             <p style={hexagramJudgmentStyle}>{displayHex?.judgment}</p>
-            {displayHex && displayHex.changingLines.length > 0 && (
+            {/* Shadow (veiled): the changing-lines detail is withheld. */}
+            {state.affinityEffects.poolPreview !== 'hidden' && displayHex && displayHex.changingLines.length > 0 && (
               <div style={changingLinesStyle}>
                 Changing lines: {displayHex.changingLines.join(', ')}
               </div>
