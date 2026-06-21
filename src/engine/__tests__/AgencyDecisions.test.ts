@@ -163,3 +163,24 @@ describe('method control', () => {
     expect(e.maybeForceMethod()).toBe(true);
   });
 });
+
+describe('peek wrapper + decline', () => {
+  it('usePeek returns a non-empty leaning derived from the preview on success', () => {
+    const e = new GameEngine();
+    e.loadState({ affinities: { ...e.getState().affinities, light: 80 } });
+    e.startTurn('self'); // beginRun drift 80→~70 (still ascendant); peek counters reset
+    const orig = Math.random; Math.random = () => 0.0; // free first peek → success
+    const r = e.usePeek(dice(18));
+    Math.random = orig;
+    expect(r.failed).toBe(false);
+    expect(r.leaning.length).toBeGreaterThan(0);
+  });
+
+  it('declinePeek feeds Shadow', () => {
+    const e = new GameEngine();
+    e.startTurn('self');
+    const before = e.getState().affinities.shadow;
+    noJitter(() => e.declinePeek());
+    expect(e.getState().affinities.shadow).toBeGreaterThan(before);
+  });
+});

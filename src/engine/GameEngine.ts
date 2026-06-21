@@ -389,6 +389,7 @@ export class GameEngine {
       results,
       question,
       affinities,
+      this.affinityEngine.getEffects(),
     );
 
     this.state.synthesis = synthesisResult;
@@ -600,6 +601,35 @@ export class GameEngine {
   // Fate (Dominant): the method may be forced on the player.
   maybeForceMethod(): boolean {
     return this.forcedOrRoll('force-method', 'fate', 'dominant', TIER_BASE_CHANCE.notable);
+  }
+
+  // ---------- Information (Light/Shadow) decisions ----------
+
+  // Light foresight. Delegates escalation/penalty to AffinityEngine; derives a
+  // vague leaning from the previewed result. The player never sees exact values.
+  usePeek(preview?: SlotResult): { failed: boolean; leaning: string } {
+    const { failed } = this.affinityEngine.usePeek();
+    if (failed) {
+      this.notify();
+      return { failed: true, leaning: 'The vision clouds over — nothing is revealed.' };
+    }
+    const leaning = this.describeLeaning(preview);
+    this.notify();
+    return { failed: false, leaning };
+  }
+
+  // Player declines a peek → embraces the unknown (Shadow).
+  declinePeek(): void {
+    this.affinityEngine.applyAction('decline-peek');
+    this.notify();
+  }
+
+  private describeLeaning(preview?: SlotResult): string {
+    if (!preview || preview.type === 'happening') return 'A faint shape stirs beyond the veil...';
+    const fav = preview.dimensions.favorability;
+    if (fav >= 1) return 'The current leans toward fortune...';
+    if (fav <= -1) return 'The current leans toward hardship...';
+    return 'The current holds in uneasy balance...';
   }
 
   // ---------- State access ----------

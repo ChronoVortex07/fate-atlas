@@ -1,6 +1,6 @@
 import type {
   AggregatedReading, SynthesisResult, SlotResult, QuestionType,
-  ModifierRole, InteractionEvent,
+  ModifierRole, InteractionEvent, AffinityEffects,
 } from './types';
 import { NARRATIVE_TEMPLATES } from '../data/narrative-templates';
 import { bandOf } from '../data/affinities';
@@ -59,6 +59,7 @@ export class NarrativeAssembler {
     _results: SlotResult[],
     question: QuestionType,
     affinities: Record<string, number>,
+    effects?: AffinityEffects,
   ): SynthesisResult {
     const paragraphs: string[] = [];
 
@@ -153,6 +154,23 @@ export class NarrativeAssembler {
       affinityNote = 'The currents of chaos run strong. Expect the unexpected — these readings carry extra volatility.';
     } else if (isElevated(orderBand)) {
       affinityNote = 'Order shapes this reading with unusual clarity. The patterns are steady and reliable.';
+    }
+
+    // Light/Shadow reading detail & clarity (Phase 3).
+    const detail = effects?.readingDetail ?? 0;
+    const clarity = effects?.hintClarity ?? 0;
+    if (detail > 0) {
+      paragraphs.push(
+        'Every thread lies plain to the eye — the reading withholds nothing, each sign spelled out in full.',
+      );
+    } else if (detail < 0) {
+      // Terse: collapse the body to its first two paragraphs.
+      if (paragraphs.length > 2) paragraphs.splice(2);
+    }
+    if (clarity >= 2 && affinityNote) {
+      affinityNote = `The forces name themselves plainly: ${affinityNote}`;
+    } else if (clarity <= -2 && affinityNote) {
+      affinityNote = 'Something stirs beneath the surface, but its name will not come.';
     }
 
     // Headline

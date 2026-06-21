@@ -158,12 +158,16 @@ export class AffinityEngine {
   }
 
   // Top 1–2 forces only, keyed to each one's current band hint pool.
-  getActiveHints(max = 2): string[] {
+  // Light (clarity >= 2) names the force; Shadow (clarity <= -2) renders it opaque.
+  getActiveHints(max = 2, clarity = 0): string[] {
     const sorted = [...AFFINITY_IDS].sort((a, b) => this.state[b] - this.state[a]);
     const hints: string[] = [];
     for (const id of sorted.slice(0, max)) {
-      const hint = this.getHint(id);
-      if (hint) hints.push(hint);
+      const base = this.getHint(id);
+      if (!base) continue;
+      if (clarity >= 2) hints.push(`${this.defById[id]?.name ?? id}: ${base}`);
+      else if (clarity <= -2) hints.push('…');
+      else hints.push(base);
     }
     return hints;
   }
