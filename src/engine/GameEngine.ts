@@ -1,4 +1,4 @@
-import type { GameState, QuestionType, AffinityId, AffinityBand, SlotResult, RunRecord, PendingEffect, InteractionEvent } from './types';
+import type { GameState, QuestionType, AffinityId, AffinityBand, MinigameMeta, SlotResult, TarotResult, RunRecord, PendingEffect, InteractionEvent } from './types';
 import { EventBus } from './EventBus';
 import { TagSystem } from './TagSystem';
 import { AffinityEngine } from './AffinityEngine';
@@ -6,7 +6,7 @@ import { TurnOrchestrator } from './TurnOrchestrator';
 import { InteractionResolver } from './InteractionResolver';
 import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
-import { AFFINITY_DEFINITIONS, defaultAffinityState, BAND_ORDER } from '../data/affinities';
+import { AFFINITY_DEFINITIONS, defaultAffinityState, BAND_ORDER, BAND_POWER_STEP, TIER_BASE_CHANCE } from '../data/affinities';
 import { INTERACTION_RULES } from '../data/interactions';
 import { selectHappening } from '../data/happenings';
 import { loadScenario, SCENARIO_PRESETS } from './scenarios';
@@ -130,7 +130,7 @@ export class GameEngine {
     this.notify();
   }
 
-  completeMinigame(result: SlotResult): void {
+  completeMinigame(result: SlotResult, meta?: MinigameMeta): void {
     // Add result to the turn's results array
     this.state.turnResults = [...this.state.turnResults, result];
     // Canonical index of the just-committed result. NOTE: not `completed - 1`,
@@ -144,6 +144,13 @@ export class GameEngine {
     if (result.type !== 'happening') {
       this.affinityEngine.applyResultTags(result);
       this.maybeWildSurge(result);
+    }
+
+    // Player-action feeds derived from how this result was reached.
+    if (meta) {
+      if (meta.reversed) this.affinityEngine.applyAction('reverse');
+      else if (meta.revealedAsDrawn) this.affinityEngine.applyAction('reveal-as-drawn');
+      if (meta.viaReroll) this.affinityEngine.applyAction('take-reroll');
     }
 
     // Check pending effects against this result
@@ -460,8 +467,11 @@ export class GameEngine {
       return true;
     }
     const band = this.affinityEngine.resolveBand(affinity);
-    if (BAND_ORDER.indexOf(band) < BAND_ORDER.indexOf(minBand)) return false;
-    return Math.random() < baseChance;
+    const idx = BAND_ORDER.indexOf(band);
+    const minIdx = BAND_ORDER.indexOf(minBand);
+    if (idx < minIdx) return false;
+    const scaled = baseChance * (1 + (idx - minIdx) * BAND_POWER_STEP);
+    return Math.random() < Math.min(1, scaled);
   }
 
   // Chaos-Dominant wild surge: a committed result can spawn a second (Major, ~8%).
@@ -489,6 +499,86 @@ export class GameEngine {
     const chaos = this.affinityEngine.getState().chaos;
     if (chaos < 40) return false;
     return Math.random() < (chaos / 100) * 0.5;
+  }
+
+  // ---------- Agency (Fate/Will) decisions ----------
+
+  // Will-gated: should a "Reroll?" prompt be offered after the player's action?
+  offerReroll(): boolean {
+    return this.forcedOrRoll('offer-reroll', 'will', 'stirring', TIER_BASE_CHANCE.notable);
+  }
+
+  // Player takes an offered reroll. Feeds Will. Fate may make it hollow (same result).
+  takeReroll(): { hollow: boolean } {
+    this.affinityEngine.applyAction('take-reroll');
+    const idx = this.state.activeSlotIndex;
+    if (idx === null) { this.notify(); return { hollow: false }; }
+    const target = this.state.turnResults[idx];
+    if (!target || target.type === 'happening') { this.notify(); return { hollow: false }; }
+
+    const hollow = this.forcedOrRoll('hollow-reroll', 'fate', 'ascendant', TIER_BASE_CHANCE.major);
+    if (hollow) {
+      this.notify(); // snapshot contract: cleared forced flag / Will feed surfaced
+      return { hollow: true };
+    }
+    const affinities = this.affinityEngine.getState();
+    const fresh = this.orchestrator.drawSingleResult(
+      target.type as 'tarot' | 'd20' | 'iching',
+      affinities,
+    );
+    this.state.turnResults = [
+      ...this.state.turnResults.slice(0, idx),
+      fresh,
+      ...this.state.turnResults.slice(idx + 1),
+    ];
+    this.notify();
+    return { hollow: false };
+  }
+
+  // Player declines an offered reroll → accepts what's given (Fate).
+  declineReroll(): void {
+    this.affinityEngine.applyAction('decline-reroll');
+    this.notify();
+  }
+
+  // Fate: the card you pick may not be the one revealed (Ascendant: card-swap;
+  // Dominant: the-hand-chooses). Returns the card to reveal and whether a swap occurred.
+  resolveTarotPick(chosenIndex: number, hand: TarotResult[]): { card: TarotResult; swapped: boolean } {
+    const chosen = hand[chosenIndex];
+    if (hand.length < 2) return { card: chosen, swapped: false };
+
+    const swap =
+      this.forcedOrRoll('the-hand-chooses', 'fate', 'dominant', TIER_BASE_CHANCE.major) ||
+      this.forcedOrRoll('card-swap', 'fate', 'ascendant', TIER_BASE_CHANCE.major);
+    if (!swap) return { card: chosen, swapped: false };
+
+    const others = hand.map((_, i) => i).filter((i) => i !== chosenIndex);
+    const pick = others[Math.floor(Math.random() * others.length)];
+    return { card: hand[pick], swapped: true };
+  }
+
+  // Fate: a coin-flip detail (orientation) may be decided for the player.
+  maybeAutoOrient(): 'upright' | 'reversed' | null {
+    if (!this.forcedOrRoll('auto-orient', 'fate', 'stirring', TIER_BASE_CHANCE.notable)) return null;
+    return Math.random() < 0.5 ? 'upright' : 'reversed';
+  }
+
+  // Will: the player exercises a free orientation choice.
+  setOrientation(_orientation: 'upright' | 'reversed'): void {
+    this.affinityEngine.applyAction('set-orientation');
+    this.notify();
+  }
+
+  // Will (Dominant): offer two candidate results; the player keeps one.
+  maybeKeepOneOfTwo(result: SlotResult): SlotResult[] | null {
+    if (result.type === 'happening') return null;
+    if (!this.forcedOrRoll('keep-one-of-two', 'will', 'dominant', TIER_BASE_CHANCE.major)) return null;
+    const affinities = this.affinityEngine.getState();
+    const alt = this.orchestrator.drawSingleResult(
+      result.type as 'tarot' | 'd20' | 'iching',
+      affinities,
+    );
+    return [result, alt];
   }
 
   // ---------- State access ----------
