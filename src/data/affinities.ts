@@ -164,7 +164,7 @@ export const WILL_AFFINITY: AffinityDefinition = {
   bandedEffects: [
     { id: 'offer-reroll',     tier: 'notable', band: 'stirring',  description: 'A "Reroll?" prompt may appear after an action.' },
     { id: 'free-orientation', tier: 'ambient', band: 'ascendant', description: 'Free orientation choice.' },
-    { id: 'keep-one-of-two',  tier: 'major',   band: 'dominant',  description: 'Keep one of two results.' },
+    { id: 'choice',           tier: 'major',   band: 'dominant',  description: 'Cast two dice and keep one.' },
   ],
 };
 
