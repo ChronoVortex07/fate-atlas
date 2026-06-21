@@ -26,3 +26,35 @@ describe('debug scenarios', () => {
     expect(engine.getState().debugForcedEffect).toBe('wild-surge');
   });
 });
+
+describe('Phase 2/3 scenarios', () => {
+  it('includes Fate/Will and Light/Shadow groups', () => {
+    const engine = new GameEngine();
+    const groups = new Set(engine.getScenarioPresets().map((p) => p.group));
+    expect(groups.has('Fate / Will')).toBe(true);
+    expect(groups.has('Light / Shadow')).toBe(true);
+  });
+
+  it('card-swap scenario sets Fate Ascendant and forces the effect', () => {
+    const engine = new GameEngine();
+    const ok = engine.loadScenarioById('fate-card-swap');
+    expect(ok).toBe(true);
+    expect(engine.getState().affinities.fate).toBeGreaterThanOrEqual(60);
+    expect(engine.getState().debugForcedEffect).toBe('card-swap');
+  });
+
+  it('peek-failure scenario sets Light Ascendant', () => {
+    const engine = new GameEngine();
+    engine.loadScenarioById('light-peek-failure');
+    expect(engine.getState().affinities.light).toBeGreaterThanOrEqual(60);
+  });
+
+  it('every Phase 2/3 preset loads without error', () => {
+    const engine = new GameEngine();
+    const ids = engine.getScenarioPresets()
+      .filter((p) => p.group === 'Fate / Will' || p.group === 'Light / Shadow')
+      .map((p) => p.id);
+    expect(ids.length).toBeGreaterThanOrEqual(10);
+    for (const id of ids) expect(engine.loadScenarioById(id)).toBe(true);
+  });
+});
