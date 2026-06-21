@@ -13,6 +13,8 @@ const QUESTION_WEIGHTS: Record<QuestionType, Partial<Record<DivinationType, numb
   self: { tarot: 2, iching: 2, d20: 1 },
 };
 
+const POOL_TYPES: DivinationType[] = ['tarot', 'd20', 'iching'];
+
 export class TurnOrchestrator {
   private availableMethods: DivinationType[] = [];
 
@@ -20,34 +22,41 @@ export class TurnOrchestrator {
     private bus: EventBus,
   ) {}
 
+  // Weighted pick among the types NOT already in the pool, so every iteration
+  // adds exactly one. This guarantees termination (≤3 passes) even when
+  // Math.random is stubbed to a constant — the old "pick-then-dedupe" loop could
+  // spin forever under deterministic RNG when the pick was always a duplicate.
+  private fillPool(target: number, weightOf: (t: DivinationType) => number): void {
+    while (this.availableMethods.length < target) {
+      const remaining = POOL_TYPES.filter((t) => !this.availableMethods.includes(t));
+      if (remaining.length === 0) break;
+      const weights = remaining.map((t) => Math.max(0, weightOf(t)));
+      const total = weights.reduce((s, w) => s + w, 0);
+      if (total <= 0) {
+        this.availableMethods.push(remaining[0]);
+        continue;
+      }
+      let roll = Math.random() * total;
+      let picked = remaining[remaining.length - 1];
+      for (let i = 0; i < remaining.length; i++) {
+        roll -= weights[i];
+        if (roll <= 0) { picked = remaining[i]; break; }
+      }
+      this.availableMethods.push(picked);
+    }
+  }
+
   generatePool(
     question: QuestionType,
     _affinities: Record<string, number>,
+    count: number = POOL_SIZE,
   ): DivinationType[] {
     this.availableMethods = [];
     this.usedThisTurn = [];
+    const target = Math.max(1, Math.min(POOL_SIZE, count));
     const weights = QUESTION_WEIGHTS[question];
 
-    const entries: { type: DivinationType; weight: number }[] = [
-      { type: 'tarot', weight: weights.tarot ?? 1 },
-      { type: 'd20', weight: weights.d20 ?? 1 },
-      { type: 'iching', weight: weights.iching ?? 1 },
-    ];
-
-    while (this.availableMethods.length < POOL_SIZE) {
-      const totalWeight = entries.reduce((s, e) => s + e.weight, 0);
-      let roll = Math.random() * totalWeight;
-      for (const entry of entries) {
-        roll -= entry.weight;
-        if (roll <= 0) {
-          // Avoid duplicate methods in the pool
-          if (!this.availableMethods.includes(entry.type)) {
-            this.availableMethods.push(entry.type);
-          }
-          break;
-        }
-      }
-    }
+    this.fillPool(target, (t) => weights[t] ?? 1);
 
     this.bus.emit('pool-generated', {
       question,
@@ -102,44 +111,13 @@ export class TurnOrchestrator {
     question: QuestionType,
     _affinities: Record<string, number>,
     bias: Partial<Record<DivinationType, number>> = {},
+    count: number = POOL_SIZE,
   ): DivinationType[] {
-    // Keep remaining methods, draw new ones to fill back to POOL_SIZE
+    // Keep remaining methods, draw new ones to fill back up to `target`.
     const baseWeights = QUESTION_WEIGHTS[question];
+    const target = Math.max(1, Math.min(POOL_SIZE, count));
 
-    const entries: { type: DivinationType; weight: number }[] = [
-      { type: 'tarot', weight: (baseWeights.tarot ?? 1) + (bias.tarot ?? 0) },
-      { type: 'd20', weight: (baseWeights.d20 ?? 1) + (bias.d20 ?? 0) },
-      { type: 'iching', weight: (baseWeights.iching ?? 1) + (bias.iching ?? 0) },
-    ];
-
-    // Clamp individual weights to minimum 0 (never negative probability)
-    for (const entry of entries) {
-      entry.weight = Math.max(0, entry.weight);
-    }
-
-    while (this.availableMethods.length < POOL_SIZE) {
-      const totalWeight = entries.reduce((s, e) => s + e.weight, 0);
-      // If all weights are 0 (shouldn't happen with clamping), fall back to uniform
-      if (totalWeight <= 0) {
-        const remaining = ['tarot', 'd20', 'iching'].filter(
-          (t) => !this.availableMethods.includes(t as DivinationType),
-        );
-        if (remaining.length > 0) {
-          this.availableMethods.push(remaining[0] as DivinationType);
-        }
-        continue;
-      }
-      let roll = Math.random() * totalWeight;
-      for (const entry of entries) {
-        roll -= entry.weight;
-        if (roll <= 0) {
-          if (!this.availableMethods.includes(entry.type)) {
-            this.availableMethods.push(entry.type);
-          }
-          break;
-        }
-      }
-    }
+    this.fillPool(target, (t) => (baseWeights[t] ?? 1) + (bias[t] ?? 0));
 
     this.bus.emit('pool-refilled', {
       question,
