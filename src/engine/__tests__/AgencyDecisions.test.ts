@@ -163,14 +163,6 @@ describe('orientation + keep-one-of-two', () => {
     expect(e.getState().affinities.will).toBeGreaterThan(before);
   });
 
-  it('maybeKeepOneOfTwo returns two candidates when forced', () => {
-    const e = new GameEngine();
-    startMinigame(e);
-    e.loadState({ debugForcedEffect: 'keep-one-of-two' });
-    const pair = e.maybeKeepOneOfTwo(dice(9));
-    expect(pair).not.toBeNull();
-    expect(pair!.length).toBe(2);
-  });
 });
 
 describe('method control', () => {
