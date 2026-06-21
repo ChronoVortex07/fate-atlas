@@ -1,14 +1,12 @@
 import { motion } from 'framer-motion';
-import type { AnimationDescriptor } from '../InteractionSequencer';
 
 interface Props {
-  descriptor: AnimationDescriptor;
-  step: string;
+  description?: string;
+  sourceSlot?: number | null;
+  targetSlot?: number | null;
 }
 
-export default function SecondResultAnimation({ descriptor: _descriptor, step }: Props) {
-  if (step === 'desc') return null;
-
+export default function SecondResultAnimation(_props: Props) {
   return (
     <motion.div style={containerStyle}>
       <motion.div

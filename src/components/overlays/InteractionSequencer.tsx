@@ -1,299 +1,134 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
-import type { InteractionEvent } from '../../engine/types';
 import RerollAnimation from './InteractionAnimations/RerollAnimation';
 import FlipAnimation from './InteractionAnimations/FlipAnimation';
 import MirrorAnimation from './InteractionAnimations/MirrorAnimation';
 import AddChoiceAnimation from './InteractionAnimations/AddChoiceAnimation';
 import SecondResultAnimation from './InteractionAnimations/SecondResultAnimation';
+import ShroudAnimation from './InteractionAnimations/ShroudAnimation';
+import WidenAnimation from './InteractionAnimations/WidenAnimation';
+import OverrideAnimation from './InteractionAnimations/OverrideAnimation';
+import type { EffectReport } from '../../engine/types';
 
-interface AnimationDescriptor {
-  effect: 'reroll' | 'flip' | 'mirror' | 'add-choice' | 'second-result';
-  sourceIndex: number | null;
-  targetIndex: number | null;
-  description: string;
-}
-
-export type { AnimationDescriptor };
-
-interface AnimationStep {
-  id: string;
-  autoAdvanceMs: number; // 0 = requires manual tap
-}
-
-interface SlotInfo {
-  sourceIndex: number | null;
-  targetIndex: number | null;
-  effect: string | null;
-}
-
-const EFFECT_LABELS: Record<string, string> = {
-  reroll: "Fool's Reroll",
-  flip: 'Critical Flip',
-  mirror: 'The Mirror',
-  'add-choice': 'I Ching Boost',
-  'second-result': 'Chaos Surge',
-};
-
-function eventToDescriptor(event: InteractionEvent): AnimationDescriptor {
-  return {
-    effect: event.effect as AnimationDescriptor['effect'],
-    sourceIndex: event.sourceSlotIndex,
-    targetIndex: event.targetSlotIndex,
-    description: event.description,
-  };
-}
-
-function getStepsForEffect(effect: AnimationDescriptor['effect']): AnimationStep[] {
-  switch (effect) {
-    case 'reroll':
-      return [
-        { id: 'desc', autoAdvanceMs: 2000 },
-        { id: 'source-glint', autoAdvanceMs: 700 },
-        { id: 'projectile', autoAdvanceMs: 600 },
-        { id: 'rerolling', autoAdvanceMs: 1000 },
-        { id: 'reveal', autoAdvanceMs: 0 },
-      ];
-    case 'flip':
-      return [
-        { id: 'desc', autoAdvanceMs: 2000 },
-        { id: 'source-glint', autoAdvanceMs: 700 },
-        { id: 'wave', autoAdvanceMs: 800 },
-        { id: 'reveal', autoAdvanceMs: 0 },
-      ];
-    case 'mirror':
-      return [
-        { id: 'desc', autoAdvanceMs: 2000 },
-        { id: 'source-glint', autoAdvanceMs: 700 },
-        { id: 'reflection', autoAdvanceMs: 900 },
-        { id: 'reveal', autoAdvanceMs: 0 },
-      ];
-    case 'add-choice':
-      return [
-        { id: 'desc', autoAdvanceMs: 2000 },
-        { id: 'source-glint', autoAdvanceMs: 700 },
-        { id: 'branching', autoAdvanceMs: 900 },
-        { id: 'reveal', autoAdvanceMs: 0 },
-      ];
-    case 'second-result':
-      return [
-        { id: 'desc', autoAdvanceMs: 2000 },
-        { id: 'source-glint', autoAdvanceMs: 700 },
-        { id: 'portal', autoAdvanceMs: 800 },
-        { id: 'reveal', autoAdvanceMs: 0 },
-      ];
-  }
-}
-
-interface Props {
-  onActiveSlotsChange: (slots: SlotInfo) => void;
-  onAnimationComplete: () => void;
-}
-
-export default function InteractionSequencer({ onActiveSlotsChange, onAnimationComplete }: Props) {
+export default function InteractionSequencer() {
   const { state, engine } = useGameEngine();
-  const [currentDescriptor, setCurrentDescriptor] = useState<AnimationDescriptor | null>(null);
-  const [stepIndex, setStepIndex] = useState(0);
-  const stepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const startedRef = useRef(false);
+  const [i, setI] = useState(0);
 
-  const queue = state.interactionQueue;
+  const queue = state.eventQueue;
 
-  const steps = currentDescriptor ? getStepsForEffect(currentDescriptor.effect) : [];
-  const currentStep = steps[stepIndex];
-  const isLastStep = stepIndex >= steps.length - 1;
-  const isDescriptionStep = currentStep?.id === 'desc';
-
-  // When queue changes, start playing the first interaction
   useEffect(() => {
-    if (queue.length > 0 && !startedRef.current) {
-      startedRef.current = true;
-      const desc = eventToDescriptor(queue[0]);
-      setCurrentDescriptor(desc);
-      setStepIndex(0);
-      onActiveSlotsChange({
-        sourceIndex: desc.sourceIndex,
-        targetIndex: desc.targetIndex,
-        effect: desc.effect,
-      });
+    if (queue.length === 0) return;
+    if (i >= queue.length) {
+      engine.clearEventQueue();
+      setI(0);
+      return;
     }
+    const t = setTimeout(() => setI((n) => n + 1), 1400);
+    return () => clearTimeout(t);
+  }, [i, queue.length, engine]);
 
-    return () => {
-      if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
-    };
-  }, [queue.length]);
+  const skip = useCallback(() => {
+    engine.clearEventQueue();
+    setI(0);
+  }, [engine]);
 
-  // Reset stepIndex when currentDescriptor changes (new interaction starts)
-  useEffect(() => {
-    if (currentDescriptor) {
-      setStepIndex(0);
-    }
-  }, [currentDescriptor]);
+  if (queue.length === 0) return null;
 
-  // Auto-advance timer per step
-  useEffect(() => {
-    if (!currentStep || currentStep.autoAdvanceMs <= 0) return;
-
-    stepTimerRef.current = setTimeout(() => {
-      if (isLastStep) {
-        handleComplete();
-      } else {
-        setStepIndex((i) => i + 1);
-      }
-    }, currentStep.autoAdvanceMs);
-
-    return () => {
-      if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
-    };
-  }, [stepIndex, currentDescriptor]);
-
-  // Update activeSlots based on current step
-  useEffect(() => {
-    if (!currentDescriptor || !currentStep) return;
-
-    const desc = currentDescriptor;
-    const stepId = currentStep.id;
-
-    // Source highlighted during desc, source-glint, and effect-specific steps
-    const highlightSource = ['desc', 'source-glint', 'projectile', 'wave', 'reflection', 'branching', 'portal'].includes(stepId);
-    // Target highlighted during rerolling and reveal steps
-    const highlightTarget = ['rerolling', 'reveal'].includes(stepId);
-    // Obscure (placeholder) target during rerolling
-    const effect = stepId === 'rerolling' ? 'reroll' : null;
-
-    onActiveSlotsChange({
-      sourceIndex: highlightSource ? desc.sourceIndex : null,
-      targetIndex: highlightTarget ? desc.targetIndex : null,
-      effect,
-    });
-  }, [stepIndex, currentDescriptor]);
-
-  // Apply the head interaction's effect when the reveal step begins, so the
-  // change lands while the minigame is still mounted and can animate it.
-  // The engine guards against double application.
-  useEffect(() => {
-    if (currentStep?.id === 'reveal') {
-      engine.applyHeadInteraction();
-    }
-    // Deps mirror the sibling step-effect above; `currentStep` is derived from
-    // these and read from the closure. The engine guard makes repeats safe.
-  }, [stepIndex, currentDescriptor]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
-    };
-  }, []);
-
-  const handleComplete = useCallback(() => {
-    if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
-
-    onActiveSlotsChange({ sourceIndex: null, targetIndex: null, effect: null });
-    engine.advanceInteractionQueue();
-    setCurrentDescriptor(null);
-    setStepIndex(0);
-    startedRef.current = false;
-
-    // Check actual queue state after advancing to avoid stale closure
-    if (engine.getState().interactionQueue.length === 0) {
-      onAnimationComplete();
-    }
-  }, [engine, onActiveSlotsChange, onAnimationComplete]);
-
-  const handleTap = useCallback(() => {
-    if (isLastStep) {
-      handleComplete();
-    } else {
-      if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
-      setStepIndex((i) => i + 1);
-    }
-  }, [isLastStep, handleComplete]);
-
-  if (!currentDescriptor || queue.length === 0) return null;
-
-  const label = EFFECT_LABELS[currentDescriptor.effect] ?? currentDescriptor.effect;
-
-  // Unique key that changes between description & animation phases so
-  // AnimatePresence can animate the transition between popup and animations.
-  const phaseKey = isDescriptionStep
-    ? `desc-${currentDescriptor.effect}-${currentDescriptor.sourceIndex}-${currentDescriptor.targetIndex}`
-    : `anim-${currentDescriptor.effect}-${currentDescriptor.sourceIndex}-${currentDescriptor.targetIndex}-${stepIndex}`;
+  const report: EffectReport = queue[Math.min(i, queue.length - 1)];
 
   return (
     <AnimatePresence>
       <motion.div
-        key={phaseKey}
-        style={isDescriptionStep ? popupOverlayStyle : animOverlayStyle}
+        key={`seq-${i}`}
+        style={overlayStyle}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.25 }}
-        onClick={handleTap}
+        transition={{ duration: 0.2 }}
+        onClick={skip}
       >
-        {isDescriptionStep ? (
-          <>
-            {/* Dimming veil */}
-            <motion.div
-              style={veilStyle}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            />
+        {/* Dimming veil */}
+        <div style={veilStyle} />
 
-            {/* Description popup */}
-            <motion.div
-              style={bannerStyle}
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.3 }}
-            >
-              <div style={bannerLabelStyle}>{label}</div>
-              <div style={bannerDescStyle}>{currentDescriptor.description}</div>
-            </motion.div>
+        {/* Animation layer */}
+        <div style={animLayerStyle}>
+          {renderAnimation(report)}
+        </div>
 
-            {/* Tap hint */}
-            <motion.div
-              style={tapHintStyle}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.5 }}
-              exit={{ opacity: 0 }}
-              transition={{ delay: 0.5, duration: 0.3 }}
-            >
-              Tap to continue
-            </motion.div>
-          </>
-        ) : (
-          <>
-            {/* Per-effect animation — plays unobstructed after popup dismisses */}
-            {currentDescriptor.effect === 'reroll' && (
-              <RerollAnimation descriptor={currentDescriptor} step={currentStep?.id ?? 'desc'} />
-            )}
-            {currentDescriptor.effect === 'flip' && (
-              <FlipAnimation descriptor={currentDescriptor} step={currentStep?.id ?? 'desc'} />
-            )}
-            {currentDescriptor.effect === 'mirror' && (
-              <MirrorAnimation descriptor={currentDescriptor} step={currentStep?.id ?? 'desc'} />
-            )}
-            {currentDescriptor.effect === 'add-choice' && (
-              <AddChoiceAnimation descriptor={currentDescriptor} step={currentStep?.id ?? 'desc'} />
-            )}
-            {currentDescriptor.effect === 'second-result' && (
-              <SecondResultAnimation descriptor={currentDescriptor} step={currentStep?.id ?? 'desc'} />
-            )}
+        {/* Info banner */}
+        <motion.div
+          style={bannerStyle}
+          initial={{ opacity: 0, y: -16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div style={bannerLabelStyle}>{report.label}</div>
+          <div style={bannerDescStyle}>{report.description}</div>
+        </motion.div>
 
-          </>
+        {/* Progress dots */}
+        {queue.length > 1 && (
+          <div style={dotsStyle}>
+            {queue.map((_r, idx) => (
+              <div
+                key={idx}
+                style={{
+                  ...dotStyle,
+                  background: idx === i ? '#d4a854' : 'rgba(212,168,84,0.25)',
+                }}
+              />
+            ))}
+          </div>
         )}
+
+        {/* Skip hint */}
+        <motion.div
+          style={skipHintStyle}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.45 }}
+          transition={{ delay: 0.4, duration: 0.3 }}
+        >
+          Tap to skip all
+        </motion.div>
       </motion.div>
     </AnimatePresence>
   );
 }
 
-// ── Popup (description) phase styles ──
+function renderAnimation(report: EffectReport) {
+  const props = {
+    description: report.description,
+    sourceSlot: report.sourceSlot ?? null,
+    targetSlot: report.targetSlot ?? null,
+  };
 
-const popupOverlayStyle: React.CSSProperties = {
+  switch (report.animation) {
+    case 'reroll':
+      return <RerollAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
+    case 'flip':
+      return <FlipAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
+    case 'mirror':
+      return <MirrorAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
+    case 'add-choice':
+      return <AddChoiceAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
+    case 'second-result':
+      return <SecondResultAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
+    case 'shroud':
+      return <ShroudAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
+    case 'widen':
+      return <WidenAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
+    case 'override':
+      return <OverrideAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
+    default:
+      // Generic fallback — no crash for unknown animation strings (e.g. 'roll-mode')
+      return null;
+  }
+}
+
+// ── Styles ──
+
+const overlayStyle: React.CSSProperties = {
   position: 'absolute',
   inset: 0,
   zIndex: 20,
@@ -310,6 +145,12 @@ const veilStyle: React.CSSProperties = {
   position: 'absolute',
   inset: 0,
   background: 'rgba(2, 4, 10, 0.55)',
+  pointerEvents: 'none',
+};
+
+const animLayerStyle: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
   pointerEvents: 'none',
 };
 
@@ -345,7 +186,22 @@ const bannerDescStyle: React.CSSProperties = {
   lineHeight: 1.5,
 };
 
-const tapHintStyle: React.CSSProperties = {
+const dotsStyle: React.CSSProperties = {
+  position: 'relative',
+  zIndex: 1,
+  display: 'flex',
+  gap: '6px',
+  alignItems: 'center',
+};
+
+const dotStyle: React.CSSProperties = {
+  width: '6px',
+  height: '6px',
+  borderRadius: '50%',
+  transition: 'background 0.3s',
+};
+
+const skipHintStyle: React.CSSProperties = {
   position: 'relative',
   zIndex: 1,
   fontFamily: "'Inter', sans-serif",
@@ -353,15 +209,4 @@ const tapHintStyle: React.CSSProperties = {
   fontSize: '0.65rem',
   color: '#5b7290',
   letterSpacing: '0.05em',
-};
-
-// ── Animation phase styles (no blocking banner) ──
-
-const animOverlayStyle: React.CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  zIndex: 20,
-  pointerEvents: 'auto',
-  cursor: 'pointer',
-  // No background — animations play unobstructed over the game screen
 };

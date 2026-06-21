@@ -29,35 +29,25 @@ function getTileLabel(run: RunRecord): string {
 export default function HistoryTiles() {
   const { state } = useGameEngine();
   const history = state.history;
-  const firstInteraction = state.interactionQueue[0];
 
   if (history.length === 0) return null;
 
   return (
     <div style={containerStyle}>
       <div style={scrollStyle}>
-        {history.map((run) => {
-          const isSource = firstInteraction && run.id === firstInteraction.ruleId.split('-').slice(1, -1).join('-');
-          return (
-            <motion.div
-              key={run.id}
-              style={{
-                ...tileStyle,
-                borderColor: isSource ? '#d4a854' : '#1a2440',
-                boxShadow: isSource ? '0 0 12px rgba(212, 168, 84, 0.4)' : 'none',
-              }}
-              animate={isSource ? { boxShadow: ['0 0 12px rgba(212,168,84,0.4)', '0 0 24px rgba(212,168,84,0.7)', '0 0 12px rgba(212,168,84,0.4)'] } : {}}
-              transition={isSource ? { duration: 1.5, repeat: Infinity } : {}}
-              title={getTileLabel(run)}
-            >
-              <span style={iconStyle}>{getTileIcon(run)}</span>
-              <span style={labelStyle}>{getTileLabel(run).slice(0, 12)}</span>
-              {run.interactions.length > 0 && (
-                <span style={badgeStyle}>{run.interactions.length}</span>
-              )}
-            </motion.div>
-          );
-        })}
+        {history.map((run) => (
+          <motion.div
+            key={run.id}
+            style={tileStyle}
+            title={getTileLabel(run)}
+          >
+            <span style={iconStyle}>{getTileIcon(run)}</span>
+            <span style={labelStyle}>{getTileLabel(run).slice(0, 12)}</span>
+            {run.interactions.length > 0 && (
+              <span style={badgeStyle}>{run.interactions.length}</span>
+            )}
+          </motion.div>
+        ))}
       </div>
     </div>
   );

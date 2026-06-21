@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
 import TitleScreen from './TitleScreen';
@@ -13,32 +13,11 @@ import HistoryModal from '../overlays/HistoryModal';
 import ConstellationFan from '../overlays/ConstellationFan';
 import InteractionSequencer from '../overlays/InteractionSequencer';
 
-interface ActiveSlots {
-  sourceIndex: number | null;
-  targetIndex: number | null;
-  effect: string | null;
-}
-
 export default function GameTable() {
   const { state } = useGameEngine();
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [activeSlots, setActiveSlots] = useState<ActiveSlots>({
-    sourceIndex: null,
-    targetIndex: null,
-    effect: null,
-  });
 
   const showTableau = state.screen !== 'title' && state.screen !== 'question' && state.screen !== 'result';
-
-  const handleActiveSlotsChange = useCallback(
-    (slots: ActiveSlots) => setActiveSlots(slots),
-    [],
-  );
-
-  const handleAnimationComplete = useCallback(
-    () => setActiveSlots({ sourceIndex: null, targetIndex: null, effect: null }),
-    [],
-  );
 
   const renderCenter = () => {
     switch (state.screen) {
@@ -87,20 +66,17 @@ export default function GameTable() {
       <div style={{
         ...centerStyle,
         ...(showTableau ? { paddingBottom: '100px' } : {}),
-        ...(state.interactionQueue.length > 0 ? { pointerEvents: 'none' as const } : {}),
+        ...(state.eventQueue.length > 0 ? { pointerEvents: 'none' as const } : {}),
       }}>
         <AnimatePresence mode="wait">
           {renderCenter()}
         </AnimatePresence>
       </div>
       {showTableau && (
-        <ConstellationFan results={state.turnResults} activeSlots={activeSlots} />
+        <ConstellationFan results={state.turnResults} activeSlots={{ sourceIndex: null, targetIndex: null, effect: null }} />
       )}
-      {state.interactionQueue.length > 0 && (
-        <InteractionSequencer
-          onActiveSlotsChange={handleActiveSlotsChange}
-          onAnimationComplete={handleAnimationComplete}
-        />
+      {state.eventQueue.length > 0 && (
+        <InteractionSequencer />
       )}
     </div>
   );
