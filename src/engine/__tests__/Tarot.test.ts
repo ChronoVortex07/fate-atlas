@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { consolidateSpread, drawTarotCard, drawTarotSpread, reverseSpread, MAJOR_ARCANA, MINOR_ARCANA, FULL_DECK, DECK_BY_ID, buildFace } from '../../data/tarot';
+import { DIVINATION_PROFILES } from '../../data/divination-profiles';
 
 describe('tarot data', () => {
   it('has 22 Major Arcana cards', () => {
@@ -128,6 +129,12 @@ describe('reverseSpread + drawTarotSpread', () => {
     expect(r.spread).toHaveLength(3);
     expect(new Set(r.spread!.map((s) => s.card.id)).size).toBe(3);
     expect(r.type).toBe('tarot');
+  });
+});
+
+describe('tarot profile', () => {
+  it('lists volatility as a dimension strength (minors bring volatility)', () => {
+    expect(DIVINATION_PROFILES.tarot.dimensionStrengths).toContain('volatility');
   });
 });
 

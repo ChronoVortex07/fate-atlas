@@ -8,7 +8,7 @@ export const DIVINATION_PROFILES: Record<string, DivinationProfile> = {
       'upheaval', 'renewal', 'stagnation', 'illumination', 'harmony',
       'conflict', 'transformation', 'mystery', 'authority', 'surrender',
     ],
-    dimensionStrengths: ['certainty', 'favorability'],
+    dimensionStrengths: ['certainty', 'favorability', 'volatility'],
     modifierStrengths: ['subject', 'action'],
   },
   d20: {
