@@ -2,11 +2,13 @@ import type { CombineReducer, PhaseContext, EffectReport } from './types';
 import type { RollMode, RollModifier } from '../types';
 import { resolveRollMode } from '../../data/dice-modifiers';
 
-function describeRollMode(mode: RollMode, offerReroll: boolean): string {
+function describeRollMode(mode: RollMode): string {
   if (mode === 'choice') return 'Your will seizes the cast — two dice, keep one.';
   if (mode === 'advantage') return 'The cast is favored — the higher die holds.';
   if (mode === 'disadvantage') return 'The cast is clouded — the lower die holds.';
-  return offerReroll ? 'The cast may be tried again.' : 'The cast holds steady.';
+  // mode === 'single' only reaches here when offerReroll is true: the reducer
+  // returns null for single + no reroll before calling this.
+  return 'The cast may be tried again.';
 }
 
 export const rollModeReducer: CombineReducer = {
@@ -21,7 +23,7 @@ export const rollModeReducer: CombineReducer = {
     return {
       responderId: 'roll-mode',
       label: 'The Cast',
-      description: describeRollMode(mode, offerReroll),
+      description: describeRollMode(mode),
       animation: 'roll-mode',
     };
   },

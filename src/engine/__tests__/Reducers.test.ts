@@ -29,5 +29,8 @@ describe('roll-mode reducer', () => {
   it('no mods → null and leaves mode single', () => {
     const c = ctx([]);
     expect(REDUCERS['roll-mode'].reduce(c)).toBeNull();
+    // The reducer still writes the resolved defaults onto the draft.
+    expect(c.draft.rollMode).toBe('single');
+    expect(c.draft.offerReroll).toBe(false);
   });
 });

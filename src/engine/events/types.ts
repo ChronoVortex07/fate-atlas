@@ -3,7 +3,7 @@ import type { AffinityId, SlotResult, MinigameState, RollModifier, RollMode } fr
 export type TriggerPoint = string; // namespaced: 'select:draw:end', 'dice:roll', 'tarot:commit'
 
 export type PriorityBand = 'STRUCTURAL' | 'MUTATE' | 'SPAWN' | 'OVERRIDE';
-export const PRIORITY_BANDS: PriorityBand[] = ['STRUCTURAL', 'MUTATE', 'SPAWN', 'OVERRIDE'];
+export const PRIORITY_BANDS: readonly PriorityBand[] = ['STRUCTURAL', 'MUTATE', 'SPAWN', 'OVERRIDE'];
 export function bandValue(b: PriorityBand): number {
   return (PRIORITY_BANDS.indexOf(b) + 1) * 100;
 }
