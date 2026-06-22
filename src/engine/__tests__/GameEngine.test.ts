@@ -253,3 +253,20 @@ describe('GameEngine — affinity effects snapshot', () => {
     expect(result.type).toBe('d20');
   });
 });
+
+import { drawAstralCast } from '../../data/astromancy';
+
+describe('astral cast façade', () => {
+  it('planAstralCast returns single when dormant', () => {
+    const e = new GameEngine();
+    e.startTurn('self');
+    expect(e.planAstralCast().mode).toBe('single');
+  });
+  it('resolveCastSelection delegates to the pure selector', () => {
+    const e = new GameEngine();
+    e.startTurn('self');
+    const a = drawAstralCast({}); const b = drawAstralCast({});
+    const { chosen } = e.resolveCastSelection([a, b], 'single');
+    expect(chosen).toBe(a);
+  });
+});

@@ -1,4 +1,4 @@
-import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, RollMode, DivinationType } from './types';
+import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, RollMode, DivinationType, AstralCast } from './types';
 import { EventBus } from './EventBus';
 import { AffinityEngine } from './AffinityEngine';
 import { TurnOrchestrator } from './TurnOrchestrator';
@@ -11,6 +11,8 @@ import { buildAffinityResponders } from './responders/affinity';
 import { buildInteractionResponders } from './responders/interactions';
 import { findScenario, freshStage, DEBUG_SCENARIOS } from './events/scenarios';
 import type { Responder, PhaseContext, PhaseDraft, EffectReport } from './events/types';
+import { planAstralCast as planAstralCastPure, resolveCastSelection as resolveCastSelectionPure, shouldOfferRecast } from './astral';
+import type { AstralCastMode } from './astral';
 
 const STORAGE_KEY = 'fate-atlas-save';
 
@@ -418,6 +420,15 @@ export class GameEngine {
   }
 
   // ---------- Dispatch-driven action methods ----------
+
+  planAstralCast(): { mode: AstralCastMode; offerRecast: boolean; sources: string[] } {
+    const affinities = this.affinityEngine.getState();
+    return planAstralCastPure(affinities, shouldOfferRecast(affinities));
+  }
+
+  resolveCastSelection(casts: AstralCast[], mode: AstralCastMode): { chosen: AstralCast; index: 0 | 1; auto: boolean } {
+    return resolveCastSelectionPure(casts, mode);
+  }
 
   // Resolves every active roll modifier into one plan for the dice minigame.
   planDiceRoll(): { mode: RollMode; offerReroll: boolean; reports: EffectReport[] } {
