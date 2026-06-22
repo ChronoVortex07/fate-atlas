@@ -65,6 +65,19 @@ describe('engine dispatch wiring', () => {
     }
   });
 
+  it('shadow-shroud (forced, high Shadow) shrouds 1..poolLength distinct methods', () => {
+    const e = new GameEngine();
+    // beginRun drifts toward baseline (~83.5 after a 100 start) → still Dominant,
+    // so the progressive responder can roll up to three distinct indices.
+    e.loadState({ affinities: { ...e.getState().affinities, shadow: 100 } });
+    e.forceEffects(['shadow-shroud'], true);
+    e.startTurn('self');
+    const s = e.getState();
+    expect(s.shroudedMethods.length).toBeGreaterThanOrEqual(1);
+    expect(s.shroudedMethods.length).toBeLessThanOrEqual(s.availableMethods.length);
+    expect(new Set(s.shroudedMethods).size).toBe(s.shroudedMethods.length); // distinct indices
+  });
+
   it('fool-reroll (forced) replaces the committed d20 slot with a fresh die', () => {
     const e = new GameEngine();
     // Load the fool-reroll scenario: slots already contain The Fool, screen=minigame, method=d20.
