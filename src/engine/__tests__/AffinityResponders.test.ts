@@ -161,6 +161,22 @@ describe('spread-aware repurposed responders', () => {
   });
 });
 
+describe('new tarot affinity responders', () => {
+  const by = (id: string) => buildAffinityResponders().find((r) => r.id === id)!;
+  it('chaos-wild-card and order-anchor are exclusive MUTATE on tarot:orient', () => {
+    for (const id of ['chaos-wild-card', 'order-anchor']) {
+      const r = by(id);
+      expect(r.triggers).toContain('tarot:orient');
+      expect(r.group).toEqual({ kind: 'exclusive', band: 'MUTATE' });
+    }
+  });
+  it('shadow-veil-position is a combine responder on the spread channel', () => {
+    const r = by('shadow-veil-position');
+    expect(r.triggers).toContain('tarot:commit');
+    expect(r.group).toEqual({ kind: 'combine', channel: 'spread' });
+  });
+});
+
 describe("Fool's Reroll across the spread", () => {
   it('fires when The Fool is any position in a committed spread', () => {
     const foolReroll = buildInteractionResponders().find((r) => r.id === 'fool-reroll')!;

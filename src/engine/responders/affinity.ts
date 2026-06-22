@@ -2,7 +2,7 @@ import type { Responder, PhaseContext, EffectReport } from '../events/types';
 import type { AffinityId, SlotResult, RollModifier, TarotResult, TarotCardFace } from '../types';
 import { bandRoll } from '../events/eligibility';
 import { TIER_BASE_CHANCE, bandOf, BAND_ORDER } from '../../data/affinities';
-import { reverseSpread, drawTarotCard } from '../../data/tarot';
+import { reverseSpread, buildFace, DECK_BY_ID, drawTarotCard, consolidateSpread } from '../../data/tarot';
 
 const T = TIER_BASE_CHANCE;
 const SHROUD_STEP_CHANCE = 0.20; // flat per-step chance (not bandRoll-scaled — see A3 note)
@@ -177,6 +177,47 @@ export function buildAffinityResponders(): Responder[] {
       group: { kind: 'combine', channel: 'roll-mode' }, weight: w('will'),
       condition: () => true, roll: (c) => bandRoll(c, 'will', 'stirring', T.notable),
       apply: pushMod('offer-reroll'),
+    },
+    {
+      id: 'chaos-wild-card', source: 'affinity', triggers: ['tarot:orient'],
+      group: { kind: 'exclusive', band: 'MUTATE' }, weight: w('chaos'),
+      condition: (c) => c.draft.outcome?.type === 'tarot' && !!(c.draft.outcome as TarotResult).spread,
+      roll: (c) => bandRoll(c, 'chaos', 'ascendant', T.notable),
+      apply: (c) => {
+        const result = c.draft.outcome as TarotResult;
+        const faces = result.spread!.map((s) => s.card);
+        const i = Math.floor(c.rng() * faces.length);
+        faces[i] = buildFace(DECK_BY_ID[faces[i].id], faces[i].orientation === 'upright' ? 'reversed' : 'upright');
+        c.draft.outcome = consolidateSpread(faces);
+        return report('chaos-wild-card', 'Chaos', 'One card defies the spread — it turns against the rest.', 'flip');
+      },
+    },
+    {
+      id: 'order-anchor', source: 'affinity', triggers: ['tarot:orient'],
+      group: { kind: 'exclusive', band: 'MUTATE' }, weight: w('order'),
+      condition: (c) => c.draft.outcome?.type === 'tarot' && !!(c.draft.outcome as TarotResult).spread
+        && (c.draft.outcome as TarotResult).spread!.some((s) => s.card.orientation === 'reversed'),
+      roll: (c) => bandRoll(c, 'order', 'ascendant', T.notable),
+      apply: (c) => {
+        const result = c.draft.outcome as TarotResult;
+        const faces = result.spread!.map((s) => buildFace(DECK_BY_ID[s.card.id], 'upright'));
+        c.draft.outcome = consolidateSpread(faces);
+        return report('order-anchor', 'Order', 'The spread settles — anchored, upright, and coherent.', 'anchor');
+      },
+    },
+    {
+      id: 'shadow-veil-position', source: 'affinity', triggers: ['tarot:commit'],
+      group: { kind: 'combine', channel: 'spread' }, weight: w('shadow'),
+      condition: (c) => c.draft.outcome?.type === 'tarot' && (c.draft.outcome as TarotResult).spread!.length > 1,
+      roll: (c) => bandRoll(c, 'shadow', 'ascendant', T.notable),
+      apply: (c) => {
+        const result = c.draft.outcome as TarotResult;
+        const i = Math.floor(c.rng() * result.spread!.length);
+        result.spread![i].card.veiled = true;
+        (c.draft.spreadReports ??= []).push(
+          report('shadow-veil-position', 'Shadow', 'One card stays veiled — its face withheld from the reading.', 'shroud'));
+        return null;
+      },
     },
   ];
 }
