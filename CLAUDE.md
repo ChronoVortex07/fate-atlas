@@ -4,6 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Atlas of Fate is a browser divination game (React 18 + TypeScript + Vite) that fuses Tarot, d20, and I Ching into a roguelike reading loop. The README has the player-facing details (gameplay flow, rule tables, debug panel, theme colors); this file covers what you need to work in the code.
 
+## Documentation (keep in sync)
+
+The behavior of the **affinities, per-band effects, meta-interactions, and happenings** is documented in [docs/game-systems.md](docs/game-systems.md) — the authoritative, hand-maintained reference. **When you change any of these systems — `src/data/affinities.ts` (affinities, bands, feeds, tuning), `src/data/happenings.ts`, `src/engine/AffinityEngine.ts` (shift math, static effects), `src/engine/responders/affinity.ts` or `src/engine/responders/interactions.ts` (event-driven effects), or `src/engine/events/reducers.ts` — update `docs/game-systems.md` (and the matching README sections) in the same change.**
+
 ## Commands
 
 | Command | Purpose |

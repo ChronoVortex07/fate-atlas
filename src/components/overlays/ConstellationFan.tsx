@@ -208,11 +208,17 @@ export default function ConstellationFan({ results, activeSlots }: Props) {
           position: 'absolute',
           bottom: isDesktop ? '14px' : '56px',
           right: isDesktop ? undefined : '14px',
-          left: isDesktop ? 0 : undefined,
-          width: isDesktop ? '100%' : '220px',
-          height: isDesktop ? '320px' : '220px',
+          left: isDesktop ? '50%' : undefined,
+          transform: isDesktop ? 'translateX(-50%)' : undefined,
+          // Collapsed: footprint hugs the real card stack so it can't cover the method grid.
+          // Expanded: span the area so polar-positioned cards have room.
+          width: expanded ? (isDesktop ? '100%' : '220px') : (isDesktop ? '120px' : '70px'),
+          height: expanded ? (isDesktop ? '320px' : '220px') : (isDesktop ? '130px' : '90px'),
           zIndex: expanded ? 16 : 8,
           cursor: !expanded ? 'pointer' : undefined,
+          WebkitTapHighlightColor: 'transparent',
+          touchAction: 'manipulation',
+          pointerEvents: expanded ? 'none' : 'auto',
         }}
         onClick={!expanded ? handleToggle : undefined}
       >

@@ -59,12 +59,6 @@ export interface Taggable {
 export type RollModifier = 'advantage' | 'disadvantage' | 'choice' | 'offer-reroll';
 export type RollMode = 'single' | 'advantage' | 'disadvantage' | 'choice';
 
-export interface RollPlan {
-  mode: RollMode;
-  offerReroll: boolean;
-  sources: string[]; // human-readable, for a caption e.g. "Light favors you"
-}
-
 // ── Question ──
 export type QuestionType = 'decision' | 'relationship' | 'future' | 'self';
 
@@ -215,28 +209,6 @@ export interface GameEvent {
   data: Record<string, unknown>;
 }
 
-// ── Interaction Rules ──
-export interface InteractionRule {
-  id: string;
-  trigger: {
-    on: EventType;
-    sourceTags: Tag[];
-  };
-  target: {
-    tags: Tag[];
-    action: 'reroll' | 'flip' | 'add-choice' | 'mirror' | 'second-result';
-  };
-  modifier?: {
-    tags: Tag[];
-    evaluate: 'contextual';
-  };
-  display: {
-    flashSource: boolean;
-    flashTarget: boolean;
-    description: string;
-  };
-}
-
 // ── Synthesis ──
 export interface SynthesisResult {
   headline: string;
@@ -251,30 +223,10 @@ export interface RunRecord {
   timestamp: number;
   question: QuestionType;
   turnResults: SlotResult[];
-  interactions: InteractionEvent[];
+  effects: EffectReport[];
   synthesis: SynthesisResult;
   happening?: HappeningResult;
   happeningChoice?: number; // index of chosen happening option
-}
-
-export interface InteractionEvent {
-  ruleId: string;
-  sourceSlotIndex: number;
-  targetSlotIndex: number;
-  effect: 'reroll' | 'flip' | 'add-choice' | 'mirror' | 'second-result';
-  description: string;
-}
-
-export interface PendingEffect {
-  id: string;
-  sourceRunId: string;
-  sourceCard: string;
-  sourceSlotIndex: number;
-  triggerTags: string[];
-  action: 'reroll' | 'flip' | 'add-choice' | 'mirror' | 'second-result' | 'advantage' | 'disadvantage' | 'choice';
-  description: string;
-  expiresAfter: number;
-  turnsRemaining: number;
 }
 
 export interface TarotMinigameState {
@@ -324,14 +276,12 @@ export interface GameState {
   minigamesCompleted: number;
   activeSlotIndex: number | null;
   minigameState: MinigameState | null;
-  interactions: InteractionEvent[];
   synthesis: SynthesisResult | null;
   happening: HappeningResult | null;
   selectedHappeningChoice: number | null;
   history: RunRecord[];
   eventLog: GameEvent[];
   debug: boolean;
-  debugForcedEffect: string | null;
   affinityEffects: AffinityEffects;
   eventQueue: EffectReport[];
   debugConfig: DebugConfig;

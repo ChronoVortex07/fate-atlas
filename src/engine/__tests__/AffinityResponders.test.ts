@@ -31,11 +31,37 @@ describe('affinity responders via dispatch', () => {
     expect(c.draft.poolTarget).toBe(4);
   });
 
-  it('shadow-shroud marks a pool index when forced', () => {
-    const pool = [{ type: 'tarot' }, { type: 'tarot' }] as any;
-    const c = ctx({ trigger: 'select:draw:end', draft: { pool } });
+  it('shadow-shroud: at Stirring with all rolls passing, shrouds exactly one', () => {
+    const pool = [{ type: 'tarot' }, { type: 'tarot' }, { type: 'tarot' }] as any;
+    const c = ctx({
+      trigger: 'select:draw:end', draft: { pool },
+      affinities: { ...defaultAffinityState(), shadow: 40 }, // Stirring
+      rng: () => 0, // every roll passes
+    });
     dispatch('select:draw:end', c, buildAffinityResponders(), { forced: ['shadow-shroud'], isolate: true });
-    expect(c.draft.shrouded!.length).toBe(1);
+    expect(new Set(c.draft.shrouded!).size).toBe(1);
+  });
+
+  it('shadow-shroud: at Dominant with all rolls passing, shrouds three distinct indices', () => {
+    const pool = [{ type: 'tarot' }, { type: 'tarot' }, { type: 'tarot' }] as any;
+    const c = ctx({
+      trigger: 'select:draw:end', draft: { pool },
+      affinities: { ...defaultAffinityState(), shadow: 95 }, // Dominant
+      rng: () => 0,
+    });
+    dispatch('select:draw:end', c, buildAffinityResponders(), { forced: ['shadow-shroud'], isolate: true });
+    expect(new Set(c.draft.shrouded!).size).toBe(3);
+  });
+
+  it('shadow-shroud: caps shroud count at pool length', () => {
+    const pool = [{ type: 'tarot' }, { type: 'tarot' }] as any; // only 2
+    const c = ctx({
+      trigger: 'select:draw:end', draft: { pool },
+      affinities: { ...defaultAffinityState(), shadow: 95 },
+      rng: () => 0,
+    });
+    dispatch('select:draw:end', c, buildAffinityResponders(), { forced: ['shadow-shroud'], isolate: true });
+    expect(new Set(c.draft.shrouded!).size).toBe(2);
   });
 
   it('fate-override-pick: no reassignment when all hand entries are reference-equal to outcome', () => {
@@ -76,5 +102,71 @@ describe('affinity responders via dispatch', () => {
     });
     dispatch('dice:roll', c, buildAffinityResponders(), noDebug);
     expect(c.draft.rollMode).toBe('single');
+  });
+
+  it('fate-thin-pool decrements poolTarget, guarded above 2', () => {
+    const c = ctx({ trigger: 'select:draw:start', draft: { poolTarget: 4 },
+      affinities: { ...defaultAffinityState(), fate: 75 } });
+    dispatch('select:draw:start', c, buildAffinityResponders(), { forced: ['fate-thin-pool'], isolate: true });
+    expect(c.draft.poolTarget).toBe(3);
+  });
+
+  it('fate-thin-pool does not fire at poolTarget 2 (condition guard)', () => {
+    const c = ctx({ trigger: 'select:draw:start', draft: { poolTarget: 2 },
+      affinities: { ...defaultAffinityState(), fate: 75 } });
+    dispatch('select:draw:start', c, buildAffinityResponders(), { forced: ['fate-thin-pool'], isolate: true });
+    expect(c.draft.poolTarget).toBe(2);
+  });
+
+  it('fate-auto-orient sets a deterministic orientation', () => {
+    const card = { type: 'tarot', id: 'fool', orientation: 'upright' } as any;
+    const c = ctx({ trigger: 'tarot:orient', draft: { outcome: card },
+      affinities: { ...defaultAffinityState(), fate: 75 }, rng: () => 0.9 });
+    dispatch('tarot:orient', c, buildAffinityResponders(), { forced: ['fate-auto-orient'], isolate: true });
+    expect((c.draft.outcome as any).orientation).toBe('reversed'); // rng 0.9 >= 0.5
+  });
+
+  it('fate-hollow-reroll reverts to the previous die', () => {
+    const prev = { type: 'd20', result: 3 } as any;
+    const curr = { type: 'd20', result: 18 } as any;
+    const c = ctx({ trigger: 'dice:reroll', draft: { outcome: curr }, event: { previous: prev },
+      affinities: { ...defaultAffinityState(), fate: 90 } });
+    dispatch('dice:reroll', c, buildAffinityResponders(), { forced: ['fate-hollow-reroll'], isolate: true });
+    expect(c.draft.outcome).toBe(prev);
+  });
+
+  it('chaos-second-result sets spawnSecond to the committed type', () => {
+    const c = ctx({ trigger: 'dice:commit', draft: { outcome: { type: 'd20' } as any },
+      affinities: { ...defaultAffinityState(), chaos: 95 } });
+    dispatch('dice:commit', c, buildAffinityResponders(), { forced: ['chaos-second-result'], isolate: true });
+    expect(c.draft.spawnSecond).toBe('d20');
+  });
+
+  it('chaos-happening-interrupt sets interruptHappening when not the last reading', () => {
+    const c = ctx({ trigger: 'minigame:end', draft: { lastReading: false },
+      affinities: { ...defaultAffinityState(), chaos: 75 } });
+    dispatch('minigame:end', c, buildAffinityResponders(), { forced: ['chaos-happening-interrupt'], isolate: true });
+    expect(c.draft.interruptHappening).toBe(true);
+  });
+
+  it('chaos-happening-interrupt does not fire on the last reading (condition guard)', () => {
+    const c = ctx({ trigger: 'minigame:end', draft: { lastReading: true },
+      affinities: { ...defaultAffinityState(), chaos: 75 } });
+    dispatch('minigame:end', c, buildAffinityResponders(), { forced: ['chaos-happening-interrupt'], isolate: true });
+    expect(c.draft.interruptHappening).toBeUndefined();
+  });
+
+  it('will-choice trumps offer-reroll in the roll-mode reducer', () => {
+    const c = ctx({ trigger: 'dice:roll', draft: { rollMods: [] },
+      affinities: { ...defaultAffinityState(), will: 95 }, rng: () => 0 });
+    dispatch('dice:roll', c, buildAffinityResponders(), noDebug);
+    expect(c.draft.rollMode).toBe('choice');
+  });
+
+  it('will-offer-reroll surfaces offerReroll without forcing a mode', () => {
+    const c = ctx({ trigger: 'dice:roll', draft: { rollMods: [] },
+      affinities: { ...defaultAffinityState(), will: 50 }, rng: () => 0 });
+    dispatch('dice:roll', c, buildAffinityResponders(), { forced: ['will-offer-reroll'], isolate: true });
+    expect(c.draft.offerReroll).toBe(true);
   });
 });

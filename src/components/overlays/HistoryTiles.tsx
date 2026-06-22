@@ -43,8 +43,8 @@ export default function HistoryTiles() {
           >
             <span style={iconStyle}>{getTileIcon(run)}</span>
             <span style={labelStyle}>{getTileLabel(run).slice(0, 12)}</span>
-            {run.interactions.length > 0 && (
-              <span style={badgeStyle}>{run.interactions.length}</span>
+            {run.effects.length > 0 && (
+              <span style={badgeStyle}>{run.effects.length}</span>
             )}
           </motion.div>
         ))}

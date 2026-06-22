@@ -1,9 +1,10 @@
 import type { Responder, PhaseContext, EffectReport } from '../events/types';
 import type { AffinityId, SlotResult, RollModifier, TarotResult } from '../types';
 import { bandRoll } from '../events/eligibility';
-import { TIER_BASE_CHANCE } from '../../data/affinities';
+import { TIER_BASE_CHANCE, bandOf, BAND_ORDER } from '../../data/affinities';
 
 const T = TIER_BASE_CHANCE;
+const SHROUD_STEP_CHANCE = 0.20; // flat per-step chance (not bandRoll-scaled — see A3 note)
 const w = (a: AffinityId) => (ctx: PhaseContext) => ctx.affinities[a];
 
 function report(id: string, label: string, description: string, animation: string, targetSlot?: number): EffectReport {
@@ -33,23 +34,72 @@ export function buildAffinityResponders(): Responder[] {
       condition: (c) => typeof c.draft.poolTarget === 'number' && (c.draft.poolTarget as number) > 2,
       roll: (c) => bandRoll(c, 'fate', 'ascendant', T.notable),
       apply: (c) => { c.draft.poolTarget = (c.draft.poolTarget as number) - 1;
-        return report('fate-thin-pool', 'Fate', 'Fate narrows the way — a path closes.', 'widen'); },
+        return report('fate-thin-pool', 'Fate', 'Fate narrows the way — a path closes.', 'thin'); },
     },
     {
       id: 'shadow-shroud', source: 'affinity', triggers: ['select:draw:end'],
       group: { kind: 'exclusive', band: 'MUTATE' }, weight: w('shadow'),
       condition: (c) => Array.isArray(c.draft.pool) && (c.draft.pool as SlotResult[]).length > 0,
-      roll: (c) => bandRoll(c, 'shadow', 'ascendant', T.notable),
+      // Firing roll: Shadow at Ascendant+ (matches the design's "veiled" band)
+      // AND a flat 20% chance. This responder intentionally uses a flat per-step
+      // chance, not the band-scaled bandRoll: `forced` bypasses only the firing
+      // roll, so a forced fire always yields >=1 shroud plus probabilistic extras
+      // — correct for the demo scenario.
+      roll: (c) => {
+        const idx = BAND_ORDER.indexOf(bandOf(c.affinities.shadow));
+        return idx >= BAND_ORDER.indexOf('ascendant') && c.rng() < SHROUD_STEP_CHANCE;
+      },
       apply: (c) => {
         const pool = c.draft.pool as SlotResult[];
-        const idx = Math.floor(c.rng() * pool.length);
-        (c.draft.shrouded ??= []).push(idx);
-        return report('shadow-shroud', 'Shadow', 'Shadow falls across a path — its nature is hidden.', 'shroud', idx);
+        const band = BAND_ORDER.indexOf(bandOf(c.affinities.shadow));
+        const shrouded = (c.draft.shrouded ??= []);
+        const pickDistinct = (): number | null => {
+          if (shrouded.length >= pool.length) return null;
+          let idx = Math.floor(c.rng() * pool.length);
+          // linear-probe to a free index (small pools)
+          while (shrouded.includes(idx)) idx = (idx + 1) % pool.length;
+          return idx;
+        };
+        // First shroud always lands (the firing roll already passed / was forced).
+        const first = pickDistinct();
+        if (first !== null) shrouded.push(first);
+        // Ascendant+: 20% for a second distinct index.
+        if (band >= BAND_ORDER.indexOf('ascendant') && c.rng() < SHROUD_STEP_CHANCE) {
+          const second = pickDistinct();
+          if (second !== null) shrouded.push(second);
+        }
+        // Dominant: 20% for a third distinct index.
+        if (band >= BAND_ORDER.indexOf('dominant') && c.rng() < SHROUD_STEP_CHANCE) {
+          const third = pickDistinct();
+          if (third !== null) shrouded.push(third);
+        }
+        const n = shrouded.length;
+        return report('shadow-shroud', 'Shadow',
+          n > 1 ? `Shadow falls across ${n} paths — their nature is hidden.`
+                : 'Shadow falls across a path — its nature is hidden.',
+          'shroud', shrouded[0]);
       },
     },
     {
-      // 'select:pick' is never dispatched and the method pool is DivinationType[] (not SlotResult[]).
-      // "Fate forces the method" is a deferred follow-up requiring a method-shaped override effect.
+      // Fate forces the method: redirects the chosen method index on select:pick.
+      // The method pool is DivinationType[] (strings), so this works on indices,
+      // not the SlotResult-shaped fate-override-pick below.
+      id: 'fate-force-method', source: 'affinity', triggers: ['select:pick'],
+      group: { kind: 'exclusive', band: 'OVERRIDE' }, weight: w('fate'),
+      condition: (c) => Array.isArray(c.draft.methodPool)
+        && (c.draft.methodPool as unknown[]).length >= 2
+        && typeof c.draft.methodIndex === 'number',
+      roll: (c) => bandRoll(c, 'fate', 'ascendant', T.major),
+      apply: (c) => {
+        const pool = c.draft.methodPool as string[];
+        const chosen = c.draft.methodIndex as number;
+        const others = pool.map((_, i) => i).filter((i) => i !== chosen);
+        if (others.length === 0) return null;
+        c.draft.methodIndex = others[Math.floor(c.rng() * others.length)];
+        return report('fate-force-method', 'Fate', 'The weave moves your hand — another path is chosen for you.', 'override');
+      },
+    },
+    {
       id: 'fate-override-pick', source: 'affinity', triggers: ['tarot:pick'],
       group: { kind: 'exclusive', band: 'OVERRIDE' }, weight: w('fate'),
       condition: (c) => !!c.hand && c.hand.length >= 2 && !!c.draft.outcome,
@@ -91,7 +141,7 @@ export function buildAffinityResponders(): Responder[] {
       roll: (c) => bandRoll(c, 'chaos', 'dominant', T.major),
       apply: (c) => {
         c.draft.spawnSecond = (c.draft.outcome as SlotResult).type;
-        return report('chaos-second-result', 'Chaos', 'Chaos surges — a second possibility emerges from the void.', 'second-result');
+        return report('chaos-second-result', 'Chaos', 'Chaos surges — a second reading manifests.', 'second-result');
       },
     },
     {
@@ -100,7 +150,7 @@ export function buildAffinityResponders(): Responder[] {
       condition: (c) => c.draft.lastReading !== true,
       roll: (c) => bandRoll(c, 'chaos', 'ascendant', T.major),
       apply: (c) => { c.draft.interruptHappening = true;
-        return report('chaos-happening-interrupt', 'Chaos', 'The weave tears — something intrudes.', 'second-result'); },
+        return report('chaos-happening-interrupt', 'Chaos', 'The weave tears — something intrudes.', 'interrupt'); },
     },
     {
       id: 'light-advantage', source: 'affinity', triggers: ['dice:roll'],

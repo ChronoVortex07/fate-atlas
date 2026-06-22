@@ -27,6 +27,8 @@ export class GameEngine {
   private listeners = new Set<(state: GameState) => void>();
   private usedHappeningIds = new Set<string>();
   private minigamesPerTurn: number;
+  private pendingTransition: (() => void) | null = null;
+  private turnEffects: EffectReport[] = []; // per-turn accumulator of all reports (for RunRecord)
 
   constructor(minigamesPerTurn = 3) {
     this.minigamesPerTurn = minigamesPerTurn;
@@ -54,14 +56,12 @@ export class GameEngine {
       minigamesCompleted: 0,
       activeSlotIndex: null,
       minigameState: null,
-      interactions: [],
       synthesis: null,
       happening: null,
       selectedHappeningChoice: null,
       history: [],
       eventLog: [],
       debug: false,
-      debugForcedEffect: null,
       affinityEffects: {
         handSize: 3, methodCount: 3, hintClarity: 0,
         readingDetail: 0, poolPreview: 'none', peekAvailable: false,
@@ -106,7 +106,10 @@ export class GameEngine {
         forced: this.state.debugConfig.forced.filter((id) => !forcedConsumed.includes(id)),
       };
     }
-    if (reports.length > 0) this.state.eventQueue = [...this.state.eventQueue, ...reports];
+    if (reports.length > 0) {
+      this.state.eventQueue = [...this.state.eventQueue, ...reports];
+      this.turnEffects = [...this.turnEffects, ...reports];
+    }
     return { draft: ctx.draft, reports };
   }
 
@@ -118,6 +121,27 @@ export class GameEngine {
   clearEventQueue(): void {
     this.state.eventQueue = [];
     this.notify();
+  }
+
+  // Runs the transition now if nothing is queued for narration; otherwise stores
+  // it and lets the sequencer run it once the batch drains (freeze-until-narrated).
+  private runOrDefer(transition: () => void): void {
+    if (this.state.eventQueue.length > 0) {
+      this.pendingTransition = transition;
+      this.notify();
+    } else {
+      transition();
+    }
+  }
+
+  // Called by InteractionSequencer when the queue finishes (or is skipped):
+  // clear the queue and run any transition that was deferred behind it.
+  finishEventBatch(): void {
+    this.state.eventQueue = [];
+    const t = this.pendingTransition;
+    this.pendingTransition = null;
+    if (t) t();
+    else this.notify();
   }
 
   // Refills/generates the pool, routing it through the select draw triggers so
@@ -155,11 +179,11 @@ export class GameEngine {
     this.state.minigamesCompleted = 0;
     this.state.activeSlotIndex = null;
     this.state.minigameState = null;
-    this.state.interactions = [];
     this.state.synthesis = null;
     this.state.happening = null;
     this.state.selectedHappeningChoice = null;
     this.state.eventQueue = [];
+    this.turnEffects = [];
 
     this.narrativeAssembler.resetRotation();
 
@@ -170,11 +194,19 @@ export class GameEngine {
   }
 
   selectMethod(index: number): void {
-    const methodType = this.state.availableMethods[index];
-    if (!methodType) {
+    if (!this.state.availableMethods[index]) {
       throw new Error(`Method index ${index} out of bounds`);
     }
-
+    // Fate (OVERRIDE) may redirect the chosen method.
+    const { draft } = this.dispatchAt('select:pick', {
+      methodIndex: index,
+      methodPool: this.state.availableMethods,
+    });
+    const finalIndex = typeof draft.methodIndex === 'number' ? draft.methodIndex : index;
+    const methodType = this.state.availableMethods[finalIndex];
+    if (!methodType) {
+      throw new Error(`Method index ${finalIndex} out of bounds`);
+    }
     this.state.selectedMethod = methodType;
     this.state.activeSlotIndex = null;
     this.state.screen = 'minigame';
@@ -236,10 +268,22 @@ export class GameEngine {
         affinities,
       );
       this.state.turnResults = [...this.state.turnResults, second];
+      const newIndex = this.state.turnResults.length - 1;
+      // The responder cannot know the post-append index; patch its queued report
+      // so the animation can spotlight the new fan slot.
+      this.state.eventQueue = this.state.eventQueue.map((r) =>
+        r.responderId === 'chaos-second-result' ? { ...r, targetSlot: newIndex } : r,
+      );
     }
 
     this.bus.emit('minigame-complete', { result, completed });
 
+    // Resolve-first, narrate-second: if the commit queued any events, freeze on
+    // the current screen until the sequencer drains them, then transition.
+    this.runOrDefer(() => this.advanceAfterCommit(result, completed));
+  }
+
+  private advanceAfterCommit(result: SlotResult, completed: number): void {
     // Final reading?
     if (completed >= this.minigamesPerTurn) {
       this.synthesizeAll();
@@ -258,7 +302,9 @@ export class GameEngine {
     });
 
     if (endDraft.interruptHappening === true) {
-      this.triggerHappening();
+      // The minigame:end dispatch may itself have queued the interrupt report;
+      // narrate it on the current screen, then open the happening.
+      this.runOrDefer(() => this.triggerHappening());
       return;
     }
 
@@ -276,7 +322,7 @@ export class GameEngine {
       timestamp: Date.now(),
       question: this.state.questionType!,
       turnResults: this.state.turnResults,
-      interactions: this.state.interactions,
+      effects: this.turnEffects,
       synthesis: this.state.synthesis!,
       happening: this.state.happening ?? undefined,
       happeningChoice: this.state.selectedHappeningChoice ?? undefined,
@@ -563,7 +609,7 @@ export class GameEngine {
     return this.narrativeAssembler.generateLLMPrompt({
       question,
       slots: results,
-      interactions: this.state.interactions,
+      effects: this.turnEffects,
       affinities,
       aggregated,
     });
@@ -590,11 +636,11 @@ export class GameEngine {
     this.state.minigamesCompleted = 0;
     this.state.activeSlotIndex = null;
     this.state.minigameState = null;
-    this.state.interactions = [];
     this.state.synthesis = null;
     this.state.happening = null;
     this.state.selectedHappeningChoice = null;
     this.state.eventQueue = [];
+    this.turnEffects = [];
     this.notify();
   }
 

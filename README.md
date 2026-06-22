@@ -45,28 +45,32 @@ npm run dev        # → http://localhost:5173
 
 ## Hidden Affinity System
 
-Two forces shape your readings behind the scenes:
+Six hidden affinities in three opposed pairs shape your readings behind the scenes:
+**Chaos ↔ Order** (fortune), **Fate ↔ Will** (agency), **Light ↔ Shadow** (information).
+Values run 0–100 (baseline 50) across four bands — *latent, stirring, ascendant, dominant* —
+and unlock progressively stronger effects as they rise. They persist across runs in
+localStorage, drift back toward baseline each run, and are never shown directly — only hinted
+at through atmospheric flavor text.
 
-| Affinity | Range | Grows from | Effect when dominant (≥ 0.5) |
-|----------|-------|-----------|------------------------------|
-| **Chaos** | 0.0–1.0 | Reversals, changing lines, low rolls | Wild modifiers, more interaction chains, extra happenings |
-| **Order** | 0.0–1.0 | Upright cards, neutral rolls, stable hexagrams | Reduced reversals, steady outcomes, extra clarity |
-
-Affinities persist across runs in localStorage. Values are never shown directly — only hinted at through atmospheric flavor text.
+See [`docs/game-systems.md`](docs/game-systems.md) for the full affinity/band/effect reference.
 
 ---
 
 ## Meta-Interaction Rules
 
-All interactions match by **tags**, not hard-coded IDs. Adding a new card type with the right tags automatically qualifies for existing rules.
+Interactions between divination results are **tag-matched** against the spread, so adding a
+new entity with the right tags automatically participates.
 
-| Rule | Trigger | Effect |
-|------|---------|--------|
-| **Fool's Reroll** | Fool archetype drawn | Reroll any pending dice (advantage if upright, disadvantage if reversed) |
-| **Critical Flip** | Critical-low dice result | Flip a reversible tarot card's orientation |
-| **I Ching Boost** | Hexagram with changing lines | +1 extra happening choice |
-| **Mirror Event** | Two reversible entities present | Both flip orientation/meaning |
-| **Chaos Surge** | Chaos dominant (≥ 0.5) | 15% chance of a second result appearing |
+| Interaction | Fires when… | Effect |
+|-------------|-------------|--------|
+| **Fool's Reroll** | The Fool is in the spread on a dice commit | Recasts the committed d20 |
+| **Critical Resonance** | upright tarot + critical-low die (or reversed + critical-high) | Flips the tarot's orientation |
+| **The Mirror** | exactly two reversible entities present | Both flip orientation (85%) |
+| **I Ching Boost** | an I Ching with changing lines is present | Adds a hidden happening choice |
+
+Affinity bands add their own probabilistic effects (widen/thin the pool, shroud methods,
+spawn a second result, force a method, advantage/disadvantage, …) — see
+[`docs/game-systems.md`](docs/game-systems.md).
 
 ---
 

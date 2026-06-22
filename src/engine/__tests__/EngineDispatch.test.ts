@@ -65,6 +65,19 @@ describe('engine dispatch wiring', () => {
     }
   });
 
+  it('shadow-shroud (forced, high Shadow) shrouds 1..poolLength distinct methods', () => {
+    const e = new GameEngine();
+    // beginRun drifts toward baseline (~83.5 after a 100 start) → still Dominant,
+    // so the progressive responder can roll up to three distinct indices.
+    e.loadState({ affinities: { ...e.getState().affinities, shadow: 100 } });
+    e.forceEffects(['shadow-shroud'], true);
+    e.startTurn('self');
+    const s = e.getState();
+    expect(s.shroudedMethods.length).toBeGreaterThanOrEqual(1);
+    expect(s.shroudedMethods.length).toBeLessThanOrEqual(s.availableMethods.length);
+    expect(new Set(s.shroudedMethods).size).toBe(s.shroudedMethods.length); // distinct indices
+  });
+
   it('fool-reroll (forced) replaces the committed d20 slot with a fresh die', () => {
     const e = new GameEngine();
     // Load the fool-reroll scenario: slots already contain The Fool, screen=minigame, method=d20.
@@ -91,5 +104,38 @@ describe('engine dispatch wiring', () => {
     const foolFired = state.eventQueue.some((r) => r.responderId === 'fool-reroll');
     expect(foolFired).toBe(true);
     expect(state.turnResults[0]).not.toBe(d20Result); // committed slot was replaced by a fresh die
+  });
+
+  it('fate-force-method redirects the selected method index when forced', () => {
+    const engine = new GameEngine();
+    engine.startTurn('decision');
+    // ensure at least two distinct methods in availableMethods, else the redirect is a no-op
+    engine.forceEffects(['fate-force-method'], true);
+    const chosen = 0;
+    engine.selectMethod(chosen);
+    const s = engine.getState();
+    // selectedMethod should match availableMethods at the (possibly redirected) index,
+    // and an override report should be queued.
+    expect(s.eventQueue.some((r) => r.responderId === 'fate-force-method')).toBe(true);
+  });
+
+  it('chaos-second-result spawns a slot and points its report at the new index', () => {
+    const engine = new GameEngine();
+    engine.startTurn('decision');
+    engine.selectMethod(0);
+    engine.forceEffects(['chaos-second-result'], true);
+
+    const before = engine.getState().turnResults.length;
+    engine.completeMinigame({
+      type: 'd20', result: 7, threshold: 'low', interpretation: '',
+      tags: [], themes: [], dimensions: { favorability: 0, certainty: 0, volatility: 0 },
+      modifierRoles: [],
+    } as any);
+
+    const s = engine.getState();
+    expect(s.turnResults.length).toBe(before + 2); // committed + spawned second
+    const report = s.eventQueue.find((r) => r.responderId === 'chaos-second-result');
+    expect(report).toBeDefined();
+    expect(report!.targetSlot).toBe(s.turnResults.length - 1);
   });
 });

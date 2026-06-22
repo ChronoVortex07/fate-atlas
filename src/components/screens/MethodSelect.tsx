@@ -56,7 +56,6 @@ export default function MethodSelect() {
           {state.availableMethods.map((method, i) => {
             const card = METHOD_CARDS[method];
             const isShrouded = state.shroudedMethods.includes(i);
-            const isHidden = state.affinityEffects.poolPreview === 'hidden';
             return (
               <motion.button
                 key={i}
@@ -71,16 +70,14 @@ export default function MethodSelect() {
                 onClick={() => handleSelect(i)}
               >
                 <div style={{ ...cardSymbolStyle, color: isShrouded ? '#4a5a7a' : card.color }}>
-                  {isShrouded || isHidden ? '?' : card.symbol}
+                  {isShrouded ? '?' : card.symbol}
                 </div>
                 <div style={cardTitleStyle}>
-                  {isShrouded || isHidden ? '???' : card.title}
+                  {isShrouded ? '???' : card.title}
                 </div>
                 <div style={cardDescStyle}>
                   {isShrouded
                     ? 'Shadow conceals this path — its nature is hidden.'
-                    : isHidden
-                    ? 'An unmarked path awaits.'
                     : card.description}
                 </div>
               </motion.button>

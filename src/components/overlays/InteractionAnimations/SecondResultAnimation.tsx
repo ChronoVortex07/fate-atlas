@@ -6,19 +6,20 @@ interface Props {
   targetSlot?: number | null;
 }
 
-export default function SecondResultAnimation(_props: Props) {
+export default function SecondResultAnimation({ targetSlot }: Props) {
+  const hasTarget = targetSlot !== null && targetSlot !== undefined;
   return (
     <motion.div style={containerStyle}>
       <motion.div
         style={rippleStyle}
-        initial={{ scale: 0.3, opacity: 0.7 }}
-        animate={{ scale: 2.5, opacity: 0 }}
+        initial={{ scale: 0.3, opacity: 0.7, y: 0 }}
+        animate={{ scale: 2.5, opacity: 0, y: hasTarget ? 120 : 0 }}
         transition={{ duration: 1.0, ease: 'easeOut' }}
       />
       <motion.div
         style={rippleStyle}
-        initial={{ scale: 0.3, opacity: 0.5 }}
-        animate={{ scale: 2.0, opacity: 0 }}
+        initial={{ scale: 0.3, opacity: 0.5, y: 0 }}
+        animate={{ scale: 2.0, opacity: 0, y: hasTarget ? 80 : 0 }}
         transition={{ duration: 0.8, delay: 0.15, ease: 'easeOut' }}
       />
     </motion.div>
