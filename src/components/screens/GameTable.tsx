@@ -7,6 +7,7 @@ import MethodSelect from './MethodSelect';
 import TarotMinigame from './TarotMinigame';
 import DiceMinigame from './DiceMinigame';
 import IChingMinigame from './IChingMinigame';
+import AstralMinigame from './AstralMinigame';
 import HappeningScene from './HappeningScene';
 import ResultReading from './ResultReading';
 import HistoryModal from '../overlays/HistoryModal';
@@ -59,6 +60,8 @@ export default function GameTable() {
         return <DiceMinigame key="dice-minigame" />;
       case 'iching':
         return <IChingMinigame key="iching-minigame" />;
+      case 'astral':
+        return <AstralMinigame key="astral-minigame" />;
       default:
         return null;
     }

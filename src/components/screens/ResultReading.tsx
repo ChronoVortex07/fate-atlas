@@ -7,6 +7,8 @@ import OrnamentalBorder from '../shared/OrnamentalBorder';
 import MysticButton from '../shared/MysticButton';
 import HistoryModal from '../overlays/HistoryModal';
 import type { SlotResult } from '../../engine/types';
+import AstralSigil from '../cards/AstralSigil';
+import { HOUSES } from '../../data/astromancy';
 
 function formatQuestionType(qt: string): string {
   switch (qt) {
@@ -39,6 +41,12 @@ function getResultDisplay(result: SlotResult): { symbol: string; name: string; s
         symbol: result.symbol,
         name: `Hexagram #${result.hexagramNumber} — ${result.name}`,
         subtitle: result.judgment.slice(0, 100),
+      };
+    case 'astral':
+      return {
+        symbol: result.symbol,
+        name: result.name,
+        subtitle: `in the House of ${HOUSES[result.house - 1]?.arena ?? result.house} — ${result.aspect}`,
       };
     case 'happening':
       return {
@@ -97,9 +105,24 @@ export default function ResultReading() {
               return (
                 <div key={i} style={resultCardStyle}>
                   <div style={resultIndexStyle}>{i + 1}</div>
-                  <div style={resultSymbolStyle}>{d.symbol}</div>
+                  {r.type === 'astral' ? (
+                    <div style={resultSymbolStyle}>
+                      <AstralSigil kind="planet" id={r.planet} size={32} />
+                    </div>
+                  ) : (
+                    <div style={resultSymbolStyle}>{d.symbol}</div>
+                  )}
                   <div style={resultNameStyle}>{d.name}</div>
-                  <div style={resultSubtitleStyle}>{d.subtitle}</div>
+                  {r.type === 'astral' ? (
+                    <>
+                      <div style={resultSubtitleStyle}>
+                        in the House of {HOUSES[r.house - 1]?.arena ?? r.house}
+                      </div>
+                      <div style={resultSubtitleStyle}>{r.aspect} — {r.interpretation}</div>
+                    </>
+                  ) : (
+                    <div style={resultSubtitleStyle}>{d.subtitle}</div>
+                  )}
                 </div>
               );
             })}

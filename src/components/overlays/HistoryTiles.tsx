@@ -10,6 +10,7 @@ function getTileIcon(run: RunRecord): string {
     case 'tarot': return last.symbol;
     case 'd20': return String.fromCodePoint(0x2685);
     case 'iching': return last.symbol;
+    case 'astral': return last.symbol;
     default: return '*';
   }
 }
@@ -22,6 +23,7 @@ function getTileLabel(run: RunRecord): string {
     case 'tarot': return last.name;
     case 'd20': return `D20 ${last.result}`;
     case 'iching': return last.name;
+    case 'astral': return last.name;
     default: return 'Unknown';
   }
 }
