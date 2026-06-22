@@ -521,6 +521,25 @@ export class GameEngine {
 
   private describeLeaning(preview?: SlotResult): string {
     if (!preview || preview.type === 'happening') return 'A faint shape stirs beyond the veil...';
+    // For a tarot spread, name the position whose card has the largest absolute dimensions.
+    if (preview.type === 'tarot' && preview.spread && preview.spread.length > 1) {
+      let maxPos = preview.spread[0];
+      let maxSum = Math.abs(maxPos.card.dimensions.favorability)
+        + Math.abs(maxPos.card.dimensions.certainty)
+        + Math.abs(maxPos.card.dimensions.volatility);
+      for (let i = 1; i < preview.spread.length; i++) {
+        const sp = preview.spread[i];
+        const s = Math.abs(sp.card.dimensions.favorability)
+          + Math.abs(sp.card.dimensions.certainty)
+          + Math.abs(sp.card.dimensions.volatility);
+        if (s > maxSum) { maxSum = s; maxPos = sp; }
+      }
+      const posLabel = maxPos.position.charAt(0).toUpperCase() + maxPos.position.slice(1);
+      const fav = maxPos.card.dimensions.favorability;
+      if (fav >= 1) return `The ${posLabel} pulls strongest, toward fortune...`;
+      if (fav <= -1) return `The ${posLabel} pulls strongest, toward hardship...`;
+      return `The ${posLabel} pulls strongest, in uneasy balance...`;
+    }
     const fav = preview.dimensions.favorability;
     if (fav >= 1) return 'The current leans toward fortune...';
     if (fav <= -1) return 'The current leans toward hardship...';

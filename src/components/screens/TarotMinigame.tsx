@@ -1,87 +1,113 @@
 import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
-import { drawTarotCard } from '../../data/tarot';
-import type { TarotResult } from '../../engine/types';
+import { drawTarotSpread, consolidateSpread, reverseSpread } from '../../data/tarot';
+import type { TarotCardFace, TarotResult } from '../../engine/types';
+import CardSigil from '../cards/CardSigil';
 
 const RUNE_BAND = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁ';
 
-type Phase = 'pick' | 'reversal-prompt' | 'revealed';
+type Phase = 'deal' | 'orient' | 'committing';
 
 export default function TarotMinigame() {
   const { state, engine } = useGameEngine();
-  const [phase, setPhase] = useState<Phase>('pick');
-  const faceDownCards = useState<TarotResult[]>(() =>
-    Array.from({ length: 3 }, () => drawTarotCard(state.affinities))
-  )[0];
-  const [chosenIndex, setChosenIndex] = useState<number | null>(null);
-  const [willReverse, setWillReverse] = useState(false);
-  const [swapped, setSwapped] = useState(false);
-  const [autoDecided, setAutoDecided] = useState(false);
 
-  const reveal = useCallback((reverse: boolean) => {
-    setWillReverse(reverse);
-    setPhase('revealed');
+  // Initialize the spread on mount: draw + Fate deal-swap.
+  const [faces, setFaces] = useState<TarotCardFace[]>(() => {
+    const raw = drawTarotSpread(state.affinities);
+    const initialFaces = raw.spread!.map((s) => s.card);
+    const { faces: dealt } = engine.resolveTarotDeal(initialFaces);
+    return dealt;
+  });
+
+  const [phase, setPhase] = useState<Phase>('deal');
+  const [revealedCount, setRevealedCount] = useState(0);
+  const [redrawsLeft, setRedrawsLeft] = useState(state.affinityEffects.spreadRedraws);
+  const [orientResult, setOrientResult] = useState<TarotResult | null>(null);
+  const [autoReverse, setAutoReverse] = useState(false);
+  const [willReverse, setWillReverse] = useState(false);
+
+  const allRevealed = revealedCount >= 3;
+
+  // ── Reveal spread with stagger ──
+  const handleRevealSpread = useCallback(() => {
+    let i = 1;
+    const revealNext = () => {
+      if (i <= 3) {
+        setRevealedCount(i);
+        i++;
+        if (i <= 3) setTimeout(revealNext, 400);
+      }
+    };
+    revealNext();
   }, []);
 
-  // Player-driven choice at the reversal prompt (feeds via completeMinigame meta).
-  const handleReveal = useCallback((reverse: boolean) => {
-    setAutoDecided(false);
-    reveal(reverse);
-  }, [reveal]);
-
-  const handlePickCard = useCallback((index: number) => {
-    const card = faceDownCards[index];
-    setChosenIndex(index);
-    setSwapped(false);
-    // Fate may decide the spread-wide orientation for you (skip the prompt).
-    const { auto, reversed } = engine.resolveSpreadOrientation(card);
-    setTimeout(() => {
-      if (auto) { setAutoDecided(true); reveal(reversed); }
-      else setPhase('reversal-prompt');
-    }, 600);
-  }, [engine, faceDownCards, reveal]);
-
+  // When all cards revealed, build the orient result and transition.
   useEffect(() => {
-    if (phase !== 'revealed' || chosenIndex === null) return;
+    if (!allRevealed || phase !== 'deal' || faces.length === 0) return;
 
-    const card = faceDownCards[chosenIndex];
-    const finalResult: TarotResult = willReverse
-      ? {
-          ...card,
-          orientation: card.orientation === 'upright' ? 'reversed' : 'upright',
-          tags: card.tags.map((t) => t === 'upright' ? 'reversed' : t === 'reversed' ? 'upright' : t),
-        }
-      : card;
+    const result = consolidateSpread(faces);
+    const { result: oriented, auto, reversed } = engine.resolveSpreadOrientation(result);
+    setOrientResult(oriented);
 
-    // Small delay for the flip animation, then complete.
-    // Player choice feeds an affinity; a Fate auto-decided orientation does not.
-    const meta = autoDecided
+    const timer = setTimeout(() => {
+      if (auto) {
+        setAutoReverse(true);
+        setWillReverse(reversed);
+        setPhase('committing');
+      } else {
+        setPhase('orient');
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [allRevealed, phase, faces, engine]);
+
+  // ── Commit after flip animation ──
+  useEffect(() => {
+    if (phase !== 'committing' || !orientResult) return;
+
+    const finalResult = willReverse ? reverseSpread(orientResult) : orientResult;
+    const meta = autoReverse
       ? {}
       : willReverse
         ? { reversed: true }
         : { revealedAsDrawn: true };
+
     const timer = setTimeout(() => {
       engine.completeMinigame(finalResult, meta);
     }, 1200);
 
     return () => clearTimeout(timer);
-  }, [phase, chosenIndex, willReverse, autoDecided, faceDownCards, engine]);
+  }, [phase, orientResult, willReverse, autoReverse, engine]);
 
-  // Once committed, the engine owns this slot. Prefer it so flip/mirror are
-  // reflected; fall back to the locally chosen card before commit.
-  const committedSlot =
-    state.activeSlotIndex !== null ? state.turnResults[state.activeSlotIndex] : undefined;
-  const engineCard = committedSlot && committedSlot.type === 'tarot' ? committedSlot : null;
-  const localCard = chosenIndex !== null ? faceDownCards[chosenIndex] : null;
-  const localOrientation: 'upright' | 'reversed' | null = localCard
-    ? (willReverse
-        ? (localCard.orientation === 'upright' ? 'reversed' : 'upright')
-        : localCard.orientation)
-    : null;
-  const displaySymbol = engineCard?.symbol ?? localCard?.symbol ?? '';
-  const displayName = engineCard?.name ?? localCard?.name ?? '';
-  const displayOrientation = engineCard?.orientation ?? localOrientation;
+  // ── Redraw one position ──
+  const handleRedraw = useCallback(
+    (index: number) => {
+      if (redrawsLeft <= 0) return;
+      setFaces((prev) => engine.redrawSpreadPosition(prev, index));
+      setRedrawsLeft((r) => r - 1);
+    },
+    [redrawsLeft, engine],
+  );
+
+  // ── Orientation choice ──
+  const handleOrientationChoice = useCallback((reverse: boolean) => {
+    setWillReverse(reverse);
+    setPhase('committing');
+  }, []);
+
+  // ── Peek ──
+  const handlePeek = useCallback(() => {
+    const preview = orientResult ?? consolidateSpread(faces);
+    return engine.usePeek(preview);
+  }, [engine, orientResult, faces]);
+
+  const handleDeclinePeek = useCallback(() => {
+    engine.declinePeek();
+  }, [engine]);
+
+  const hasAction = phase === 'deal' && !allRevealed;
 
   return (
     <motion.div
@@ -94,78 +120,177 @@ export default function TarotMinigame() {
       <style>{`.snap-scroll-row::-webkit-scrollbar { display: none; }`}</style>
       <div style={contentStyle}>
         <h1 style={headingStyle}>
-          {phase === 'pick' && 'Draw a card'}
-          {phase === 'reversal-prompt' && 'The stars offer a choice'}
-          {phase === 'revealed' && 'Your card'}
+          {phase === 'deal' && !allRevealed && 'The spread awaits...'}
+          {phase === 'deal' && allRevealed && phase === 'deal' && 'Reading the spread...'}
+          {phase === 'orient' && 'The stars offer a choice'}
+          {phase === 'committing' && 'Your reading'}
         </h1>
 
-        {phase === 'pick' && (
-          <motion.div style={cardsRowStyle} className="snap-scroll-row" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.15 } } }}>
-            {faceDownCards.map((_, i) => (
-              <motion.button
-                key={i}
-                style={faceDownCardStyle}
-                variants={{ hidden: { opacity: 0, y: 40 }, visible: { opacity: 1, y: 0 } }}
-                whileHover={{ y: -8, boxShadow: '0 8px 30px rgba(155,107,176,0.3)', borderColor: '#9b6bb0' }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => handlePickCard(i)}
-                animate={chosenIndex !== null && chosenIndex !== i ? { opacity: 0, scale: 0.8, rotateY: 90, filter: 'brightness(2)' } : {}}
-                transition={chosenIndex !== null && chosenIndex !== i ? { duration: 0.6, ease: 'easeIn' } : {}}
-              >
-                <span style={runeStyle}>{RUNE_BAND}</span>
-                <span style={cardBackSymbolStyle}>✧</span>
-              </motion.button>
-            ))}
+        {/* ── Spread cards (always visible once dealt) ── */}
+        {faces.length > 0 && (
+          <motion.div
+            style={spreadRowStyle}
+            initial="hidden"
+            animate="visible"
+            variants={{
+              hidden: {},
+              visible: { transition: { staggerChildren: 0.15 } },
+            }}
+          >
+            {[
+              { label: 'Past', index: 0 },
+              { label: 'Present', index: 1 },
+              { label: 'Future', index: 2 },
+            ].map((pos) => {
+              const card = faces[pos.index];
+              const revealed =
+                phase === 'deal' ? pos.index < revealedCount : true;
+
+              return (
+                <div key={pos.index} style={positionColumnStyle}>
+                  <div style={positionLabelStyle}>{pos.label}</div>
+
+                  {revealed ? (
+                    <motion.div
+                      key={card.id}
+                      style={revealedCardStyle}
+                      initial={{ opacity: 0, scale: 0.8, rotateY: 180 }}
+                      animate={{ opacity: 1, scale: 1, rotateY: 0 }}
+                      transition={{ duration: 0.8, ease: 'easeOut' }}
+                    >
+                      <CardSigil
+                        card={card}
+                        size={28}
+                        color={
+                          card.orientation === 'reversed'
+                            ? '#d4a854'
+                            : '#7b9ec7'
+                        }
+                      />
+                      <div style={revealedNameStyle}>{card.name}</div>
+                      <div
+                        style={{
+                          ...revealedOrientStyle,
+                          color:
+                            card.orientation === 'reversed'
+                              ? '#d4a854'
+                              : '#7b9ec7',
+                        }}
+                      >
+                        {card.orientation === 'reversed'
+                          ? '▼ Reversed'
+                          : '▲ Upright'}
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      style={faceDownCardStyle}
+                      variants={{
+                        hidden: { opacity: 0, y: 40 },
+                        visible: { opacity: 1, y: 0 },
+                      }}
+                    >
+                      <span style={runeStyle}>{RUNE_BAND}</span>
+                      <span style={cardBackSymbolStyle}>{'✧'}</span>
+                    </motion.div>
+                  )}
+
+                  {/* Redraw affordance — only during deal, before reveal */}
+                  {hasAction && redrawsLeft > 0 && (
+                    <motion.button
+                      style={redrawBtnStyle}
+                      whileHover={{ borderColor: '#d4a854' }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleRedraw(pos.index)}
+                    >
+                      Redraw ({redrawsLeft})
+                    </motion.button>
+                  )}
+                </div>
+              );
+            })}
           </motion.div>
         )}
 
-        {phase === 'reversal-prompt' && chosenIndex !== null && (
-          <motion.div style={promptStyle} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-            <motion.div style={singleCardStyle} animate={{ y: -5 }} transition={{ yoyo: Infinity, duration: 2 }}>
-              <span style={runeStyle}>{RUNE_BAND}</span>
-              <span style={cardBackSymbolStyle}>✧</span>
-            </motion.div>
-            <p style={promptTextStyle}>Reveal as drawn, or reverse its course?</p>
-            {state.affinityEffects.peekAvailable && chosenIndex !== null && (
+        {/* ── Reveal button (deal phase, before any cards flipped) ── */}
+        {phase === 'deal' && !allRevealed && revealedCount === 0 && (
+          <motion.button
+            style={revealBtnStyle}
+            whileHover={{ borderColor: '#d4a854', scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={handleRevealSpread}
+          >
+            Reveal the Spread
+          </motion.button>
+        )}
+
+        {/* ── Orientation choice ── */}
+        {phase === 'orient' && orientResult && (
+          <motion.div
+            style={promptStyle}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <p style={promptTextStyle}>
+              Reveal as drawn, or reverse the spread&rsquo;s course?
+            </p>
+
+            {state.affinityEffects.peekAvailable && (
               <PeekControl
-                onPeek={() => engine.usePeek(faceDownCards[chosenIndex])}
-                onDecline={() => engine.declinePeek()}
+                onPeek={handlePeek}
+                onDecline={handleDeclinePeek}
               />
             )}
+
             <div style={choiceRowStyle}>
-              <motion.button style={choiceBtnStyle} whileHover={{ borderColor: '#d4a854', scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={() => handleReveal(false)}>
-                ▲ Reveal as Drawn
+              <motion.button
+                style={choiceBtnStyle}
+                whileHover={{ borderColor: '#d4a854', scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => handleOrientationChoice(false)}
+              >
+                {'▲'} Reveal as Drawn
               </motion.button>
-              <motion.button style={{ ...choiceBtnStyle, borderColor: '#9b6bb0' }} whileHover={{ borderColor: '#c8a0d0', scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={() => handleReveal(true)}>
-                ▼ Reverse its Course
+              <motion.button
+                style={{ ...choiceBtnStyle, borderColor: '#9b6bb0' }}
+                whileHover={{ borderColor: '#c8a0d0', scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => handleOrientationChoice(true)}
+              >
+                {'▼'} Reverse the Spread&rsquo;s Course
               </motion.button>
             </div>
           </motion.div>
         )}
 
-        {phase === 'revealed' && displayOrientation && (
+        {/* ── Commit flash ── */}
+        {phase === 'committing' && orientResult && (
           <motion.div
-            key={`${displayName}-${displayOrientation}`}
-            style={revealStyle}
+            key={`${orientResult.id}-${willReverse ? 'reversed' : 'upright'}`}
+            style={commitFlashStyle}
             initial={{ opacity: 0, scale: 0.8, rotateY: 180 }}
             animate={{ opacity: 1, scale: 1, rotateY: 0 }}
             transition={{ duration: 0.8, ease: 'easeOut' }}
           >
-            <div style={revealedSymbolStyle}>{displaySymbol}</div>
-            <div style={revealedNameStyle}>{displayName}</div>
-            <div style={{ ...revealedOrientStyle, color: displayOrientation === 'reversed' ? '#d4a854' : '#7b9ec7' }}>
-              {displayOrientation === 'reversed' ? '▼ Reversed' : '▲ Upright'}
+            <div style={revealedSymbolStyle}>
+              <CardSigil
+                card={orientResult}
+                size={48}
+                color={willReverse ? '#d4a854' : '#7b9ec7'}
+              />
             </div>
-            {swapped && (
-              <motion.div
-                style={{ ...revealedOrientStyle, color: '#9b6bb0', marginTop: '0.4rem' }}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: [0, 1, 0.7] }}
-                transition={{ duration: 1.6 }}
-              >
-                ✶ your hand moved of its own accord
-              </motion.div>
-            )}
+            <div style={revealedNameStyle}>
+              {orientResult.name}
+            </div>
+            <div
+              style={{
+                ...revealedOrientStyle,
+                color: willReverse ? '#d4a854' : '#7b9ec7',
+              }}
+            >
+              {willReverse ? '▼ Reversed' : '▲ Upright'}
+            </div>
           </motion.div>
         )}
       </div>
@@ -173,24 +298,54 @@ export default function TarotMinigame() {
   );
 }
 
-// Light foresight: glimpse the chosen card's leaning, or embrace the unknown (Shadow).
-function PeekControl({ onPeek, onDecline }: {
+// ── Peek Control ──
+function PeekControl({
+  onPeek,
+  onDecline,
+}: {
   onPeek: () => { failed: boolean; leaning: string };
   onDecline: () => void;
 }) {
   const [line, setLine] = useState<string | null>(null);
-  if (line) return <p style={{ ...promptTextStyle, color: '#7b9ec7', fontStyle: 'italic' }}>{line}</p>;
+  if (line) {
+    return (
+      <p
+        style={{
+          ...promptTextStyle,
+          color: '#7b9ec7',
+          fontStyle: 'italic',
+        }}
+      >
+        {line}
+      </p>
+    );
+  }
   return (
     <div style={choiceRowStyle}>
-      <motion.button style={{ ...choiceBtnStyle, borderColor: '#d4c068' }} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={() => setLine(onPeek().leaning)}>
-        ✦ Seek a glimpse
+      <motion.button
+        style={{ ...choiceBtnStyle, borderColor: '#d4c068' }}
+        whileHover={{ scale: 1.03 }}
+        whileTap={{ scale: 0.97 }}
+        onClick={() => setLine(onPeek().leaning)}
+      >
+        {'✦'} Seek a glimpse
       </motion.button>
-      <motion.button style={choiceBtnStyle} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={() => { onDecline(); setLine('You let the mystery stand.'); }}>
+      <motion.button
+        style={choiceBtnStyle}
+        whileHover={{ scale: 1.03 }}
+        whileTap={{ scale: 0.97 }}
+        onClick={() => {
+          onDecline();
+          setLine('You let the mystery stand.');
+        }}
+      >
         Embrace the unknown
       </motion.button>
     </div>
   );
 }
+
+// ── Style Objects ──
 
 const containerStyle: React.CSSProperties = {
   width: '100%',
@@ -215,20 +370,27 @@ const headingStyle: React.CSSProperties = {
   textAlign: 'center',
 };
 
-const cardsRowStyle: React.CSSProperties = {
+const spreadRowStyle: React.CSSProperties = {
   display: 'flex',
   gap: '1.25rem',
   justifyContent: 'center',
-  overflowX: 'auto',
-  overflowY: 'hidden',
-  scrollSnapType: 'x mandatory',
-  WebkitOverflowScrolling: 'touch',
-  padding: '10px 40px',
-  margin: '0 -40px',
-  // Invisible scrollbar
-  scrollbarWidth: 'none',          // Firefox
-  msOverflowStyle: 'none',         // IE/Edge
-  // Chrome/Safari: handled via injected style below
+  alignItems: 'flex-start',
+};
+
+const positionColumnStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '0.75rem',
+};
+
+const positionLabelStyle: React.CSSProperties = {
+  fontFamily: "'Cormorant Garamond', serif",
+  fontWeight: 600,
+  fontSize: 'clamp(0.85rem, 2vw, 1rem)',
+  color: '#7b9ec7',
+  letterSpacing: '0.1em',
+  textTransform: 'uppercase',
 };
 
 const faceDownCardStyle: React.CSSProperties = {
@@ -242,11 +404,9 @@ const faceDownCardStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   gap: '0.5rem',
-  cursor: 'pointer',
+  cursor: 'default',
   outline: 'none',
   fontFamily: 'inherit',
-  scrollSnapAlign: 'center',
-  transition: 'border-color 0.3s, box-shadow 0.3s',
 };
 
 const runeStyle: React.CSSProperties = {
@@ -263,14 +423,7 @@ const cardBackSymbolStyle: React.CSSProperties = {
   opacity: 0.6,
 };
 
-const promptStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  gap: '1.25rem',
-};
-
-const singleCardStyle: React.CSSProperties = {
+const revealedCardStyle: React.CSSProperties = {
   width: '100px',
   height: '150px',
   background: '#0d1220',
@@ -280,7 +433,66 @@ const singleCardStyle: React.CSSProperties = {
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  gap: '0.5rem',
+  gap: '0.4rem',
+  padding: '0.25rem',
+};
+
+const revealedNameStyle: React.CSSProperties = {
+  fontFamily: "'Cormorant Garamond', serif",
+  fontWeight: 700,
+  fontSize: 'clamp(0.55rem, 1.5vw, 0.7rem)',
+  color: '#c8d8f0',
+  letterSpacing: '0.04em',
+  textAlign: 'center',
+  lineHeight: 1.15,
+  maxWidth: '90px',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+const revealedOrientStyle: React.CSSProperties = {
+  fontFamily: "'Inter', sans-serif",
+  fontWeight: 400,
+  fontSize: 'clamp(0.5rem, 1.2vw, 0.6rem)',
+  letterSpacing: '0.08em',
+};
+
+const revealBtnStyle: React.CSSProperties = {
+  fontFamily: "'Cormorant Garamond', serif",
+  fontWeight: 600,
+  fontSize: 'clamp(0.9rem, 1.5vw, 1rem)',
+  letterSpacing: '0.12em',
+  color: '#c8d8f0',
+  background: '#0d1220',
+  border: '1px solid #1a2440',
+  padding: '0.8rem 2rem',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  outline: 'none',
+  transition: 'border-color 0.3s ease',
+};
+
+const redrawBtnStyle: React.CSSProperties = {
+  fontFamily: "'Cormorant Garamond', serif",
+  fontWeight: 500,
+  fontSize: 'clamp(0.6rem, 1.2vw, 0.7rem)',
+  letterSpacing: '0.08em',
+  color: '#9b6bb0',
+  background: '#0d1220',
+  border: '1px solid #3a2a50',
+  padding: '0.25rem 0.7rem',
+  borderRadius: '3px',
+  cursor: 'pointer',
+  outline: 'none',
+  transition: 'border-color 0.3s ease',
+};
+
+const promptStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '1.25rem',
 };
 
 const promptTextStyle: React.CSSProperties = {
@@ -315,7 +527,7 @@ const choiceBtnStyle: React.CSSProperties = {
   transition: 'border-color 0.3s ease',
 };
 
-const revealStyle: React.CSSProperties = {
+const commitFlashStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
@@ -325,19 +537,4 @@ const revealStyle: React.CSSProperties = {
 const revealedSymbolStyle: React.CSSProperties = {
   fontSize: 'clamp(2.5rem, 6vw, 3.5rem)',
   color: '#d4a854',
-};
-
-const revealedNameStyle: React.CSSProperties = {
-  fontFamily: "'Cormorant Garamond', serif",
-  fontWeight: 700,
-  fontSize: 'clamp(1.2rem, 3vw, 1.6rem)',
-  color: '#c8d8f0',
-  letterSpacing: '0.08em',
-};
-
-const revealedOrientStyle: React.CSSProperties = {
-  fontFamily: "'Inter', sans-serif",
-  fontWeight: 400,
-  fontSize: 'clamp(0.8rem, 1.5vw, 0.95rem)',
-  letterSpacing: '0.1em',
 };

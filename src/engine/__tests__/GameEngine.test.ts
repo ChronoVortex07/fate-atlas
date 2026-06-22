@@ -320,6 +320,25 @@ describe('spread coherence feeds', () => {
   });
 });
 
+describe('usePeek — position foresight for spreads', () => {
+  it('returns a leaning mentioning a position for a spread preview', () => {
+    const e = new GameEngine();
+    e.startTurn('self');
+    // The Tower (past position, index 0) has the strongest sumAbs.
+    // The Tower dimensions: favorability -1.5, certainty 1.5, volatility 2.0 → sumAbs = 5.0
+    // The Sun (present): 2.0 + 1.5 + 1.0 = 4.5
+    // The Fool (future): 0.5 + 1.5 + 1.5 = 3.5
+    const spread = consolidateSpread([
+      buildFace(DECK_BY_ID['the-tower'], 'upright'),
+      buildFace(DECK_BY_ID['the-sun'], 'upright'),
+      buildFace(DECK_BY_ID['the-fool'], 'upright'),
+    ]);
+    const result = e.usePeek(spread);
+    expect(result.failed).toBe(false);
+    expect(result.leaning.toLowerCase()).toContain('past');
+  });
+});
+
 describe('GameEngine — affinity effects snapshot', () => {
   it('carries affinityEffects in the snapshot and reflects band changes after notify', () => {
     const engine = new GameEngine();
