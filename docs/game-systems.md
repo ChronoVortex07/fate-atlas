@@ -181,18 +181,53 @@ volatility) but theme-light (most ranks have 0 themes -- only Aces, court cards,
 carry a theme). This makes minor arcana a strong signal for dimension-averaging but a weak
 signal for theme-matching interactions, by design.
 
-### 4b. The three-card spread
+### 4b. The card-drafting minigame
 
-When the player chooses Tarot, **three cards** are drawn without replacement from
-`FULL_DECK` (MAJOR_ARCANA UNION MINOR_ARCANA). Each card is assigned an independent
-orientation via `pickOrientation(affinities)` -- biased by Chaos (more reversals) and
-Order (fewer reversals).
+When the player chooses Tarot, a **card-drafting minigame** begins:
 
-The positions are **Past**, **Present**, **Future**, each mapping to one drawn card. The
-player sees all three face-up (or veiled by Shadow) and may **redraw** disliked positions
-if Will's `spreadRedraws` modifier is greater than 0.
+1. **Deal** — 9 cards are dealt face-down from the shuffled 78-card deck onto the table.
+   The remaining cards stay in the deck (visible as a face-down stack).
+2. **Draft** — the player picks 3 cards from the table into their hand, one per position:
+   **Past** (hand[0]), **Present** (hand[1]), **Future** (hand[2]). Cards are inserted in
+   order — the first empty slot is filled first.
+3. **Table interaction** — on desktop, hovering near table cards fans them apart for easier
+   clicking. On mobile, the first tap fans out a zone, the second tap selects a card.
+4. **Peek** — if Light is Ascendant+, an eye icon appears on hand cards. Successful peek
+   reveals the card's identity and orientation; failure shows a "veil holds fast" message.
+   Peeked cards stay face-up in hand. Returning a peeked card to the table keeps it face-up;
+   returning it to the deck makes it face-down again.
+5. **Shuffle** — the player may reshuffle the table at any time (up to `spreadRedraws` times).
+   All face-up table cards flip face-down, all table cards + deck are shuffled, and a fresh
+   set of cards is dealt. Uses the `take-reroll` affinity action (feeds Will).
+6. **Swap** — cards in hand can be drag-swapped between Past/Present/Future positions at any
+   time before reveal. Peeked cards keep their revealed identity when swapped.
+7. **Return** — hand cards can be dragged back to the table (stays face-up if peeked) or
+   returned to the deck via a button (always face-down).
+8. **Reveal** — when all 3 hand slots are filled, the player may **Reveal as Drawn**
+   (accepts the dealt orientations, feeds Fate) or **Invert Meaning** (reverses every
+   card's orientation, feeds Will + Chaos).
 
-### 4c. Consolidation (`consolidateSpread`)
+The draft engine state (`TarotDraftState`) is managed entirely on `GameState.minigameState`.
+All mutations route through `GameEngine` methods that call `notify()`.
+
+### 4c. New event triggers
+
+The draft minigame introduces seven new event dispatch points for meta-interactions:
+
+| Trigger | Fires when |
+|---------|-----------|
+| `tarot:draft:started` | The draft begins (9 cards dealt) |
+| `tarot:picked` | Player picks a card from table → hand |
+| `tarot:returned:table` | Player returns a card from hand → table |
+| `tarot:returned:deck` | Player returns a card from hand → deck |
+| `tarot:shuffled` | Table is reshuffled and redealt |
+| `tarot:peeked` | Peek attempt completes (success or failure) |
+| `tarot:swapped` | Player swaps two hand positions |
+
+Responders can hook into these to trigger meta-interactions during the draft phase (e.g.,
+Chaos responder at `tarot:picked` could force a different card).
+
+### 4d. Consolidation (`consolidateSpread`)
 
 After the player confirms the spread, the three faces are **consolidated into one
 `TarotResult` slot** via `consolidateSpread`:
@@ -210,7 +245,7 @@ After the player confirms the spread, the three faces are **consolidated into on
 6. The spread's individual faces remain accessible on the result as `result.spread` (an
    array of `{ position, card }` objects), used by spread-internal responders.
 
-### 4d. Balance rationale
+### 4e. Balance rationale
 
 Consolidating the spread into one slot keeps the slot model uniform (one result per
 method) and integrates with existing responders without structural changes. Dimension
@@ -218,7 +253,7 @@ averaging and theme capping prevent the spread from overwhelming the reading wit
 the preserved spread array enables the spread-internal interaction channel without
 breaking cross-slot interactions that match on the consolidated result.
 
-### 4e. SVG sigils
+### 4f. SVG sigils
 
 Each card has an SVG sigil rendered by the `CardSigil` component:
 
@@ -231,7 +266,7 @@ Each card has an SVG sigil rendered by the `CardSigil` component:
 Sigils appear in the fan (method select), slot views (Past/Present/Future), history
 tiles, and result readings.
 
-### 4f. Spread coherence affinity feeds
+### 4g. Spread coherence affinity feeds
 
 When a tarot spread is committed, `completeMinigame` checks every face's orientation:
 
@@ -242,6 +277,22 @@ When a tarot spread is committed, `completeMinigame` checks every face's orienta
 These are **flat shifts** applied on top of the normal tag-based feeds (which add +5 per
 `upright` or `reversed` tag), rewarding consistent spreads with a predictable affinity
 bonus.
+
+### 4h. Display touchpoints
+
+The spread composition is visible at every display surface:
+
+- **consolidateSpread name** — multi-card spreads join card names with ` · ` (e.g.
+  "The Fool · The Star · Two of Cups") instead of the old "Three-Card Spread" placeholder.
+- **FanCard (ConstellationFan)** — when the fan expands, a tarot spread slot renders 3
+  sub-cards above the consolidated card with Past/Present/Future labels, sigils, names,
+  and orientation indicators.
+- **ResultReading** — the final results page shows a 3-column positional layout for each
+  multi-card tarot slot, with per-card symbol, name, orientation, and meaning snippet.
+- **NarrativeAssembler** — `describeSlotBrief` renders position breakdowns
+  ("Past: The Fool (upright); Present: The Magician (upright); Future: The High Priestess
+  (upright)") for modifier-frame text. `describeSlotFull` (LLM prompt) already handles
+  per-position rendering with veiled-card support.
 
 ---
 
