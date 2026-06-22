@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
 import type { TarotDraftState, TableCard } from '../../engine/types';
@@ -6,19 +6,32 @@ import { DECK_BY_ID } from '../../data/tarot';
 import CardSigil from '../cards/CardSigil';
 
 const TABLE_CARD_WIDTH = 58; // px per card face
-const TABLE_OVERLAP = 16;    // px overlap between adjacent cards
-const FAN_RADIUS = 200;      // px — hover fan-out radius
-const MAX_FAN_OFFSET = 30;   // px — max displacement
+const TABLE_OVERLAP = 16;   // px overlap between adjacent cards
+const FAN_RADIUS = 200;     // px — hover fan-out detection radius
+const MAX_FAN_OFFSET = 32;  // px — max fan-out displacement
+
 type FanState = { centerX: number; active: boolean };
 
 export default function TarotMinigame() {
   const { state, engine } = useGameEngine();
   const draft = state.minigameState as TarotDraftState | null;
   const tableRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(640);
   const [fan, setFan] = useState<FanState>({ centerX: 0, active: false });
   const [peekResult, setPeekResult] = useState<{ index: number; success: boolean; message: string } | null>(null);
   const [dragOverTable, setDragOverTable] = useState(false);
   const [draggingHandIdx, setDraggingHandIdx] = useState<number | null>(null);
+  const [shuffleKey, setShuffleKey] = useState(0);
+  const [animatingPick, setAnimatingPick] = useState<{ tableIndex: number; handIndex: number } | null>(null);
+  const [animatingReturn, setAnimatingReturn] = useState<number | null>(null);
+
+  // Track container width for correct fan-out math
+  useEffect(() => {
+    const update = () => { if (tableRef.current) setContainerWidth(tableRef.current.getBoundingClientRect().width); };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
 
   if (!draft) return null;
   const isDesktop = typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches;
@@ -32,7 +45,7 @@ export default function TarotMinigame() {
   }, [isDesktop]);
 
   const handleTableMouseLeave = useCallback(() => {
-    setFan((f) => ({ ...f, active: false }));
+    setFan({ centerX: 0, active: false });
   }, []);
 
   // ── Mobile tap-to-fan ──
@@ -41,26 +54,45 @@ export default function TarotMinigame() {
     const rect = tableRef.current.getBoundingClientRect();
     const touchX = e.touches[0]?.clientX ?? e.changedTouches[0]?.clientX;
     if (touchX === undefined) return;
-    const centerX = touchX - rect.left;
-    setFan({ centerX, active: true });
-    // Auto-collapse after 1.5s of no interaction
+    setFan({ centerX: touchX - rect.left, active: true });
     setTimeout(() => setFan((f) => ({ ...f, active: false })), 1500);
   }, [isDesktop]);
 
   // ── Actions ──
   const handlePick = useCallback((tableIndex: number) => {
     const emptySlot = draft.hand.findIndex((h) => h === null);
-    if (emptySlot < 0) return; // hand full
-    engine.pickForHand(emptySlot, tableIndex);
+    if (emptySlot < 0) return;
+    setAnimatingPick({ tableIndex, handIndex: emptySlot });
+    // brief delay so exit animation plays before the card is removed from table
+    setTimeout(() => {
+      engine.pickForHand(emptySlot, tableIndex);
+      setAnimatingPick(null);
+    }, 200);
   }, [engine, draft.hand]);
 
   const handleReturnToDeck = useCallback((handIndex: number) => {
-    engine.returnToDeck(handIndex);
+    setAnimatingReturn(handIndex);
+    setTimeout(() => {
+      engine.returnToDeck(handIndex);
+      setAnimatingReturn(null);
+    }, 180);
+  }, [engine]);
+
+  const handleReturnToTable = useCallback((handIndex: number) => {
+    setAnimatingReturn(handIndex);
+    setTimeout(() => {
+      engine.returnToTable(handIndex);
+      setAnimatingReturn(null);
+    }, 180);
   }, [engine]);
 
   const handleShuffle = useCallback(() => {
     if (draft.shufflesRemaining <= 0) return;
-    engine.shuffleTable();
+    setShuffleKey((k) => k + 1);
+    // Delay the actual shuffle so exit animation plays first
+    setTimeout(() => {
+      engine.shuffleTable();
+    }, 250);
   }, [engine, draft.shufflesRemaining]);
 
   const handlePeek = useCallback((handIndex: number) => {
@@ -114,42 +146,49 @@ export default function TarotMinigame() {
     setDragOverTable(false);
     const sourceIdx = parseInt(e.dataTransfer.getData('text/plain'));
     if (!isNaN(sourceIdx)) {
-      engine.returnToTable(sourceIdx);
+      handleReturnToTable(sourceIdx);
     }
-  }, [engine]);
+  }, [handleReturnToTable]);
 
   const handFull = draft.hand.every((h) => h !== null);
   const peekAvailable = state.affinityEffects.peekAvailable;
 
-  // ── Compute fan displacements ──
-  const getFanStyle = (cardIndex: number, totalCards: number): React.CSSProperties => {
-    const cardWidth = TABLE_CARD_WIDTH - TABLE_OVERLAP; // visible width of each card
-    const totalWidth = totalCards * cardWidth + TABLE_OVERLAP;
-    const startX = -(totalWidth / 2) + cardWidth / 2;
-    const baseX = startX + cardIndex * cardWidth;
-    const cardCenterX = baseX + TABLE_CARD_WIDTH / 2;
+  // ── Compute fan displacements (absolute-container coordinate system) ──
+  const fanDisplacements = useMemo(() => {
+    const activeTableCards = draft.table.filter((t): t is TableCard => t !== null);
+    const totalCards = draft.table.length;
+    const cardStep = TABLE_CARD_WIDTH - TABLE_OVERLAP;
+    const totalSpan = totalCards * cardStep + TABLE_OVERLAP;
+    // first card's left edge offset from container center
+    const startOffset = -totalSpan / 2;
 
-    let offsetX = 0;
-    let scale = 1;
-    if (fan.active) {
-      const dist = Math.abs(cardCenterX - fan.centerX);
-      if (dist < FAN_RADIUS) {
-        const t = 1 - dist / FAN_RADIUS;
-        offsetX = (cardCenterX > fan.centerX ? 1 : -1) * MAX_FAN_OFFSET * t * t;
-        scale = 1 + 0.06 * t;
+    return activeTableCards.map((card) => {
+      // default position of this card's left edge from container center
+      const defaultLeftOffset = startOffset + card.originIndex * cardStep;
+      // card center in absolute container coordinates:
+      const cardCenterAbs = containerWidth / 2 + defaultLeftOffset + TABLE_CARD_WIDTH / 2;
+
+      let offsetX = 0;
+      let scale = 1;
+      if (fan.active) {
+        const dx = cardCenterAbs - fan.centerX;
+        const dist = Math.abs(dx);
+        if (dist < FAN_RADIUS) {
+          const t = 1 - dist / FAN_RADIUS;
+          // push cards AWAY from cursor — sign of dx determines direction
+          offsetX = (dx > 0 ? 1 : dx < 0 ? -1 : 0) * MAX_FAN_OFFSET * t;
+          scale = 1 + 0.06 * t;
+        }
       }
-    }
+      return { cardId: card.cardId, originIndex: card.originIndex, defaultLeftOffset, offsetX, scale };
+    });
+  }, [draft.table, fan, containerWidth]);
 
-    return {
-      position: 'absolute' as const,
-      left: '50%',
-      marginLeft: `${-(TABLE_CARD_WIDTH / 2) + baseX + offsetX}px`,
-      width: `${TABLE_CARD_WIDTH}px`,
-      transform: `scale(${scale})`,
-      zIndex: cardIndex,
-      transition: fan.active ? 'none' : 'transform 0.3s ease, margin-left 0.3s ease',
-    };
-  };
+  // Quick lookup by originIndex
+  const dispMap = useMemo(
+    () => new Map(fanDisplacements.map((d) => [`${d.cardId}-${d.originIndex}`, d])),
+    [fanDisplacements],
+  );
 
   // ── Render ──
   const activeTableCards = draft.table.filter((t): t is TableCard => t !== null);
@@ -160,21 +199,33 @@ export default function TarotMinigame() {
 
       <div style={contentStyle}>
         {/* Heading */}
-        <h1 style={headingStyle}>
+        <motion.h1
+          key={`h-${handFull ? 'full' : 'draft'}-${draft.phase}`}
+          style={headingStyle}
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
           {draft.phase === 'drafting' && !handFull && 'Draft your spread...'}
           {draft.phase === 'drafting' && handFull && 'Your spread awaits'}
           {draft.phase === 'committing' && 'The cards are cast'}
-        </h1>
+        </motion.h1>
 
         {/* Deck visual */}
-        <div style={deckStyle}>
+        <motion.div style={deckStyle} layout>
           <div style={deckStackStyle}>
-            <div style={deckCardBack} />
-            <div style={deckCardBack} />
-            <div style={deckCardBack} />
+            {draft.deck.length > 0 && <div style={deckCardBack(0)} />}
+            {draft.deck.length > 1 && <div style={deckCardBack(1)} />}
+            {draft.deck.length > 2 && <div style={deckCardBack(2)} />}
           </div>
-          <span style={deckCountStyle}>{draft.deck.length} cards</span>
-        </div>
+          <motion.span
+            key={`count-${draft.deck.length}`}
+            style={deckCountStyle}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            {draft.deck.length} cards
+          </motion.span>
+        </motion.div>
 
         {/* Table spread */}
         <div
@@ -190,55 +241,88 @@ export default function TarotMinigame() {
           onDragLeave={handleTableDragLeave}
           onDrop={handleTableDrop}
         >
-          <div style={tableInnerStyle}>
-            {activeTableCards.map((card, i) => {
-              const cardData = DECK_BY_ID[card.cardId];
-              if (!cardData) return null;
-              return (
-                <motion.div
-                  key={`${card.cardId}-${card.originIndex}`}
-                  style={{
-                    ...tableCardStyle,
-                    ...getFanStyle(card.originIndex, draft.table.length),
-                    background: card.faceUp ? '#0d1220' : '#080d18',
-                    borderColor: card.faceUp ? '#7b9ec7' : '#1a2440',
-                    cursor: handFull ? 'default' : 'pointer',
-                    opacity: handFull ? 0.5 : 1,
-                  }}
-                  whileHover={!handFull ? { borderColor: '#d4a854' } : {}}
-                  whileTap={!handFull ? { scale: 1.05 } : {}}
-                  onClick={() => !handFull && handlePick(card.originIndex)}
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: handFull ? 0.5 : 1, y: 0 }}
-                  transition={{ delay: i * 0.03 }}
-                >
-                  {card.faceUp && card.revealedFace ? (
-                    <>
-                      <CardSigil card={card.revealedFace} size={20} color="#7b9ec7" />
-                      <div style={tableCardNameStyle}>{card.revealedFace.name}</div>
-                      <div style={tableCardOrientStyle}>
-                        {card.revealedFace.orientation === 'upright' ? '▲' : '▼'}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <span style={tableRuneStyle}>ᚠᚢᚦ</span>
-                      <span style={tableStarStyle}>✧</span>
-                    </>
-                  )}
-                </motion.div>
-              );
-            })}
-          </div>
+          <AnimatePresence mode="popLayout">
+            <motion.div key={`table-${shuffleKey}`} style={tableInnerStyle}>
+              {activeTableCards.map((card, i) => {
+                const cardData = DECK_BY_ID[card.cardId];
+                if (!cardData) return null;
+                const d = dispMap.get(`${card.cardId}-${card.originIndex}`);
+                const defaultLeftOffset = d?.defaultLeftOffset ?? 0;
+                const offsetX = d?.offsetX ?? 0;
+                const scale = d?.scale ?? 1;
+                const leftPx = containerWidth / 2 + defaultLeftOffset + offsetX;
+
+                const isPicking = animatingPick?.tableIndex === card.originIndex;
+
+                return (
+                  <motion.div
+                    key={`${card.cardId}-${card.originIndex}-${shuffleKey}`}
+                    layout
+                    style={{
+                      ...tableCardStyle,
+                      position: 'absolute',
+                      left: `${leftPx}px`,
+                      marginLeft: `${-TABLE_CARD_WIDTH / 2}px`,
+                      width: `${TABLE_CARD_WIDTH}px`,
+                      transform: `scale(${scale})`,
+                      zIndex: cardIndexZ(card.originIndex, fan),
+                      background: card.faceUp ? '#0d1220' : '#080d18',
+                      borderColor: card.faceUp ? '#7b9ec7' : '#1a2440',
+                      cursor: handFull ? 'default' : 'pointer',
+                      opacity: handFull ? 0.5 : 1,
+                    }}
+                    whileHover={!handFull ? { borderColor: '#d4a854', y: -3 } : {}}
+                    whileTap={!handFull ? { scale: Math.min(scale, 1) * 1.05 } : {}}
+                    onClick={() => !handFull && !animatingPick && handlePick(card.originIndex)}
+                    initial={
+                      shuffleKey > 0
+                        ? { opacity: 0, y: -30, scale: 0.8 }
+                        : { opacity: 0, y: -20 }
+                    }
+                    animate={
+                      isPicking
+                        ? { opacity: 0, scale: 0.5, y: 40, transition: { duration: 0.2 } }
+                        : { opacity: handFull ? 0.5 : 1, y: 0, scale: 1 }
+                    }
+                    exit={{ opacity: 0, y: -30, scale: 0.8, transition: { duration: 0.2 } }}
+                    transition={{
+                      type: 'spring',
+                      stiffness: 300,
+                      damping: 25,
+                      delay: shuffleKey > 0 ? i * 0.04 : i * 0.03,
+                    }}
+                  >
+                    {card.faceUp && card.revealedFace ? (
+                      <>
+                        <CardSigil card={card.revealedFace} size={20} color="#7b9ec7" />
+                        <div style={tableCardNameStyle}>{card.revealedFace.name}</div>
+                        <div style={tableCardOrientStyle}>
+                          {card.revealedFace.orientation === 'upright' ? '▲' : '▼'}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span style={tableRuneStyle}>ᚠᚢᚦ</span>
+                        <span style={tableStarStyle}>✧</span>
+                      </>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         {/* Shuffle button */}
         <motion.button
+          key={`shuffle-${draft.shufflesRemaining}`}
           style={draft.shufflesRemaining > 0 ? shuffleBtnStyle : { ...shuffleBtnStyle, opacity: 0.4, cursor: 'not-allowed' }}
           whileHover={draft.shufflesRemaining > 0 ? { borderColor: '#d4a854', scale: 1.03 } : {}}
           whileTap={draft.shufflesRemaining > 0 ? { scale: 0.97 } : {}}
           onClick={handleShuffle}
           disabled={draft.shufflesRemaining <= 0}
+          initial={false}
+          animate={draft.shufflesRemaining > 0 ? { opacity: 1 } : { opacity: 0.4 }}
         >
           ↻ Shuffle ({draft.shufflesRemaining})
         </motion.button>
@@ -248,6 +332,7 @@ export default function TarotMinigame() {
           <div style={handSlotsStyle}>
             {(['Past', 'Present', 'Future'] as const).map((label, i) => {
               const card = draft.hand[i];
+              const isReturning = animatingReturn === i;
               return (
                 <div
                   key={label}
@@ -256,63 +341,78 @@ export default function TarotMinigame() {
                   onDrop={(e) => handleHandDrop(e, i)}
                 >
                   <div style={handLabelStyle}>{label}</div>
-                  {card ? (
-                    <div
-                      draggable
-                      onDragStart={(e) => handleHandDragStart(e, i)}
-                      style={{
-                        ...handCardStyle,
-                        opacity: draggingHandIdx === i ? 0.5 : 1,
-                      }}
-                    >
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                  <AnimatePresence mode="wait">
+                    {card ? (
+                      <div
+                        key={`hand-wrap-${card.cardId}-${card.tableOriginIndex}`}
+                        draggable
+                        onDragStart={(e) => handleHandDragStart(e as unknown as React.DragEvent, i)}
+                        style={{
+                          ...handCardStyle,
+                          opacity: draggingHandIdx === i ? 0.5 : 1,
+                        }}
                       >
-                      {card.peeked && card.revealedFace ? (
-                        <>
-                          <CardSigil card={card.revealedFace} size={22} color="#7b9ec7" />
-                          <div style={handCardNameStyle}>{card.revealedFace.name}</div>
-                          <div style={handCardOrientStyle}>
-                            {card.revealedFace.orientation === 'upright' ? '▲ Upright' : '▼ Reversed'}
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <span style={handRuneStyle}>ᚠᚢᚦᚨ</span>
-                          <span style={handStarStyle}>✧</span>
-                        </>
-                      )}
+                        <motion.div
+                          key={`hand-${card.cardId}-${card.tableOriginIndex}`}
+                          style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                          initial={{ opacity: 0, scale: 0.7, y: 30 }}
+                          animate={
+                            isReturning
+                              ? { opacity: 0, scale: 0.7, y: -30 }
+                              : { opacity: 1, scale: 1, y: 0 }
+                          }
+                          exit={{ opacity: 0, scale: 0.7, y: -20 }}
+                          transition={{ type: 'spring', stiffness: 350, damping: 22 }}
+                        >
+                        {card.peeked && card.revealedFace ? (
+                          <>
+                            <CardSigil card={card.revealedFace} size={22} color="#7b9ec7" />
+                            <div style={handCardNameStyle}>{card.revealedFace.name}</div>
+                            <div style={handCardOrientStyle}>
+                              {card.revealedFace.orientation === 'upright' ? '▲ Upright' : '▼ Reversed'}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <span style={handRuneStyle}>ᚠᚢᚦᚨ</span>
+                            <span style={handStarStyle}>✧</span>
+                          </>
+                        )}
 
-                      {/* Affordances: peek + return-to-deck */}
-                      <div style={handAffordanceStyle}>
-                        {peekAvailable && !card.peeked && (
+                        {/* Affordances: peek + return-to-deck */}
+                        <div style={handAffordanceStyle}>
+                          {peekAvailable && !card.peeked && (
+                            <motion.button
+                              style={handIconBtnStyle}
+                              whileHover={{ scale: 1.2 }}
+                              onClick={(e) => { e.stopPropagation(); handlePeek(i); }}
+                              title="Peek"
+                            >
+                              👁
+                            </motion.button>
+                          )}
                           <motion.button
                             style={handIconBtnStyle}
                             whileHover={{ scale: 1.2 }}
-                            onClick={(e) => { e.stopPropagation(); handlePeek(i); }}
-                            title="Peek"
+                            onClick={(e) => { e.stopPropagation(); handleReturnToDeck(i); }}
+                            title="Return to deck"
                           >
-                            👁
+                            ↩
                           </motion.button>
-                        )}
-                        <motion.button
-                          style={handIconBtnStyle}
-                          whileHover={{ scale: 1.2 }}
-                          onClick={(e) => { e.stopPropagation(); handleReturnToDeck(i); }}
-                          title="Return to deck"
-                        >
-                          ↩
-                        </motion.button>
+                        </div>
+                      </motion.div>
                       </div>
-                    </motion.div>
-                    </div>
-                  ) : (
-                    <div style={emptyHandSlotStyle}>
-                      <span style={emptySlotSymbolStyle}>·</span>
-                    </div>
-                  )}
+                    ) : (
+                      <motion.div
+                        key={`empty-${i}`}
+                        style={emptyHandSlotStyle}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 0.4 }}
+                      >
+                        <span style={emptySlotSymbolStyle}>·</span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               );
             })}
@@ -320,16 +420,24 @@ export default function TarotMinigame() {
         </div>
 
         {/* Commit buttons */}
-        {handFull && draft.phase === 'drafting' && (
-          <motion.div style={commitRowStyle} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <motion.button style={revealBtnStyle} whileHover={{ borderColor: '#d4a854', scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={handleReveal}>
-              ▲ Reveal as Drawn
-            </motion.button>
-            <motion.button style={{ ...revealBtnStyle, borderColor: '#9b6bb0' }} whileHover={{ borderColor: '#c8a0d0', scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={handleInvert}>
-              ▼ Invert Meaning
-            </motion.button>
-          </motion.div>
-        )}
+        <AnimatePresence>
+          {handFull && draft.phase === 'drafting' && (
+            <motion.div
+              style={commitRowStyle}
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 26 }}
+            >
+              <motion.button style={revealBtnStyle} whileHover={{ borderColor: '#d4a854', scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={handleReveal}>
+                ▲ Reveal as Drawn
+              </motion.button>
+              <motion.button style={{ ...revealBtnStyle, borderColor: '#9b6bb0' }} whileHover={{ borderColor: '#c8a0d0', scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={handleInvert}>
+                ▼ Invert Meaning
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Peek result popup */}
         <AnimatePresence>
@@ -350,6 +458,17 @@ export default function TarotMinigame() {
       </div>
     </motion.div>
   );
+}
+
+// ── Helpers ──
+
+/** Cards closer to cursor get higher z-index, so they layer above their neighbors during fan-out. */
+function cardIndexZ(originIndex: number, fan: FanState): number {
+  // When fan is inactive, tiebreak by natural order.
+  if (!fan.active) return originIndex;
+  // We don't have per-card distance here; return natural order.
+  // The absolute positioning + origin-based z-index gives a stable stack.
+  return originIndex;
 }
 
 // ── Styles ──
@@ -376,10 +495,13 @@ const deckStackStyle: React.CSSProperties = {
   position: 'relative', width: '50px', height: '60px',
 };
 
-const deckCardBack: React.CSSProperties = {
-  position: 'absolute', inset: 0, width: '46px', height: '62px',
+const deckCardBack = (i: number): React.CSSProperties => ({
+  position: 'absolute',
+  top: `${i * 2}px`,
+  left: `${i * 2}px`,
+  width: '46px', height: '62px',
   background: '#080d18', border: '1px solid #1a2440', borderRadius: '4px',
-};
+});
 
 const deckCountStyle: React.CSSProperties = {
   fontFamily: "'Inter', sans-serif", fontWeight: 300, fontSize: '0.65rem',
@@ -389,7 +511,7 @@ const deckCountStyle: React.CSSProperties = {
 const tableAreaStyle: React.CSSProperties = {
   width: '100%', minHeight: '120px', border: '1px dashed #1a2440',
   borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-  padding: '1rem', transition: 'border-color 0.3s ease',
+  padding: '1rem', transition: 'border-color 0.3s ease', overflow: 'hidden',
 };
 
 const tableInnerStyle: React.CSSProperties = {
@@ -398,7 +520,7 @@ const tableInnerStyle: React.CSSProperties = {
 };
 
 const tableCardStyle: React.CSSProperties = {
-  width: '58px', height: '84px', border: '1px solid #1a2440', borderRadius: '4px',
+  height: '84px', border: '1px solid #1a2440', borderRadius: '4px',
   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
   gap: '0.2rem', cursor: 'pointer', userSelect: 'none',
 };
