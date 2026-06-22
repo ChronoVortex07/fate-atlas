@@ -364,8 +364,8 @@ chance to recast.
 | Mode | Affinity required | What happens |
 |------|-------------------|--------------|
 | `single` | *(default — no qualifying affinity)* | One cast, auto-accepted |
-| `favored` | Light ascendant+ | Two casts drawn; the one with higher favorability + harmony rank is kept automatically |
-| `clouded` | Shadow ascendant+ | Two casts drawn; the one with *lower* favorability + harmony rank is kept automatically |
+| `favored` | Light ascendant+ | Two casts drawn; the one scoring higher on `favorability * 10 + harmonyRank` (favorability dominates, aspect harmony breaks ties) is kept automatically |
+| `clouded` | Shadow ascendant+ | Two casts drawn; the one with the *lower* such score is kept automatically |
 | `choice` | Will dominant | Two casts drawn; the player picks which to keep (suppresses offer-recast) |
 
 `choice` wins over `favored`/`clouded`; among `favored`/`clouded`, the first match in list
@@ -378,9 +378,9 @@ order wins (Will dominant checked first, then Light ascendant, then Shadow ascen
 ### 8h. Symbolic-resonance + omen responders
 
 All eight responders trigger at `astral:commit`. All are deterministic (`roll → true`).
-Five compete in the `MUTATE` exclusive band; one (`astral-errant-star`) is in `SPAWN`;
-`astral-conjunction-crowned` is also `MUTATE` but carries weight 2 (beats weight-1 MUTATE
-rivals in a tie).
+Seven compete in the `MUTATE` exclusive band; the eighth (`astral-errant-star`) is in
+`SPAWN`. Among the MUTATE seven, `astral-conjunction-crowned` carries weight 2 (beats
+weight-1 MUTATE rivals in a tie); the rest are weight 1.
 
 #### Symbolic-resonance responders (tag-matched, always fire when condition is true)
 
