@@ -115,21 +115,36 @@ export const ELEMENT_THEMES: Record<SignDef['element'], ThemeTag> = {
   water: 'mystery',
 };
 
+// ── Element and modality dimension leans ──
+
+const ELEMENT_LEAN: Record<SignDef['element'], Partial<DimensionValues>> = {
+  fire:  { volatility: 0.5, favorability: 0.5 },
+  earth: { certainty: 0.5, volatility: -0.5 },
+  air:   { certainty: 0.5 },
+  water: { favorability: 0.5, certainty: -0.5 },
+};
+const MODALITY_LEAN: Record<SignDef['modality'], Partial<DimensionValues>> = {
+  cardinal: { volatility: 0.5 },
+  fixed:    { certainty: 0.5, volatility: -0.5 },
+  mutable:  { volatility: 0.5, certainty: -0.5 },
+};
+
 // ── Dignity ──
 
-export function dignityOf(planet: PlanetId, sign: SignId): 'dignified' | 'debilitated' | undefined {
+export function dignityOf(planet: PlanetId, sign: SignId): 'dignified' | 'debilitated' | null {
   const d = DIGNITY[planet];
   if (d.dignified.includes(sign)) return 'dignified';
   if (d.debilitated.includes(sign)) return 'debilitated';
-  return undefined;
+  return null;
 }
 
 // ── Consolidation ──
 
-function clampDim(v: number): number {
-  // Clamp to [-2, 2] at 0.5 granularity
-  const clamped = Math.max(-2, Math.min(2, v));
-  return Math.round(clamped * 2) / 2;
+const AXES: (keyof DimensionValues)[] = ['favorability', 'certainty', 'volatility'];
+const clampDim = (v: number) => Math.max(-2, Math.min(2, Math.round(v * 2) / 2));
+
+function addDims(target: DimensionValues, src: Partial<DimensionValues>) {
+  for (const a of AXES) target[a] += src[a] ?? 0;
 }
 
 export function consolidateCast(cast: AstralCast): AstralResult {
@@ -140,87 +155,52 @@ export function consolidateCast(cast: AstralCast): AstralResult {
   const aspectEffect = ASPECT_EFFECT[aspect];
   const dignity = dignityOf(cast.planet, cast.sign);
 
-  // Sum dimensions: planet + sign(element) + sign(modality) + aspect, then divide by 2
-  const dimensions: DimensionValues = { favorability: 0, certainty: 0, volatility: 0 };
-
-  // Planet dimensions
-  for (const axis of ['favorability', 'certainty', 'volatility'] as const) {
-    dimensions[axis] += planet.dimensions[axis] ?? 0;
-  }
-
-  // Aspect effect
-  for (const axis of ['favorability', 'certainty', 'volatility'] as const) {
-    dimensions[axis] += aspectEffect.dims[axis] ?? 0;
-  }
-
-  // Divide by 2 and clamp to 0.5 granularity
-  for (const axis of ['favorability', 'certainty', 'volatility'] as const) {
-    dimensions[axis] = clampDim(dimensions[axis] / 2);
-  }
+  // Sum dimensions: planet + element lean + modality lean + aspect, then divide by 2
+  const dims: DimensionValues = { favorability: 0, certainty: 0, volatility: 0 };
+  addDims(dims, planet.dimensions);
+  addDims(dims, ELEMENT_LEAN[sign.element]);
+  addDims(dims, MODALITY_LEAN[sign.modality]);
+  addDims(dims, aspectEffect.dims);
+  for (const a of AXES) dims[a] = clampDim(dims[a] / 2);
 
   // Build themes: ranked by house → planet → aspect → sign(element), deduped, capped at 2
   const themes: ThemeTag[] = [];
   const seenThemes = new Set<ThemeTag>();
 
-  // House theme (highest priority)
-  if (house.theme && !seenThemes.has(house.theme)) {
-    themes.push(house.theme);
-    seenThemes.add(house.theme);
-  }
+  const addTheme = (t: ThemeTag | undefined) => {
+    if (t && !seenThemes.has(t)) { themes.push(t); seenThemes.add(t); }
+  };
+  addTheme(house.theme);
+  addTheme(planet.theme);
+  addTheme(aspectEffect.theme);
+  addTheme(ELEMENT_THEMES[sign.element]);
 
-  // Planet theme
-  if (planet.theme && !seenThemes.has(planet.theme)) {
-    themes.push(planet.theme);
-    seenThemes.add(planet.theme);
-  }
-
-  // Aspect theme
-  if (aspectEffect.theme && !seenThemes.has(aspectEffect.theme)) {
-    themes.push(aspectEffect.theme);
-    seenThemes.add(aspectEffect.theme);
-  }
-
-  // Sign element theme
-  const elementTheme = ELEMENT_THEMES[sign.element];
-  if (elementTheme && !seenThemes.has(elementTheme)) {
-    themes.push(elementTheme);
-    seenThemes.add(elementTheme);
-  }
-
-  // Cap at 2
   themes.splice(2);
 
   // Build tags
   const tags: Tag[] = [
-    'astral',
+    'draw', 'random', 'astral',
     `planet-${cast.planet}`,
     `sign-${cast.sign}`,
     `house-${cast.planetHouse}`,
     `element-${sign.element}`,
     `aspect-${aspect}`,
+    ...(dignity ? [dignity] : []),
+    ...cast.omens,
   ];
-
-  if (dignity) {
-    tags.push(dignity);
-  }
-
-  // Add omen tags
-  for (const omen of cast.omens) {
-    tags.push(omen as any);
-  }
 
   return {
     type: 'astral',
     id: `astral:${cast.planet}-${cast.sign}-h${cast.planetHouse}`,
     name: `${planet.name} in ${sign.name}`,
     symbol: planet.glyph,
-    interpretation: '', // placeholder
+    interpretation: `${planet.name} in ${sign.name}, in the House of ${house.arena} — ${planet.theme} meets its arena.`,
     planet: cast.planet,
     sign: cast.sign,
     house: cast.planetHouse,
     aspect,
     themes,
-    dimensions,
+    dimensions: dims,
     modifierRoles: [planet.modifierRole],
     tags,
     cast,

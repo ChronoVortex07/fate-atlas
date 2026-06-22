@@ -69,9 +69,9 @@ describe('dignityOf', () => {
     expect(dignityOf('mars', 'libra')).toBe('debilitated');
     expect(dignityOf('sun', 'aquarius')).toBe('debilitated');
   });
-  it('returns undefined when neither dignified nor debilitated', () => {
-    expect(dignityOf('mars', 'gemini')).toBeUndefined();
-    expect(dignityOf('sun', 'aries')).toBeUndefined();
+  it('returns null when neither dignified nor debilitated', () => {
+    expect(dignityOf('mars', 'gemini')).toBeNull();
+    expect(dignityOf('sun', 'aries')).toBeNull();
   });
 });
 
@@ -163,5 +163,31 @@ describe('consolidateCast', () => {
     const cast: AstralCast = { planet: 'saturn', planetHouse: 1, sign: 'capricorn', signHouse: 1, omens: [] };
     const r = consolidateCast(cast);
     expect(r.type).toBe('astral');
+  });
+
+  // Regression: element+modality lean must contribute to dimensions.
+  // Mercury in Gemini (air/mutable), house 3 vs house 3 (conjunction).
+  // Hand-computed from the brief's formula:
+  //   planet Mercury: {fav:0, cert:0.5, vol:0.5}
+  //   ELEMENT_LEAN.air: {cert:0.5}
+  //   MODALITY_LEAN.mutable: {vol:0.5, cert:-0.5}
+  //   ASPECT_EFFECT.conjunction: {cert:1.5, vol:0.5}
+  //   raw sum: {fav:0, cert:0.5+0.5-0.5+1.5=2.0, vol:0.5+0+0.5+0.5=1.5}
+  //   /2: {fav:0, cert:1.0, vol:0.75}
+  //   clamp(0.5 granularity): {fav:0, cert:1.0, vol:1.0}
+  it('element+modality lean contributes to dimensions (Mercury in Gemini vs Aries)', () => {
+    const gemini: AstralCast = { planet: 'mercury', planetHouse: 3, sign: 'gemini', signHouse: 3, omens: [] };
+    const aries: AstralCast  = { planet: 'mercury', planetHouse: 3, sign: 'aries',  signHouse: 3, omens: [] };
+    const rGemini = consolidateCast(gemini);
+    const rAries  = consolidateCast(aries);
+    // Pinned exact values for Mercury in Gemini (air/mutable, conjunction)
+    expect(rGemini.dimensions).toEqual({ favorability: 0, certainty: 1.0, volatility: 1.0 });
+    // Mercury in Aries (fire/cardinal, conjunction) differs in favorability due to fire lean (+0.5)
+    // raw sum: {fav:0+0.5=0.5, cert:0.5+0+0+1.5=2.0, vol:0.5+0.5+0.5+0.5=2.0}
+    // /2: {fav:0.25, cert:1.0, vol:1.0}
+    // clamp: {fav:0.5, cert:1.0, vol:1.0}
+    expect(rAries.dimensions).toEqual({ favorability: 0.5, certainty: 1.0, volatility: 1.0 });
+    // The two casts must differ, proving element lean is active
+    expect(rGemini.dimensions.favorability).not.toBe(rAries.dimensions.favorability);
   });
 });
