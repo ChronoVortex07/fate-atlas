@@ -35,6 +35,8 @@ export default function AstralMinigame() {
   const committedRef = useRef(false);
   // Tracks whether the recast was already used (so second settle auto-commits viaReroll)
   const recastUsedRef = useRef(false);
+  // Timer ref for the choice-path commit delay — cleared on unmount to avoid stale calls
+  const choiceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const veiled = state.affinityEffects.poolPreview === 'hidden';
 
@@ -154,12 +156,19 @@ export default function AstralMinigame() {
     setPhase('casting');
   }, [plan, state.affinities]);
 
+  // Cleanup choice-path commit timer on unmount
+  useEffect(() => {
+    return () => {
+      if (choiceTimerRef.current !== null) clearTimeout(choiceTimerRef.current);
+    };
+  }, []);
+
   // Choice: player picks one of the two readings (Will)
   const handlePickChoice = useCallback((index: 0 | 1) => {
     if (!choiceResults) return;
     const picked = choiceResults[index];
     setPhase('done');
-    setTimeout(() => commit(picked, { viaReroll: true }), REVEAL_DELAY_MS);
+    choiceTimerRef.current = setTimeout(() => commit(picked, { viaReroll: true }), REVEAL_DELAY_MS);
   }, [choiceResults, commit]);
 
   // After commit, prefer the engine's slot so responder mutations (e.g. dignity flip) show.
@@ -252,7 +261,7 @@ export default function AstralMinigame() {
             <div style={houseStyle}>
               in the House of {HOUSES[displayResult.house - 1]?.arena ?? displayResult.house}
             </div>
-            {veiled && !committedRef.current ? (
+            {veiled && phase !== 'done' ? (
               <p style={interpretationStyle}>The stars rest, their meaning veiled…</p>
             ) : (
               <motion.div
