@@ -63,7 +63,7 @@ export type RollMode = 'single' | 'advantage' | 'disadvantage' | 'choice';
 export type QuestionType = 'decision' | 'relationship' | 'future' | 'self';
 
 // ── Divination Methods ──
-export type DivinationType = 'tarot' | 'd20' | 'iching' | 'happening';
+export type DivinationType = 'tarot' | 'd20' | 'iching' | 'astral' | 'happening';
 
 // ── Thematic Data Layer ──
 
@@ -168,6 +168,34 @@ export interface IChingResult extends ThematicData {
   tags: Tag[];
 }
 
+// ── Astromancy Types ──
+export type PlanetId = 'sun'|'moon'|'mercury'|'venus'|'mars'|'jupiter'|'saturn'|'uranus'|'neptune'|'pluto'|'north-node'|'south-node';
+export type SignId   = 'aries'|'taurus'|'gemini'|'cancer'|'leo'|'virgo'|'libra'|'scorpio'|'sagittarius'|'capricorn'|'aquarius'|'pisces';
+export type OmenTag  = 'errant-star' | 'crowned-conjunction' | 'veiled-oracle';
+export type AspectName = 'conjunction'|'sextile'|'square'|'trine'|'opposition'|'minor';
+
+export interface AstralCast {
+  planet: PlanetId;
+  planetHouse: number; // 1..12 — arena (where the Planet die settled)
+  sign: SignId;
+  signHouse: number;   // 1..12 — used only to derive the aspect
+  omens: OmenTag[];
+}
+
+export interface AstralResult extends ThematicData {
+  type: 'astral';
+  id: string;
+  name: string;
+  symbol: string;
+  interpretation: string;
+  planet: PlanetId;
+  sign: SignId;
+  house: number;     // 1..12
+  aspect: AspectName;
+  tags: Tag[];
+  cast: AstralCast;
+}
+
 export interface HappeningResult extends ThematicData {
   type: 'happening';
   id: string;
@@ -181,7 +209,7 @@ export interface HappeningChoice {
   affinityChanges: Partial<Record<AffinityId, number>>;
 }
 
-export type DivinationResult = TarotResult | DiceResult | IChingResult;
+export type DivinationResult = TarotResult | DiceResult | IChingResult | AstralResult;
 
 export type SlotResult = DivinationResult | HappeningResult;
 
