@@ -23,15 +23,32 @@ function getCardDisplay(result: SlotResult): {
   name: string;
   detail: string;
   borderColor: string;
+  subCards?: { position: string; name: string; orientation: string; face: import('../../engine/types').TarotCardFace }[];
 } {
   switch (result.type) {
-    case 'tarot':
+    case 'tarot': {
+      const spread = result.spread;
+      if (spread && spread.length > 1) {
+        return {
+          symbol: result.symbol,
+          name: result.name,
+          detail: result.orientation === 'upright' ? '▲ Upright' : '▼ Reversed',
+          borderColor: '#9b6bb0',
+          subCards: spread.map((sp) => ({
+            position: sp.position.charAt(0).toUpperCase() + sp.position.slice(1),
+            name: sp.card.name,
+            orientation: sp.card.orientation === 'upright' ? '▲' : '▼',
+            face: sp.card,
+          })),
+        };
+      }
       return {
         symbol: result.symbol,
-        name: result.spread && result.spread.length > 1 ? 'Spread' : result.name,
+        name: result.name,
         detail: result.orientation === 'upright' ? '▲ Upright' : '▼ Reversed',
         borderColor: '#9b6bb0',
       };
+    }
     case 'd20':
       return {
         symbol: getDieFace(result.result),
@@ -295,6 +312,73 @@ export default function FanCard({
       >
         {runes}
       </div>
+
+      {/* Sub-card spread (expanded tarot) */}
+      {isExpanded && display.subCards && display.subCards.length > 1 && (
+        <motion.div
+          style={{
+            position: 'absolute',
+            bottom: `${height + 6}px`,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            gap: isDesktop ? '8px' : '4px',
+            pointerEvents: 'none',
+            zIndex: 10,
+          }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.15 }}
+        >
+          {display.subCards.map((sc) => (
+            <div
+              key={sc.position}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '1px',
+                background: '#0d1220',
+                border: '1px solid #1a2440',
+                borderRadius: '4px',
+                padding: '3px 4px',
+                minWidth: isDesktop ? '56px' : '36px',
+              }}
+            >
+              <span style={{
+                fontFamily: "'Cormorant Garamond', serif",
+                fontWeight: 600,
+                fontSize: isDesktop ? '0.45rem' : '0.32rem',
+                color: '#d4a854',
+                letterSpacing: '0.04em',
+              }}>
+                {sc.position}
+              </span>
+              <CardSigil card={sc.face} size={isDesktop ? 14 : 10} color="#7b9ec7" />
+              <span style={{
+                fontFamily: "'Cormorant Garamond', serif",
+                fontWeight: 500,
+                fontSize: isDesktop ? '0.38rem' : '0.28rem',
+                color: '#c8d8f0',
+                textAlign: 'center',
+                maxWidth: isDesktop ? '50px' : '32px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>
+                {sc.name}
+              </span>
+              <span style={{
+                fontFamily: "'Inter', sans-serif",
+                fontSize: isDesktop ? '0.35rem' : '0.26rem',
+                color: '#7b9ec7',
+              }}>
+                {sc.orientation}
+              </span>
+            </div>
+          ))}
+        </motion.div>
+      )}
     </motion.div>
   );
 }
