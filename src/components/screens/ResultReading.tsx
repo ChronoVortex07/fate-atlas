@@ -19,9 +19,29 @@ function formatQuestionType(qt: string): string {
   }
 }
 
-function getResultDisplay(result: SlotResult): { symbol: string; name: string; subtitle: string } {
+function getResultDisplay(result: SlotResult): {
+  symbol: string;
+  name: string;
+  subtitle: string;
+  subCards?: { position: string; name: string; orientation: string; symbol: string; meaning: string }[];
+} {
   switch (result.type) {
-    case 'tarot':
+    case 'tarot': {
+      const spread = (result as import('../../engine/types').TarotResult).spread;
+      if (spread && spread.length > 1) {
+        return {
+          symbol: result.symbol,
+          name: result.name,
+          subtitle: `${result.orientation === 'upright' ? '▲ Upright' : '▼ Reversed'} — Three-card spread`,
+          subCards: spread.map((sp) => ({
+            position: sp.position.charAt(0).toUpperCase() + sp.position.slice(1),
+            name: sp.card.name,
+            orientation: sp.card.orientation === 'upright' ? '▲ Upright' : '▼ Reversed',
+            symbol: sp.card.symbol,
+            meaning: (sp.card.orientation === 'upright' ? sp.card.meaningUpright : sp.card.meaningReversed).slice(0, 80),
+          })),
+        };
+      }
       return {
         symbol: result.symbol,
         name: result.name,
@@ -29,6 +49,7 @@ function getResultDisplay(result: SlotResult): { symbol: string; name: string; s
           ? `Upright — ${result.meaningUpright.slice(0, 100)}`
           : `Reversed — ${result.meaningReversed.slice(0, 100)}`,
       };
+    }
     case 'd20':
       return {
         symbol: String.fromCodePoint(0x2685),
@@ -105,6 +126,75 @@ export default function ResultReading() {
                   </div>
                   <div style={resultNameStyle}>{d.name}</div>
                   <div style={resultSubtitleStyle}>{d.subtitle}</div>
+                  {/* Sub-card spread layout for multi-card tarot */}
+                  {d.subCards && d.subCards.length > 1 && (
+                    <div style={{
+                      display: 'flex',
+                      gap: '0.5rem',
+                      width: '100%',
+                      marginTop: '0.25rem',
+                    }}>
+                      {d.subCards.map((sc) => (
+                        <div key={sc.position} style={{
+                          flex: 1,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '0.2rem',
+                          background: '#080d18',
+                          border: '1px solid #1a2440',
+                          borderRadius: '4px',
+                          padding: '0.4rem 0.25rem',
+                        }}>
+                          <span style={{
+                            fontFamily: "'Cormorant Garamond', serif",
+                            fontWeight: 600,
+                            fontSize: '0.6rem',
+                            color: '#d4a854',
+                            letterSpacing: '0.1em',
+                            textTransform: 'uppercase',
+                          }}>
+                            {sc.position}
+                          </span>
+                          <span style={{
+                            fontSize: '1.2rem',
+                            color: sc.orientation === '▲ Upright' ? '#7b9ec7' : '#d4a854',
+                          }}>
+                            {sc.symbol}
+                          </span>
+                          <span style={{
+                            fontFamily: "'Cormorant Garamond', serif",
+                            fontWeight: 600,
+                            fontSize: '0.65rem',
+                            color: '#c8d8f0',
+                            textAlign: 'center',
+                            lineHeight: 1.15,
+                          }}>
+                            {sc.name}
+                          </span>
+                          <span style={{
+                            fontFamily: "'Inter', sans-serif",
+                            fontWeight: 300,
+                            fontSize: '0.5rem',
+                            color: sc.orientation === '▲ Upright' ? '#7b9ec7' : '#d4a854',
+                          }}>
+                            {sc.orientation}
+                          </span>
+                          <span style={{
+                            fontFamily: "'Inter', sans-serif",
+                            fontWeight: 300,
+                            fontSize: '0.55rem',
+                            color: '#5b7290',
+                            textAlign: 'center',
+                            lineHeight: 1.3,
+                            marginTop: '0.15rem',
+                          }}>
+                            {sc.meaning}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
