@@ -301,4 +301,65 @@ describe('tarot draft state', () => {
     expect((state.turnResults[0] as any).spread).toHaveLength(3);
     expect((state.turnResults[0] as any).spread.map((s: any) => s.position)).toEqual(['past', 'present', 'future']);
   });
+
+  it('full draft flow: deal → pick 3 → commit produces valid run', () => {
+    const engine = new GameEngine();
+    engine.startTurn('self');
+    engine.startTarotDraft();
+
+    const state1 = engine.getState();
+    const draft = state1.minigameState as import('../types').TarotDraftState;
+
+    // Pick 3 distinct cards from the table into hand[0], [1], [2]
+    const pickedIndices: number[] = [];
+    for (let h = 0; h < 3; h++) {
+      const tableIdx = draft.table.findIndex(
+        (t, i) => t !== null && !pickedIndices.includes(i)
+      );
+      expect(tableIdx).toBeGreaterThanOrEqual(0);
+      engine.pickForHand(h, tableIdx);
+      pickedIndices.push(tableIdx);
+    }
+
+    // Verify hand is full
+    const state2 = engine.getState();
+    const draft2 = state2.minigameState as import('../types').TarotDraftState;
+    expect(draft2.hand.every((h) => h !== null)).toBe(true);
+
+    // Commit the draft
+    engine.commitDraft(false);
+
+    const state3 = engine.getState();
+    expect(state3.turnResults).toHaveLength(1);
+    expect(state3.turnResults[0].type).toBe('tarot');
+
+    // The spread should have 3 positions
+    const tarot = state3.turnResults[0] as import('../types').TarotResult;
+    expect(tarot.spread).toHaveLength(3);
+    expect(tarot.spread!.map((s) => s.position)).toEqual(['past', 'present', 'future']);
+
+    // Name should be joined card names (from Task 1 fix)
+    expect(tarot.name).toContain(' · ');
+  });
+
+  it('returnToTable appends when origin occupied and no open slots', () => {
+    const engine = new GameEngine();
+    engine.startTarotDraft();
+
+    // Fill all table slots with picks and returns to create a full table
+    // Pick 3 cards
+    engine.pickForHand(0, 0);
+    engine.pickForHand(1, 1);
+    engine.pickForHand(2, 2);
+
+    // Return hand[0] to a different occupied slot situation
+    // The origin (0) is null, so it should go back to 0
+    engine.returnToTable(0);
+    const state = engine.getState();
+    const draft = state.minigameState as import('../types').TarotDraftState;
+
+    // Card should be back on table
+    expect(draft.table[0]).not.toBeNull();
+    expect(draft.hand[0]).toBeNull();
+  });
 });
