@@ -9,6 +9,7 @@ import { selectHappening } from '../data/happenings';
 import { dispatch } from './events/EventDispatcher';
 import { buildAffinityResponders } from './responders/affinity';
 import { buildInteractionResponders } from './responders/interactions';
+import { buildAstralResponders } from './responders/astral';
 import { findScenario, freshStage, DEBUG_SCENARIOS } from './events/scenarios';
 import type { Responder, PhaseContext, PhaseDraft, EffectReport } from './events/types';
 import { planAstralCast as planAstralCastPure, resolveCastSelection as resolveCastSelectionPure, shouldOfferRecast } from './astral';
@@ -39,7 +40,7 @@ export class GameEngine {
     this.orchestrator = new TurnOrchestrator(this.bus);
     this.readingPlanner = new ReadingPlanner();
     this.narrativeAssembler = new NarrativeAssembler();
-    this.responders = [...buildAffinityResponders(), ...buildInteractionResponders()];
+    this.responders = [...buildAffinityResponders(), ...buildInteractionResponders(), ...buildAstralResponders()];
     this.state = this.defaultState();
     this.cachedSnapshot = JSON.parse(JSON.stringify(this.state)) as GameState;
   }
