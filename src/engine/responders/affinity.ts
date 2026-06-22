@@ -34,7 +34,7 @@ export function buildAffinityResponders(): Responder[] {
       condition: (c) => typeof c.draft.poolTarget === 'number' && (c.draft.poolTarget as number) > 2,
       roll: (c) => bandRoll(c, 'fate', 'ascendant', T.notable),
       apply: (c) => { c.draft.poolTarget = (c.draft.poolTarget as number) - 1;
-        return report('fate-thin-pool', 'Fate', 'Fate narrows the way — a path closes.', 'widen'); },
+        return report('fate-thin-pool', 'Fate', 'Fate narrows the way — a path closes.', 'thin'); },
     },
     {
       id: 'shadow-shroud', source: 'affinity', triggers: ['select:draw:end'],
@@ -150,7 +150,7 @@ export function buildAffinityResponders(): Responder[] {
       condition: (c) => c.draft.lastReading !== true,
       roll: (c) => bandRoll(c, 'chaos', 'ascendant', T.major),
       apply: (c) => { c.draft.interruptHappening = true;
-        return report('chaos-happening-interrupt', 'Chaos', 'The weave tears — something intrudes.', 'second-result'); },
+        return report('chaos-happening-interrupt', 'Chaos', 'The weave tears — something intrudes.', 'interrupt'); },
     },
     {
       id: 'light-advantage', source: 'affinity', triggers: ['dice:roll'],

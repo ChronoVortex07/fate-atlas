@@ -9,6 +9,8 @@ import SecondResultAnimation from './InteractionAnimations/SecondResultAnimation
 import ShroudAnimation from './InteractionAnimations/ShroudAnimation';
 import WidenAnimation from './InteractionAnimations/WidenAnimation';
 import OverrideAnimation from './InteractionAnimations/OverrideAnimation';
+import ThinAnimation from './InteractionAnimations/ThinAnimation';
+import InterruptAnimation from './InteractionAnimations/InterruptAnimation';
 import type { EffectReport } from '../../engine/types';
 
 // Per-animation on-screen durations (ms). Animations with ripples/delays need
@@ -21,6 +23,8 @@ const DURATION: Record<string, number> = {
   override: 1800,
   shroud: 1600,
   widen: 1500,
+  thin: 1500,
+  interrupt: 2000,
   'add-choice': 1800,
 };
 const DEFAULT_DURATION = 1400;
@@ -134,6 +138,10 @@ function renderAnimation(report: EffectReport) {
       return <ShroudAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
     case 'widen':
       return <WidenAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
+    case 'thin':
+      return <ThinAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
+    case 'interrupt':
+      return <InterruptAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
     case 'override':
       return <OverrideAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
     default:
