@@ -18,7 +18,7 @@ npm run dev        # → http://localhost:5173
 | `npm run dev` | Start Vite dev server |
 | `npm run build` | Production build → `dist/` |
 | `npm run preview` | Preview production build |
-| `npm test` | Run all 68 engine tests (Vitest) |
+| `npm test` | Run all 251 engine tests (Vitest) |
 
 ---
 
@@ -36,7 +36,7 @@ npm run dev        # → http://localhost:5173
 
 | Method | Mechanic | Tags |
 |--------|----------|------|
-| **Tarot** | 22 Major Arcana, upright or reversed | `major-arcana` `reversible` `fool-archetype` ... |
+| **Tarot** | 78 cards (22 Major Arcana + 56 Minor Arcana by suit×rank), three-card Past/Present/Future spread consolidated into one result, upright or reversed per face, SVG sigils | `major-arcana` `minor-arcana` `reversible` `fool-archetype` `suit-*` `element-*` ... |
 | **d20 Dice** | 1d20 roll, 5-tier thresholds (critical-low → critical-high) | `roll` `numeric` `threshold` |
 | **I Ching** | 64 hexagrams, 3-coin casting method, changing lines | `binary` `reversible` `changing-lines` |
 | **Happenings** | 8 authored cryptic scenes with 2-3 choices each | `event` `choice` `affinity-shift` |
@@ -61,12 +61,17 @@ See [`docs/game-systems.md`](docs/game-systems.md) for the full affinity/band/ef
 Interactions between divination results are **tag-matched** against the spread, so adding a
 new entity with the right tags automatically participates.
 
-| Interaction | Fires when… | Effect |
-|-------------|-------------|--------|
-| **Fool's Reroll** | The Fool is in the spread on a dice commit | Recasts the committed d20 |
-| **Critical Resonance** | upright tarot + critical-low die (or reversed + critical-high) | Flips the tarot's orientation |
-| **The Mirror** | exactly two reversible entities present | Both flip orientation (85%) |
-| **I Ching Boost** | an I Ching with changing lines is present | Adds a hidden happening choice |
+| Interaction | Scope | Fires when… | Effect |
+|-------------|-------|-------------|--------|
+| **Fool's Reroll** | cross-slot | The Fool is in the spread on a dice commit | Recasts the committed d20 |
+| **Critical Resonance** | cross-slot | upright spread + critical-low die (or reversed + critical-high) | Flips the whole spread |
+| **The Mirror** | cross-slot | exactly two reversible entities present | Both flip orientation (85%) |
+| **I Ching Boost** | cross-slot | an I Ching with changing lines is present | Adds a hidden happening choice |
+| **Suit Accord** | spread-internal | all three spread faces share the same suit | Amplifies the suit's primary dimension |
+| **Elemental Clash** | spread-internal | opposing elements are present in the spread | Increases volatility |
+| **Major Convergence** | spread-internal | two or more Major Arcana in the spread | Emits a fated-current report |
+| **Spread Aligned** | spread-internal | every spread face is upright | Emits a clarity report |
+| **Spread Cascade** | spread-internal | every spread face is reversed | Emits an upheaval report |
 
 Affinity bands add their own probabilistic effects (widen/thin the pool, shroud methods,
 spawn a second result, force a method, advantage/disadvantage, …) — see
@@ -107,7 +112,7 @@ Example injection:
 | UI | React 18 + TypeScript |
 | Animation | Framer Motion |
 | Game engine | Pure TypeScript (no framework dependency) |
-| Tests | Vitest (53 tests, 10 suites) |
+| Tests | Vitest (251 tests, 27 suites) |
 | Image export | html2canvas |
 | Persistence | localStorage |
 | Typography | Cormorant Garamond + Inter |
@@ -120,20 +125,24 @@ Example injection:
 src/
 ├── engine/           # Pure TypeScript game engine (no React/DOM)
 │   ├── types.ts
-│   ├── EventBus.ts
-│   ├── TagSystem.ts
+│   ├── GameEngine.ts
 │   ├── AffinityEngine.ts
 │   ├── TurnOrchestrator.ts
-│   ├── InteractionResolver.ts
-│   ├── SynthesisEngine.ts
-│   └── GameEngine.ts
+│   ├── ReadingPlanner.ts
+│   ├── NarrativeAssembler.ts
+│   ├── EventBus.ts
+│   ├── TagSystem.ts
+│   ├── events/       # Event dispatch, responders, reducers
+│   └── responders/   # Affinity & interaction responders
 ├── data/             # Game data (typed TS objects)
-│   ├── tarot.ts      # 22 Major Arcana
+│   ├── tarot.ts      # 78 cards (22 Major + 56 Minor Arcana)
 │   ├── dice.ts       # d20 thresholds
 │   ├── iching.ts     # 64 hexagrams
 │   ├── happenings.ts # 8 happenings
-│   ├── interactions.ts  # 5 MVP rules
-│   └── affinities.ts # Chaos & Order definitions
+│   ├── affinities.ts # 6 affinity definitions
+│   ├── divination-profiles.ts
+│   ├── dice-modifiers.ts
+│   └── constellations.ts
 ├── components/
 │   ├── screens/      # 7 screen components
 │   ├── cards/        # Card display components
