@@ -156,6 +156,45 @@ export function generateMinorArcana(): TarotCardData[] {
 
 export const MINOR_ARCANA: TarotCardData[] = generateMinorArcana();
 
+export const FULL_DECK: TarotCardData[] = [...MAJOR_ARCANA, ...MINOR_ARCANA];
+export const DECK_BY_ID: Record<string, TarotCardData> =
+  Object.fromEntries(FULL_DECK.map((c) => [c.id, c]));
+
+function baseTagsFor(card: TarotCardData): string[] {
+  const tags = ['draw', 'random', 'reversible', card.arcana === 'major' ? 'major-arcana' : 'minor-arcana'];
+  if (card.archetypeTag) tags.push(card.archetypeTag);
+  if (card.suit) tags.push(`suit-${card.suit}`, `element-${ELEMENT_BY_SUIT[card.suit]}`);
+  if (card.rank !== undefined) tags.push(`rank-${rankKey(card.rank)}`);
+  return tags;
+}
+
+export function buildFace(card: TarotCardData, orientation: 'upright' | 'reversed'): TarotCardFace {
+  const reversed = orientation === 'reversed';
+  let themes = card.themes;
+  const dimensions: DimensionValues = { ...card.dimensions };
+  if (reversed) {
+    dimensions.favorability = (-dimensions.favorability) as DimensionValues['favorability'];
+    themes = [...new Set(themes.map((t) => REVERSAL_THEME_MAP[t] ?? t))];
+  }
+  return {
+    id: card.id,
+    name: card.name,
+    arcana: card.arcana,
+    suit: card.suit,
+    rank: card.rank,
+    number: card.number,
+    orientation,
+    symbol: card.symbol,
+    themes,
+    dimensions,
+    modifierRoles: card.modifierRoles,
+    meaningUpright: card.meaningUpright,
+    meaningReversed: card.meaningReversed,
+    archetypeTag: card.archetypeTag,
+    tags: [...baseTagsFor(card), reversed ? 'reversed' : 'upright'],
+  };
+}
+
 const REVERSAL_THEME_MAP: Partial<Record<ThemeTag, ThemeTag>> = {
   upheaval: 'stagnation',
   renewal: 'stagnation',

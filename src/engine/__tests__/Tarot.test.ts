@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { drawTarotCard, MAJOR_ARCANA, MINOR_ARCANA } from '../../data/tarot';
+import { drawTarotCard, MAJOR_ARCANA, MINOR_ARCANA, FULL_DECK, DECK_BY_ID, buildFace } from '../../data/tarot';
 
 describe('tarot data', () => {
   it('has 22 Major Arcana cards', () => {
@@ -88,5 +88,24 @@ describe('minor arcana generator', () => {
   it('mid pips carry no themes; courts carry one', () => {
     expect(MINOR_ARCANA.find((c) => c.id === 'wands-5')!.themes).toHaveLength(0);
     expect(MINOR_ARCANA.find((c) => c.id === 'cups-queen')!.themes).toHaveLength(1);
+  });
+});
+
+describe('full deck + buildFace', () => {
+  it('FULL_DECK has 78 cards and DECK_BY_ID indexes them', () => {
+    expect(FULL_DECK).toHaveLength(78);
+    expect(DECK_BY_ID['the-fool'].arcana).toBe('major');
+    expect(DECK_BY_ID['wands-10'].arcana).toBe('minor');
+  });
+  it('buildFace upright keeps favorability; reversed flips it', () => {
+    const card = DECK_BY_ID['the-star']; // favorability +2 upright
+    expect(buildFace(card, 'upright').dimensions.favorability).toBe(2);
+    expect(buildFace(card, 'reversed').dimensions.favorability).toBe(-2);
+  });
+  it('buildFace tags carry arcana class, archetype/suit, and orientation', () => {
+    const major = buildFace(DECK_BY_ID['the-fool'], 'upright');
+    expect(major.tags).toEqual(expect.arrayContaining(['major-arcana', 'fool-archetype', 'upright', 'reversible', 'random']));
+    const minor = buildFace(DECK_BY_ID['cups-queen'], 'reversed');
+    expect(minor.tags).toEqual(expect.arrayContaining(['minor-arcana', 'suit-cups', 'element-water', 'rank-queen', 'reversed']));
   });
 });
