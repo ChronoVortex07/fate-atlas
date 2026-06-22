@@ -264,7 +264,7 @@ export class GameEngine {
     if (typeof draft.spawnSecond === 'string') {
       const affinities = this.affinityEngine.getState();
       const second = this.orchestrator.drawSingleResult(
-        draft.spawnSecond as 'tarot' | 'd20' | 'iching',
+        draft.spawnSecond as 'tarot' | 'd20' | 'iching' | 'astral',
         affinities,
       );
       this.state.turnResults = [...this.state.turnResults, second];
@@ -296,7 +296,7 @@ export class GameEngine {
 
     // Between-minigame transition. Ask the minigame:end trigger whether a
     // happening interrupts the flow.
-    this.orchestrator.removeUsedMethod(result.type as 'tarot' | 'd20' | 'iching');
+    this.orchestrator.removeUsedMethod(result.type as 'tarot' | 'd20' | 'iching' | 'astral');
     const { draft: endDraft } = this.dispatchAt('minigame:end', {
       lastReading: completed >= this.minigamesPerTurn,
     });

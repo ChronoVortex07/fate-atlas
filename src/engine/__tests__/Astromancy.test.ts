@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { AstralResult, AstralCast } from '../types';
 import { PLANETS, SIGNS, HOUSES, DIGNITY, aspectBetween, consolidateCast, dignityOf, drawAstralCast } from '../../data/astromancy';
+import { DIVINATION_PROFILES } from '../../data/divination-profiles';
+import { TurnOrchestrator } from '../TurnOrchestrator';
+import { EventBus } from '../EventBus';
 
 describe('astral types', () => {
   it('an AstralResult is assignable with the required surface', () => {
@@ -212,5 +215,17 @@ describe('drawAstralCast', () => {
       const c = drawAstralCast({ order: 100, chaos: 0 });
       expect(Math.abs(c.planetHouse - c.signHouse)).toBeLessThanOrEqual(6);
     } finally { Math.random = orig; }
+  });
+});
+
+describe('astral registration', () => {
+  it('has a divination profile', () => {
+    expect(DIVINATION_PROFILES.astral).toBeDefined();
+    expect(DIVINATION_PROFILES.astral.type).toBe('astral');
+  });
+  it('orchestrator can draw an astral result', () => {
+    const o = new TurnOrchestrator(new EventBus());
+    const r = o.drawSingleResult('astral', { chaos: 0, order: 0 });
+    expect(r.type).toBe('astral');
   });
 });
