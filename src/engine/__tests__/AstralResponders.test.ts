@@ -39,3 +39,20 @@ describe('astral symbolic responders', () => {
     expect(R('astral-saturns-gate').condition(ctx(cast({ planet: 'saturn', planetHouse: 10 })))).toBe(true);
   });
 });
+
+describe('astral omen responders', () => {
+  it('errant-star fires on the off-board omen and spawns a second cast', () => {
+    const c = ctx(cast({ omens: ['errant-star'] }));
+    const r = R('astral-errant-star');
+    expect(r.condition(c)).toBe(true);
+    r.apply(c);
+    expect(c.draft.spawnSecond).toBe('astral');
+  });
+  it('conjunction-crowned fires only with the omen tag', () => {
+    expect(R('astral-conjunction-crowned').condition(ctx(cast({ omens: ['crowned-conjunction'] })))).toBe(true);
+    expect(R('astral-conjunction-crowned').condition(ctx(cast({ omens: [] })))).toBe(false);
+  });
+  it('veiled-oracle fires on the cocked-die omen', () => {
+    expect(R('astral-veiled-oracle').condition(ctx(cast({ omens: ['veiled-oracle'] })))).toBe(true);
+  });
+});

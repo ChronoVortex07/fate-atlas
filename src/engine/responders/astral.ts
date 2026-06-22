@@ -71,5 +71,37 @@ export function buildAstralResponders(): Responder[] {
         return report('astral-saturns-gate', "Saturn's Gate", 'Saturn guards the angle — the way forward exacts its toll.', 'override');
       },
     },
+    {
+      id: 'astral-errant-star', source: 'interaction', triggers: ['astral:commit'],
+      group: { kind: 'exclusive', band: 'SPAWN' }, weight: () => 1,
+      condition: (c) => has(c, 'errant-star'),
+      roll: () => true,
+      apply: (c) => {
+        c.draft.spawnSecond = 'astral';
+        return report('astral-errant-star', 'The Errant Star', 'A die flees the chart entirely — a force beyond the heavens answers.', 'second-result');
+      },
+    },
+    {
+      id: 'astral-conjunction-crowned', source: 'interaction', triggers: ['astral:commit'],
+      group: { kind: 'exclusive', band: 'MUTATE' }, weight: () => 2,
+      condition: (c) => has(c, 'crowned-conjunction'),
+      roll: () => true,
+      apply: (c) => {
+        const r = out(c)!; const axis = dominantAxis(r.dimensions);
+        bump(r, axis, Math.sign(r.dimensions[axis] || 1) * 1.0);
+        return report('astral-conjunction-crowned', 'Conjunction Crowned', 'The dice rest as one — their union blazes past all measure.', 'override');
+      },
+    },
+    {
+      id: 'astral-veiled-oracle', source: 'interaction', triggers: ['astral:commit'],
+      group: { kind: 'exclusive', band: 'MUTATE' }, weight: () => 1,
+      condition: (c) => has(c, 'veiled-oracle'),
+      roll: () => true,
+      apply: (c) => {
+        const r = out(c)!; bump(r, 'certainty', -1.0);
+        if (!r.themes.includes('mystery')) r.themes = [...r.themes.slice(0, 1), 'mystery' as ThemeTag];
+        return report('astral-veiled-oracle', 'The Veiled Oracle', 'A die rests askew — the reading keeps its secret.', 'shroud');
+      },
+    },
   ];
 }
