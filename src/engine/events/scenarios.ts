@@ -1,5 +1,6 @@
 import type { AffinityId, SlotResult } from '../types';
 import { defaultAffinityState } from '../../data/affinities';
+import { consolidateSpread, buildFace, DECK_BY_ID } from '../../data/tarot';
 
 export interface ScenarioStage {
   affinities: Record<AffinityId, number>;
@@ -94,6 +95,24 @@ export const DEBUG_SCENARIOS: DebugScenario[] = [
     setup: (s) => { atTarot(s); s.slots = [criticalLowDie]; } },
   { id: 'iching-happening-boost', label: 'I Ching boosts the happening', group: 'Interaction', forced: ['iching-happening-boost'], isolate: true,
     setup: (s) => { s.screen = 'happening'; s.slots = [changingLinesHex]; } },
+  // ── Affinity (Task 13: new affinity responders) ──
+  { id: 'chaos-wild-card', label: 'Chaos: wild card flips', group: 'Affinity', forced: ['chaos-wild-card'], isolate: true,
+    setup: (s) => { atTarot(s); set(s, { chaos: 80 }); } },
+  { id: 'order-anchor', label: 'Order: anchor the spread', group: 'Affinity', forced: ['order-anchor'], isolate: true,
+    setup: (s) => { atTarot(s); set(s, { order: 80 }); } },
+  { id: 'shadow-veil-position', label: 'Shadow: veil a card', group: 'Affinity', forced: ['shadow-veil-position'], isolate: true,
+    setup: (s) => { atTarot(s); set(s, { shadow: 80 }); } },
+  // ── Interaction (spread-internal) ──
+  { id: 'suit-accord', label: 'Suit Accord', group: 'Interaction', forced: ['suit-accord'], isolate: true,
+    setup: (s) => { atTarot(s); s.slots = [consolidateSpread([buildFace(DECK_BY_ID['cups-2'], 'upright'), buildFace(DECK_BY_ID['cups-5'], 'upright'), buildFace(DECK_BY_ID['cups-8'], 'upright')]) as SlotResult]; } },
+  { id: 'elemental-clash', label: 'Elemental Clash', group: 'Interaction', forced: ['elemental-clash'], isolate: true,
+    setup: (s) => { atTarot(s); s.slots = [consolidateSpread([buildFace(DECK_BY_ID['cups-2'], 'upright'), buildFace(DECK_BY_ID['swords-3'], 'upright'), buildFace(DECK_BY_ID['pentacles-4'], 'upright')]) as SlotResult]; } },
+  { id: 'major-convergence', label: 'Major Convergence', group: 'Interaction', forced: ['major-convergence'], isolate: true,
+    setup: (s) => { atTarot(s); s.slots = [consolidateSpread([buildFace(DECK_BY_ID['the-sun'], 'upright'), buildFace(DECK_BY_ID['the-star'], 'upright'), buildFace(DECK_BY_ID['cups-2'], 'upright')]) as SlotResult]; } },
+  { id: 'spread-aligned', label: 'Spread Aligned (all upright)', group: 'Interaction', forced: ['spread-aligned'], isolate: true,
+    setup: (s) => { atTarot(s); s.slots = [consolidateSpread([buildFace(DECK_BY_ID['the-sun'], 'upright'), buildFace(DECK_BY_ID['cups-2'], 'upright'), buildFace(DECK_BY_ID['pentacles-3'], 'upright')]) as SlotResult]; } },
+  { id: 'spread-cascade', label: 'Spread Cascade (all reversed)', group: 'Interaction', forced: ['spread-cascade'], isolate: true,
+    setup: (s) => { atTarot(s); s.slots = [consolidateSpread([buildFace(DECK_BY_ID['the-sun'], 'reversed'), buildFace(DECK_BY_ID['cups-2'], 'reversed'), buildFace(DECK_BY_ID['pentacles-3'], 'reversed')]) as SlotResult]; } },
 ];
 
 export function findScenario(id: string): DebugScenario | undefined {

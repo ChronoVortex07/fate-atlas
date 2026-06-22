@@ -270,6 +270,56 @@ describe('redrawSpreadPosition', () => {
   });
 });
 
+describe('spread coherence feeds', () => {
+  it('committing an all-upright spread boosts Order above tag-feed baseline', () => {
+    const e = new GameEngine();
+    e.startTurn('self');
+    const spread = consolidateSpread([
+      buildFace(DECK_BY_ID['the-sun'], 'upright'),
+      buildFace(DECK_BY_ID['cups-2'], 'upright'),
+      buildFace(DECK_BY_ID['pentacles-3'], 'upright'),
+    ]);
+    const orig = Math.random; Math.random = () => 0.99;
+    e.completeMinigame(spread, { revealedAsDrawn: true });
+    Math.random = orig;
+    // With coherence feed: expected Order = 57 (tag +5 → coupling → coherence +6).
+    // Without coherence feed: Order would be 51.
+    expect(e.getState().affinities.order).toBe(57);
+  });
+
+  it('committing an all-reversed spread boosts Chaos above tag-feed baseline', () => {
+    const e = new GameEngine();
+    e.startTurn('self');
+    const spread = consolidateSpread([
+      buildFace(DECK_BY_ID['the-sun'], 'reversed'),
+      buildFace(DECK_BY_ID['cups-2'], 'reversed'),
+      buildFace(DECK_BY_ID['pentacles-3'], 'reversed'),
+    ]);
+    const orig = Math.random; Math.random = () => 0.99;
+    e.completeMinigame(spread, { revealedAsDrawn: true });
+    Math.random = orig;
+    // With coherence feed: expected Chaos = 65 (tag +10 → coupling → coherence +6).
+    // Without coherence feed: Chaos would be 59.
+    expect(e.getState().affinities.chaos).toBe(65);
+  });
+
+  it('a mixed-orientation spread does not get a coherence boost', () => {
+    const e = new GameEngine();
+    e.startTurn('self');
+    const spread = consolidateSpread([
+      buildFace(DECK_BY_ID['the-sun'], 'upright'),
+      buildFace(DECK_BY_ID['cups-2'], 'upright'),
+      buildFace(DECK_BY_ID['pentacles-3'], 'reversed'),
+    ]);
+    const orig = Math.random; Math.random = () => 0.99;
+    e.completeMinigame(spread, { revealedAsDrawn: true });
+    Math.random = orig;
+    // Mixed spread: Order should NOT benefit from the extra +6 coherence.
+    // Tag feed gives Order ~5 (before coupling); mixed has no coherence.
+    expect(e.getState().affinities.order).toBe(51);
+  });
+});
+
 describe('GameEngine — affinity effects snapshot', () => {
   it('carries affinityEffects in the snapshot and reflects band changes after notify', () => {
     const engine = new GameEngine();

@@ -1,5 +1,4 @@
-import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, RollMode, DivinationType } from './types';
-import type { TarotCardFace } from './types';
+import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, RollMode, DivinationType, TarotCardFace } from './types';
 import { FULL_DECK, buildFace, pickOrientation, DECK_BY_ID } from '../data/tarot';
 import { EventBus } from './EventBus';
 import { AffinityEngine } from './AffinityEngine';
@@ -226,6 +225,13 @@ export class GameEngine {
     // Apply affinities from the result (Chaos/Order tag feeds, routed through shift)
     if (result.type !== 'happening') {
       this.affinityEngine.applyResultTags(result);
+    }
+
+    // Spread coherence feeds (All Upright → Order, All Reversed → Chaos).
+    if (result.type === 'tarot' && (result as TarotResult).spread && (result as TarotResult).spread!.length > 1) {
+      const faces = (result as TarotResult).spread!.map((s) => s.card);
+      if (faces.every((f) => f.orientation === 'upright')) this.affinityEngine.shift('order', 6, 'spread-aligned');
+      else if (faces.every((f) => f.orientation === 'reversed')) this.affinityEngine.shift('chaos', 6, 'spread-cascade');
     }
 
     // Player-action feeds derived from how this result was reached.
