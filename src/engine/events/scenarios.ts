@@ -60,7 +60,7 @@ export const DEBUG_SCENARIOS: DebugScenario[] = [
     setup: (s) => { atMethodSelect(s); set(s, { will: 75 }); } },
   { id: 'shadow-shroud', label: 'Shadow shrouds an option', group: 'Affinity', forced: ['shadow-shroud'], isolate: true,
     setup: (s) => { atMethodSelect(s); set(s, { shadow: 75 }); } },
-  { id: 'fate-override-pick', label: 'Fate overrides the pick', group: 'Affinity', forced: ['fate-override-pick'], isolate: true,
+  { id: 'fate-deal-swap', label: 'Fate swaps the deal', group: 'Affinity', forced: ['fate-deal-swap'], isolate: true,
     setup: (s) => { atTarot(s); set(s, { fate: 75 }); } },
   { id: 'chaos-second-result', label: 'Chaos second result', group: 'Affinity', forced: ['chaos-second-result'], isolate: true,
     setup: (s) => { atDice(s); set(s, { chaos: 90 }); } },

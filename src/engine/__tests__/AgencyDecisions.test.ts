@@ -3,13 +3,17 @@ import { GameEngine } from '../GameEngine';
 import { buildFace, DECK_BY_ID } from '../../data/tarot';
 import type { TarotCardFace, TarotResult, DiceResult } from '../types';
 
-const tarot = (orientation: 'upright' | 'reversed'): TarotResult => ({
-  type: 'tarot', id: 'the-fool', name: 'The Fool', number: 0, orientation, symbol: '☉',
-  meaningUpright: 'x', meaningReversed: 'y',
-  tags: ['draw', 'random', 'major-arcana', 'reversible', 'fool-archetype', orientation],
-  themes: ['renewal'], dimensions: { favorability: 0.5, certainty: -1.5, volatility: 1.5 },
-  modifierRoles: ['subject'],
-});
+const tarot = (orientation: 'upright' | 'reversed'): TarotResult => {
+  const face = buildFace(DECK_BY_ID['the-fool'], orientation);
+  return {
+    type: 'tarot', id: 'the-fool', name: 'The Fool', number: 0, orientation, symbol: '☉',
+    meaningUpright: 'x', meaningReversed: 'y',
+    tags: ['draw', 'random', 'major-arcana', 'reversible', 'fool-archetype', orientation],
+    themes: ['renewal'], dimensions: { favorability: 0.5, certainty: -1.5, volatility: 1.5 },
+    modifierRoles: ['subject'],
+    spread: [{ position: 'present', card: face }],
+  };
+};
 
 function startMinigame(e: GameEngine) {
   e.startTurn('self');

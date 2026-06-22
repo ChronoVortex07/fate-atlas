@@ -1,5 +1,6 @@
 import type { Responder, EffectReport } from '../events/types';
 import type { SlotResult, TarotResult, DiceResult } from '../types';
+import { reverseSpread } from '../../data/tarot';
 
 const has = (s: SlotResult, ...tags: string[]) => tags.every((t) => s.tags.includes(t));
 const reversibles = (spread: SlotResult[]) => spread.filter((s) => s.tags.includes('reversible'));
@@ -35,9 +36,9 @@ export function buildInteractionResponders(): Responder[] {
       apply: (c) => {
         const card = c.draft.outcome as TarotResult;
         const wasUpright = card.orientation === 'upright';
-        card.orientation = wasUpright ? 'reversed' : 'upright';
+        c.draft.outcome = reverseSpread(card);
         return report('critical-resonance', 'Critical Resonance',
-          wasUpright ? 'A dire omen drags the card down — it inverts.' : 'A bright omen lifts the card — it rights itself.',
+          wasUpright ? 'A dire omen drags the spread down — it inverts.' : 'A bright omen lifts the spread — it rights itself.',
           'flip');
       },
     },
@@ -47,11 +48,8 @@ export function buildInteractionResponders(): Responder[] {
       condition: (c) => reversibles(c.spread).length === 2,
       roll: (c) => c.rng() < 0.85,
       apply: (c) => {
-        for (const s of reversibles(c.spread)) {
-          // Only tarot carries a meaningful orientation field; skip non-tarot even if reversible-tagged.
-          if (s.type !== 'tarot') continue;
-          const card = s as TarotResult;
-          card.orientation = card.orientation === 'upright' ? 'reversed' : 'upright';
+        if (c.draft.outcome?.type === 'tarot') {
+          c.draft.outcome = reverseSpread(c.draft.outcome as TarotResult);
         }
         return report('mirror', 'The Mirror', 'Two forces reflect each other across the weave — both turn.', 'mirror');
       },

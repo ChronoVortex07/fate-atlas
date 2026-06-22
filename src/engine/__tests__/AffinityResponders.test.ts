@@ -4,6 +4,7 @@ import { buildAffinityResponders } from '../responders/affinity';
 import { bandRoll } from '../events/eligibility';
 import type { PhaseContext } from '../events/types';
 import { defaultAffinityState } from '../../data/affinities';
+import { buildFace, DECK_BY_ID } from '../../data/tarot';
 
 function ctx(over: Partial<PhaseContext> = {}): PhaseContext {
   return {
@@ -64,36 +65,6 @@ describe('affinity responders via dispatch', () => {
     expect(new Set(c.draft.shrouded!).size).toBe(2);
   });
 
-  it('fate-override-pick: no reassignment when all hand entries are reference-equal to outcome', () => {
-    const card = { type: 'tarot', id: 'fool' } as any;
-    const c = ctx({
-      trigger: 'tarot:pick',
-      hand: [card, card],
-      draft: { outcome: card },
-      affinities: { ...defaultAffinityState(), fate: 100 },
-      rng: () => 0,
-    });
-    const { reports } = dispatch('tarot:pick', c, buildAffinityResponders(), { forced: ['fate-override-pick'], isolate: true });
-    expect(c.draft.outcome).toBe(card);
-    expect(reports).toHaveLength(0);
-  });
-
-  it('fate-override-pick: replaces outcome with a distinct hand card when candidates exist', () => {
-    const original = { type: 'tarot', id: 'fool' } as any;
-    const other = { type: 'tarot', id: 'tower' } as any;
-    const c = ctx({
-      trigger: 'tarot:pick',
-      hand: [original, other],
-      draft: { outcome: original },
-      affinities: { ...defaultAffinityState(), fate: 100 },
-      rng: () => 0,
-    });
-    const { reports } = dispatch('tarot:pick', c, buildAffinityResponders(), { forced: ['fate-override-pick'], isolate: true });
-    expect(c.draft.outcome).toBe(other);
-    expect(reports).toHaveLength(1);
-    expect(reports[0].responderId).toBe('fate-override-pick');
-  });
-
   it('light-advantage + shadow-disadvantage cancel to single', () => {
     const c = ctx({
       trigger: 'dice:roll',
@@ -118,12 +89,16 @@ describe('affinity responders via dispatch', () => {
     expect(c.draft.poolTarget).toBe(2);
   });
 
-  it('fate-auto-orient sets a deterministic orientation', () => {
-    const card = { type: 'tarot', id: 'fool', orientation: 'upright' } as any;
+  it('fate-auto-orient spreads the orientation via reverseSpread', () => {
+    const face = buildFace(DECK_BY_ID['the-fool'], 'upright');
+    const card = { type: 'tarot', id: 'the-fool', name: 'The Fool', number: 0, orientation: 'upright', symbol: '☉',
+      meaningUpright: 'x', meaningReversed: 'y', tags: ['major-arcana', 'reversible', 'upright'],
+      themes: ['renewal'], dimensions: { favorability: 0.5, certainty: -1.5, volatility: 1.5 },
+      modifierRoles: ['subject'], spread: [{ position: 'present', card: face }] } as any;
     const c = ctx({ trigger: 'tarot:orient', draft: { outcome: card },
-      affinities: { ...defaultAffinityState(), fate: 75 }, rng: () => 0.9 });
+      affinities: { ...defaultAffinityState(), fate: 75 }, rng: () => 0.0 });
     dispatch('tarot:orient', c, buildAffinityResponders(), { forced: ['fate-auto-orient'], isolate: true });
-    expect((c.draft.outcome as any).orientation).toBe('reversed'); // rng 0.9 >= 0.5
+    expect((c.draft.outcome as any).orientation).toBe('reversed'); // rng 0.0 < 0.5 triggers reverseSpread
   });
 
   it('fate-hollow-reroll reverts to the previous die', () => {
@@ -168,5 +143,19 @@ describe('affinity responders via dispatch', () => {
       affinities: { ...defaultAffinityState(), will: 50 }, rng: () => 0 });
     dispatch('dice:roll', c, buildAffinityResponders(), { forced: ['will-offer-reroll'], isolate: true });
     expect(c.draft.offerReroll).toBe(true);
+  });
+});
+
+describe('spread-aware repurposed responders', () => {
+  it('fate-deal-swap is registered on tarot:deal and fate-override-pick is gone', () => {
+    const ids = buildAffinityResponders().map((r) => r.id);
+    expect(ids).toContain('fate-deal-swap');
+    expect(ids).not.toContain('fate-override-pick');
+    const swap = buildAffinityResponders().find((r) => r.id === 'fate-deal-swap')!;
+    expect(swap.triggers).toContain('tarot:deal');
+  });
+  it('fate-auto-orient now triggers on tarot:orient', () => {
+    const r = buildAffinityResponders().find((x) => x.id === 'fate-auto-orient')!;
+    expect(r.triggers).toContain('tarot:orient');
   });
 });

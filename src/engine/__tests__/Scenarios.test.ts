@@ -35,12 +35,12 @@ describe('debug scenarios', () => {
     expect(groups.has('Combination')).toBe(true);
   });
 
-  it('fate-override-pick scenario sets Fate Ascendant and forces the effect', () => {
+  it('fate-deal-swap scenario sets Fate Ascendant and forces the effect', () => {
     const engine = new GameEngine();
-    const ok = engine.loadScenarioById('fate-override-pick');
+    const ok = engine.loadScenarioById('fate-deal-swap');
     expect(ok).toBe(true);
     expect(engine.getState().affinities.fate).toBeGreaterThanOrEqual(60);
-    expect(engine.getState().debugConfig.forced).toEqual(['fate-override-pick']);
+    expect(engine.getState().debugConfig.forced).toEqual(['fate-deal-swap']);
   });
 
   it('every preset loads without error', () => {

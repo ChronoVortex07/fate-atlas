@@ -3,10 +3,23 @@ import { dispatch } from '../events/EventDispatcher';
 import { buildInteractionResponders } from '../responders/interactions';
 import type { PhaseContext } from '../events/types';
 import { defaultAffinityState } from '../../data/affinities';
+import { buildFace, DECK_BY_ID } from '../../data/tarot';
 
 const fool = { type: 'tarot', tags: ['major-arcana', 'fool-archetype', 'reversible'], orientation: 'upright' } as any;
 const critLow = { type: 'd20', threshold: 'critical-low', tags: ['threshold', 'critical-low'] } as any;
-const uprightCard = { type: 'tarot', orientation: 'upright', tags: ['major-arcana', 'reversible'] } as any;
+
+function spreadCard(id: string, orientation: 'upright' | 'reversed') {
+  const face = buildFace(DECK_BY_ID[id], orientation);
+  return {
+    type: 'tarot', id, name: face.name, number: face.number ?? 0,
+    orientation, symbol: face.symbol,
+    meaningUpright: face.meaningUpright, meaningReversed: face.meaningReversed,
+    tags: ['major-arcana', 'reversible', orientation],
+    themes: face.themes, dimensions: { ...face.dimensions },
+    modifierRoles: [...face.modifierRoles],
+    spread: [{ position: 'present', card: face }],
+  } as any;
+}
 
 function ctx(over: Partial<PhaseContext> = {}): PhaseContext {
   const base: PhaseContext = {
@@ -25,24 +38,23 @@ describe('interaction responders', () => {
   });
 
   it('critical-resonance inverts an upright tarot when a critical-low die is present', () => {
-    const card = { ...uprightCard };
+    const card = spreadCard('the-fool', 'upright');
     const c = ctx({ trigger: 'tarot:commit', slots: [critLow], spread: [critLow, card], draft: { outcome: card } });
     dispatch('tarot:commit', c, buildInteractionResponders(), noDebug);
     expect((c.draft.outcome as any).orientation).toBe('reversed');
   });
 
-  it('mirror flips exactly two reversible items', () => {
+  it('mirror flips the committed outcome when two reversible items are present', () => {
     const a = { type: 'tarot', orientation: 'upright', tags: ['reversible'] } as any;
-    const b = { type: 'tarot', orientation: 'reversed', tags: ['reversible'] } as any;
+    const b = spreadCard('the-tower', 'reversed');
     const c = ctx({ trigger: 'tarot:commit', spread: [a, b], rng: () => 0, draft: { outcome: b } });
     dispatch('tarot:commit', c, buildInteractionResponders(), noDebug);
-    expect(a.orientation).toBe('reversed');
-    expect(b.orientation).toBe('upright');
+    expect((c.draft.outcome as any).orientation).toBe('upright');
   });
 
   it('critical-resonance: reversed tarot + critical-high die flips to upright', () => {
     const critHigh = { type: 'd20', threshold: 'critical-high', tags: ['threshold', 'critical-high'] } as any;
-    const card = { type: 'tarot', orientation: 'reversed', tags: ['major-arcana', 'reversible'] } as any;
+    const card = spreadCard('the-tower', 'reversed');
     const c = ctx({ trigger: 'tarot:commit', slots: [critHigh], spread: [critHigh, card], draft: { outcome: card } });
     dispatch('tarot:commit', c, buildInteractionResponders(), noDebug);
     expect((c.draft.outcome as any).orientation).toBe('upright');

@@ -1,7 +1,8 @@
 import type { Responder, PhaseContext, EffectReport } from '../events/types';
-import type { AffinityId, SlotResult, RollModifier, TarotResult } from '../types';
+import type { AffinityId, SlotResult, RollModifier, TarotResult, TarotCardFace } from '../types';
 import { bandRoll } from '../events/eligibility';
 import { TIER_BASE_CHANCE, bandOf, BAND_ORDER } from '../../data/affinities';
+import { reverseSpread, drawTarotCard } from '../../data/tarot';
 
 const T = TIER_BASE_CHANCE;
 const SHROUD_STEP_CHANCE = 0.20; // flat per-step chance (not bandRoll-scaled — see A3 note)
@@ -81,9 +82,6 @@ export function buildAffinityResponders(): Responder[] {
       },
     },
     {
-      // Fate forces the method: redirects the chosen method index on select:pick.
-      // The method pool is DivinationType[] (strings), so this works on indices,
-      // not the SlotResult-shaped fate-override-pick below.
       id: 'fate-force-method', source: 'affinity', triggers: ['select:pick'],
       group: { kind: 'exclusive', band: 'OVERRIDE' }, weight: w('fate'),
       condition: (c) => Array.isArray(c.draft.methodPool)
@@ -100,28 +98,32 @@ export function buildAffinityResponders(): Responder[] {
       },
     },
     {
-      id: 'fate-override-pick', source: 'affinity', triggers: ['tarot:pick'],
+      id: 'fate-deal-swap', source: 'affinity', triggers: ['tarot:deal'],
       group: { kind: 'exclusive', band: 'OVERRIDE' }, weight: w('fate'),
-      condition: (c) => !!c.hand && c.hand.length >= 2 && !!c.draft.outcome,
+      condition: (c) => Array.isArray(c.draft.faces) && (c.draft.faces as unknown[]).length >= 1,
       roll: (c) => bandRoll(c, 'fate', 'ascendant', T.major),
       apply: (c) => {
-        const hand = c.hand as SlotResult[];
-        const others = hand.filter((h) => h !== c.draft.outcome);
-        if (others.length === 0) return null;
-        c.draft.outcome = others[Math.floor(c.rng() * others.length)];
-        return report('fate-override-pick', 'Fate', 'The weave moves your hand — another is chosen for you.', 'override');
+        const faces = c.draft.faces as unknown as TarotCardFace[];
+        const idx = Math.floor(c.rng() * faces.length);
+        const used = new Set(faces.map((f) => f.id));
+        const replacement = drawTarotCard(c.affinities).spread![0].card;
+        if (used.has(replacement.id)) return null;
+        faces[idx] = replacement;
+        c.draft.faces = faces as unknown as typeof c.draft.faces;
+        c.draft.swappedIndex = idx;
+        return report('fate-deal-swap', 'Fate', 'The weave deals you another — a card changes before it turns.', 'override');
       },
     },
     {
       id: 'fate-auto-orient', source: 'affinity', triggers: ['tarot:orient'],
       group: { kind: 'exclusive', band: 'OVERRIDE' }, weight: w('fate'),
       condition: (c) => c.draft.outcome?.type === 'tarot',
-      apply: (c) => {
-        const card = c.draft.outcome as TarotResult;
-        card.orientation = c.rng() < 0.5 ? 'upright' : 'reversed';
-        return report('fate-auto-orient', 'Fate', 'Fate turns the card for you.', 'override');
-      },
       roll: (c) => bandRoll(c, 'fate', 'stirring', T.notable),
+      apply: (c) => {
+        const result = c.draft.outcome as TarotResult;
+        if (c.rng() < 0.5) c.draft.outcome = reverseSpread(result);
+        return report('fate-auto-orient', 'Fate', 'Fate turns the spread for you.', 'override');
+      },
     },
     {
       id: 'fate-hollow-reroll', source: 'affinity', triggers: ['dice:reroll'],
