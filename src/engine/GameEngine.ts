@@ -1,4 +1,6 @@
-import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, TarotCardFace, DiceResult, RunRecord, RollMode, DivinationType } from './types';
+import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, RollMode, DivinationType } from './types';
+import type { TarotCardFace } from './types';
+import { FULL_DECK, buildFace, pickOrientation, DECK_BY_ID } from '../data/tarot';
 import { EventBus } from './EventBus';
 import { AffinityEngine } from './AffinityEngine';
 import { TurnOrchestrator } from './TurnOrchestrator';
@@ -452,6 +454,18 @@ export class GameEngine {
     const result = (draft.outcome as DiceResult) ?? fresh;
     this.notify();
     return { result, hollow: result === current };
+  }
+
+  // Will: redraw one disliked spread position. Draws a fresh distinct card, feeds Will.
+  redrawSpreadPosition(faces: TarotCardFace[], index: number): TarotCardFace[] {
+    const used = new Set(faces.map((f) => f.id));
+    const candidates = FULL_DECK.filter((c) => !used.has(c.id));
+    const card = candidates[Math.floor(Math.random() * candidates.length)] ?? DECK_BY_ID[faces[index].id];
+    const next = [...faces];
+    next[index] = buildFace(card, pickOrientation(this.affinityEngine.getState()));
+    this.affinityEngine.applyAction('take-reroll'); // agency → Will
+    this.notify();
+    return next;
   }
 
   // Will: the player exercises a free orientation choice.

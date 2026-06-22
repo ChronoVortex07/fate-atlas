@@ -255,6 +255,21 @@ describe('tarot deal + spread orientation', () => {
   });
 });
 
+describe('redrawSpreadPosition', () => {
+  it('replaces one position with a different card and feeds Will', () => {
+    const e = new GameEngine();
+    e.startTurn('self');
+    const before = e.getState().affinities.will;
+    const faces = [buildFace(DECK_BY_ID['the-fool'], 'upright'), buildFace(DECK_BY_ID['cups-2'], 'upright'), buildFace(DECK_BY_ID['swords-3'], 'upright')];
+    const out = e.redrawSpreadPosition(faces, 1);
+    expect(out).toHaveLength(3);
+    expect(out[0].id).toBe('the-fool');
+    expect(out[2].id).toBe('swords-3');
+    expect(e.getState().affinities.will).toBeGreaterThanOrEqual(before);
+    expect(out[1].id).not.toBe('cups-2');
+  });
+});
+
 describe('GameEngine — affinity effects snapshot', () => {
   it('carries affinityEffects in the snapshot and reflects band changes after notify', () => {
     const engine = new GameEngine();
