@@ -94,6 +94,29 @@ export interface ThematicData {
   modifierRoles: ModifierRole[];
 }
 
+// ── Tarot Spread Types ──
+
+export type SpreadPosition = 'past' | 'present' | 'future';
+
+export interface TarotCardFace {
+  id: string;
+  name: string;
+  arcana: 'major' | 'minor';
+  suit?: 'wands' | 'cups' | 'swords' | 'pentacles';
+  rank?: number | 'page' | 'knight' | 'queen' | 'king';
+  number?: number;
+  orientation: 'upright' | 'reversed';
+  symbol: string;
+  themes: ThemeTag[];
+  dimensions: DimensionValues;
+  modifierRoles: ModifierRole[];
+  meaningUpright: string;
+  meaningReversed: string;
+  archetypeTag?: string;
+  veiled?: boolean;
+  tags: Tag[];
+}
+
 // ── Divination Profile (for gap-aware pool steering) ──
 
 export interface DivinationProfile {
@@ -148,6 +171,7 @@ export interface TarotResult extends ThematicData {
   meaningUpright: string;
   meaningReversed: string;
   tags: Tag[];
+  spread?: { position: SpreadPosition; card: TarotCardFace }[];
 }
 
 export interface DiceResult extends ThematicData {

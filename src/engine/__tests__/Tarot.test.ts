@@ -54,3 +54,9 @@ describe('drawTarotCard', () => {
     expect(reversals).toBeLessThan(iterations * 0.5);
   });
 });
+
+describe('major arcana arcana field', () => {
+  it('every major is tagged arcana="major"', () => {
+    expect(MAJOR_ARCANA.every((c) => c.arcana === 'major')).toBe(true);
+  });
+});
