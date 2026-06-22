@@ -9,6 +9,7 @@ const CENTER = { x: SIZE / 2, y: SIZE / 2 };
 const BOARD_R = 168;      // inner edge of the bowl wall ring
 const DIE_R = 20;         // radius of each die circle body
 const WALL_SEGS = 28;     // number of wall segments approximating the circle
+const SETTLE_TICK_CAP = 700; // hard timeout; also the threshold for veiled-oracle omen
 
 // ── House calculation ────────────────────────────────────────────────────────
 // Returns 1..12 based on (x, y) position relative to CENTER.
@@ -245,7 +246,7 @@ export default function CelestialCast({ affinities, faces, onSettled }: Props) {
         planetBody.position.y - signBody.position.y,
       ) < DIE_R * 2.3)
         omens.push('crowned-conjunction');
-      if (ticks > 600)
+      if (ticks >= SETTLE_TICK_CAP)
         omens.push('veiled-oracle');
 
       const pPos = { x: planetBody.position.x, y: planetBody.position.y };
@@ -307,7 +308,7 @@ export default function CelestialCast({ affinities, faces, onSettled }: Props) {
       const speed = planetBody.speed + signBody.speed;
       still = speed < 0.35 ? still + 1 : 0;
 
-      if (still > 40 || ticks > 700) {
+      if (still > 40 || ticks >= SETTLE_TICK_CAP) {
         finalize();
         // Draw one final settled frame
         if (ctx) {
@@ -324,6 +325,7 @@ export default function CelestialCast({ affinities, faces, onSettled }: Props) {
     rafId = requestAnimationFrame(step);
 
     return () => {
+      settledRef.current = false;
       cancelAnimationFrame(rafId);
       Matter.World.clear(world, false);
       Matter.Engine.clear(engine);
