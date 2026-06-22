@@ -240,8 +240,8 @@ describe('GameEngine — affinity effects snapshot', () => {
     const engine = new GameEngine();
     engine.startTurn('self');
     engine.loadState({ affinities: { ...engine.getState().affinities, will: 90 } });
-    expect(engine.getState().affinityEffects.handSize).toBe(5);
-    expect(engine.getAffinityEffects().handSize).toBe(5);
+    expect(engine.getState().affinityEffects.spreadRedraws).toBe(2);
+    expect(engine.getAffinityEffects().spreadRedraws).toBe(2);
   });
 
   it('resolveReroll returns a usable dice result', () => {

@@ -11,9 +11,8 @@ type Phase = 'pick' | 'reversal-prompt' | 'revealed';
 export default function TarotMinigame() {
   const { state, engine } = useGameEngine();
   const [phase, setPhase] = useState<Phase>('pick');
-  const handSize = useState(() => state.affinityEffects.handSize)[0];
   const faceDownCards = useState<TarotResult[]>(() =>
-    Array.from({ length: handSize }, () => drawTarotCard(state.affinities))
+    Array.from({ length: 3 }, () => drawTarotCard(state.affinities))
   )[0];
   const [chosenIndex, setChosenIndex] = useState<number | null>(null);
   const [willReverse, setWillReverse] = useState(false);

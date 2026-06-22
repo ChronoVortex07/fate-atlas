@@ -85,9 +85,9 @@ export default function MethodSelect() {
           })}
         </motion.div>
 
-        {/* Will (elevated): call for a different set of methods. handSize >= 4
-            is the already-exposed proxy for an elevated Will. */}
-        {state.affinityEffects.handSize >= 4 && (
+        {/* Will (elevated): call for a different set of methods. spreadRedraws >= 1
+            is the proxy for an elevated Will. */}
+        {state.affinityEffects.spreadRedraws >= 1 && (
           <motion.button
             style={swapMethodStyle}
             whileHover={{ borderColor: '#9b6bb0', scale: 1.02 }}

@@ -124,7 +124,7 @@ export class AffinityEngine {
     else if (lightIdx >= 1 && lightIdx > shadowIdx) poolPreview = 'theme';
 
     return {
-      handSize: 3 + clamp(willIdx - 1, 0, 2),   // latent/stirring 3, ascendant 4, dominant 5
+      spreadRedraws: clamp(willIdx - 1, 0, 2),  // latent/stirring 0, ascendant 1, dominant 2
       methodCount: fateIdx >= 2 ? 2 : 3,          // Fate Ascendant+ → fewer methods
       hintClarity: clamp(info, -2, 2),
       readingDetail: clamp(info, -1, 1),

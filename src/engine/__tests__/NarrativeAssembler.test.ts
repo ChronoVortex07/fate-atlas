@@ -229,7 +229,7 @@ describe('NarrativeAssembler', () => {
 
 describe('NarrativeAssembler — reading detail/clarity (Light/Shadow)', () => {
   const fx = (over: Partial<import('../types').AffinityEffects>): import('../types').AffinityEffects => ({
-    handSize: 3, methodCount: 3, hintClarity: 0, readingDetail: 0, poolPreview: 'none', peekAvailable: false, ...over,
+    spreadRedraws: 0, methodCount: 3, hintClarity: 0, readingDetail: 0, poolPreview: 'none', peekAvailable: false, ...over,
   });
 
   it('rich reading (readingDetail>0) has at least as many paragraphs as terse', () => {

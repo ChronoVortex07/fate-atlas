@@ -63,7 +63,7 @@ export class GameEngine {
       eventLog: [],
       debug: false,
       affinityEffects: {
-        handSize: 3, methodCount: 3, hintClarity: 0,
+        spreadRedraws: 0, methodCount: 3, hintClarity: 0,
         readingDetail: 0, poolPreview: 'none', peekAvailable: false,
       },
       eventQueue: [],

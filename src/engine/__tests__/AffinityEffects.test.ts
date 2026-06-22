@@ -8,7 +8,7 @@ describe('AffinityEngine.getEffects', () => {
   it('fresh baseline gives base modifiers', () => {
     const e = make();
     const fx = e.getEffects();
-    expect(fx.handSize).toBe(3);
+    expect(fx.spreadRedraws).toBe(0);
     expect(fx.methodCount).toBe(3);
     expect(fx.hintClarity).toBe(0);
     expect(fx.readingDetail).toBe(0);
@@ -16,10 +16,13 @@ describe('AffinityEngine.getEffects', () => {
     expect(fx.peekAvailable).toBe(false);
   });
 
-  it('Will raises hand size: Ascendant 4, Dominant 5', () => {
+  it('spreadRedraws by Will: 0 at baseline, 1 at ascendant, 2 at dominant', () => {
     const e = make();
-    e.setState({ will: 70 }); expect(e.getEffects().handSize).toBe(4);
-    e.setState({ will: 90 }); expect(e.getEffects().handSize).toBe(5);
+    expect(e.getEffects().spreadRedraws).toBe(0);
+    e.setState({ will: 70 }); // ascendant
+    expect(e.getEffects().spreadRedraws).toBe(1);
+    e.setState({ will: 95 }); // dominant
+    expect(e.getEffects().spreadRedraws).toBe(2);
   });
 
   it('Fate Ascendant lowers methodCount to 2', () => {
