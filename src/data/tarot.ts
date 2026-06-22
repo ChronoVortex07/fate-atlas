@@ -233,7 +233,7 @@ export function consolidateSpread(faces: TarotCardFace[]): TarotResult {
   return {
     type: 'tarot',
     id: single ? faces[0].id : 'spread:' + faces.map((f) => f.id).join('+'),
-    name: single ? faces[0].name : 'Three-Card Spread',
+    name: single ? faces[0].name : faces.map((f) => f.name).join(' · '),
     number: present.number ?? 0,
     orientation,
     symbol: single ? faces[0].symbol : SPREAD_GLYPH,

@@ -169,4 +169,8 @@ describe('consolidateSpread', () => {
     expect(r.id).toBe('the-magician');
     expect(r.spread).toHaveLength(1);
   });
+  it('multi-card spread name joins card names with middle dot', () => {
+    const r = consolidateSpread([F('the-fool', 'upright'), F('the-star', 'upright'), F('cups-2', 'reversed')]);
+    expect(r.name).toBe('The Fool · The Star · Two of Cups');
+  });
 });
