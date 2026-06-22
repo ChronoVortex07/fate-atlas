@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { drawTarotCard, MAJOR_ARCANA, MINOR_ARCANA, FULL_DECK, DECK_BY_ID, buildFace } from '../../data/tarot';
+import { consolidateSpread, drawTarotCard, MAJOR_ARCANA, MINOR_ARCANA, FULL_DECK, DECK_BY_ID, buildFace } from '../../data/tarot';
 
 describe('tarot data', () => {
   it('has 22 Major Arcana cards', () => {
@@ -107,5 +107,38 @@ describe('full deck + buildFace', () => {
     expect(major.tags).toEqual(expect.arrayContaining(['major-arcana', 'fool-archetype', 'upright', 'reversible', 'random']));
     const minor = buildFace(DECK_BY_ID['cups-queen'], 'reversed');
     expect(minor.tags).toEqual(expect.arrayContaining(['minor-arcana', 'suit-cups', 'element-water', 'rank-queen', 'reversed']));
+  });
+});
+
+describe('consolidateSpread', () => {
+  const F = (id: string, o: 'upright' | 'reversed') => buildFace(DECK_BY_ID[id], o);
+
+  it('averages dimensions to 0.5 granularity', () => {
+    const r = consolidateSpread([F('the-world', 'upright'), F('wands-5', 'upright'), F('cups-2', 'upright')]);
+    for (const v of Object.values(r.dimensions)) expect(Math.round(v * 2)).toBe(v * 2);
+  });
+  it('caps consolidated themes at 2', () => {
+    const r = consolidateSpread([F('the-sun', 'upright'), F('judgement', 'upright'), F('the-world', 'upright')]);
+    expect(r.themes.length).toBeLessThanOrEqual(2);
+  });
+  it('uses majority orientation (2+ reversed = reversed)', () => {
+    const r = consolidateSpread([F('the-fool', 'reversed'), F('cups-2', 'reversed'), F('wands-5', 'upright')]);
+    expect(r.orientation).toBe('reversed');
+    expect(r.tags).toContain('reversed');
+    expect(r.tags).not.toContain('upright');
+  });
+  it('lifts archetype + suit tags from every face onto the slot', () => {
+    const r = consolidateSpread([F('the-fool', 'upright'), F('cups-queen', 'upright'), F('swords-3', 'upright')]);
+    expect(r.tags).toEqual(expect.arrayContaining(['major-arcana', 'fool-archetype', 'minor-arcana', 'suit-cups', 'suit-swords']));
+  });
+  it('unions modifier roles and records the 3 positions', () => {
+    const r = consolidateSpread([F('the-fool', 'upright'), F('cups-2', 'upright'), F('swords-3', 'upright')]);
+    expect(r.spread).toHaveLength(3);
+    expect(r.spread!.map((s) => s.position)).toEqual(['past', 'present', 'future']);
+  });
+  it('single face passes through as that card', () => {
+    const r = consolidateSpread([F('the-magician', 'upright')]);
+    expect(r.id).toBe('the-magician');
+    expect(r.spread).toHaveLength(1);
   });
 });

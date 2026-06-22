@@ -1,4 +1,4 @@
-import type { TarotResult, TarotCardFace, ThemeTag, DimensionValues, ModifierRole } from '../engine/types';
+import type { TarotResult, TarotCardFace, ThemeTag, DimensionValues, ModifierRole, SpreadPosition } from '../engine/types';
 
 export interface TarotCardData {
   id: string;
@@ -192,6 +192,58 @@ export function buildFace(card: TarotCardData, orientation: 'upright' | 'reverse
     meaningReversed: card.meaningReversed,
     archetypeTag: card.archetypeTag,
     tags: [...baseTagsFor(card), reversed ? 'reversed' : 'upright'],
+  };
+}
+
+export const SPREAD_GLYPH = '✦';
+const SPREAD_POSITIONS: SpreadPosition[] = ['past', 'present', 'future'];
+const AXES: (keyof DimensionValues)[] = ['favorability', 'certainty', 'volatility'];
+const sumAbs = (d: DimensionValues) => Math.abs(d.favorability) + Math.abs(d.certainty) + Math.abs(d.volatility);
+
+export function consolidateSpread(faces: TarotCardFace[]): TarotResult {
+  const n = faces.length;
+
+  const dimensions: DimensionValues = { favorability: 0, certainty: 0, volatility: 0 };
+  for (const f of faces) for (const a of AXES) dimensions[a] += f.dimensions[a];
+  for (const a of AXES) dimensions[a] = clampDim(dimensions[a] / n);
+
+  const count = new Map<ThemeTag, number>();
+  const mag = new Map<ThemeTag, number>();
+  for (const f of faces) for (const t of f.themes) {
+    count.set(t, (count.get(t) ?? 0) + 1);
+    mag.set(t, (mag.get(t) ?? 0) + sumAbs(f.dimensions));
+  }
+  const themes = [...count.keys()]
+    .sort((a, b) => (count.get(b)! - count.get(a)!) || (mag.get(b)! - mag.get(a)!))
+    .slice(0, 2);
+
+  const modifierRoles = [...new Set(faces.flatMap((f) => f.modifierRoles))];
+
+  const reversedCount = faces.filter((f) => f.orientation === 'reversed').length;
+  const orientation: 'upright' | 'reversed' = reversedCount * 2 > n ? 'reversed' : 'upright';
+
+  const tagSet = new Set<string>();
+  for (const f of faces) for (const t of f.tags) if (t !== 'upright' && t !== 'reversed') tagSet.add(t);
+  tagSet.add('draw'); tagSet.add('random'); tagSet.add('reversible'); tagSet.add(orientation);
+
+  const spread = faces.map((card, i) => ({ position: SPREAD_POSITIONS[i] ?? 'present', card }));
+  const single = n === 1;
+  const present = faces[Math.min(1, n - 1)];
+
+  return {
+    type: 'tarot',
+    id: single ? faces[0].id : 'spread:' + faces.map((f) => f.id).join('+'),
+    name: single ? faces[0].name : 'Three-Card Spread',
+    number: present.number ?? 0,
+    orientation,
+    symbol: single ? faces[0].symbol : SPREAD_GLYPH,
+    meaningUpright: present.meaningUpright,
+    meaningReversed: present.meaningReversed,
+    themes,
+    dimensions,
+    modifierRoles,
+    tags: [...tagSet],
+    spread,
   };
 }
 
