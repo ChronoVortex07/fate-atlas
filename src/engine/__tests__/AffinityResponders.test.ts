@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { dispatch } from '../events/EventDispatcher';
 import { buildAffinityResponders } from '../responders/affinity';
+import { buildInteractionResponders } from '../responders/interactions';
 import { bandRoll } from '../events/eligibility';
 import type { PhaseContext } from '../events/types';
 import { defaultAffinityState } from '../../data/affinities';
-import { buildFace, DECK_BY_ID } from '../../data/tarot';
+import { buildFace, consolidateSpread, DECK_BY_ID } from '../../data/tarot';
 
 function ctx(over: Partial<PhaseContext> = {}): PhaseContext {
   return {
@@ -157,5 +158,23 @@ describe('spread-aware repurposed responders', () => {
   it('fate-auto-orient now triggers on tarot:orient', () => {
     const r = buildAffinityResponders().find((x) => x.id === 'fate-auto-orient')!;
     expect(r.triggers).toContain('tarot:orient');
+  });
+});
+
+describe("Fool's Reroll across the spread", () => {
+  it('fires when The Fool is any position in a committed spread', () => {
+    const foolReroll = buildInteractionResponders().find((r) => r.id === 'fool-reroll')!;
+    const spreadSlot = consolidateSpread([
+      buildFace(DECK_BY_ID['cups-2'], 'upright'),
+      buildFace(DECK_BY_ID['the-fool'], 'upright'),
+      buildFace(DECK_BY_ID['swords-3'], 'upright'),
+    ]);
+    const die = { type: 'd20', result: 10, threshold: 'neutral', interpretation: '', tags: ['draw'], themes: [], dimensions: { favorability: 0, certainty: 0, volatility: 0 }, modifierRoles: ['effect'] };
+    const ctx = {
+      trigger: 'dice:commit', affinities: {} as PhaseContext['affinities'],
+      slots: [spreadSlot] as PhaseContext['slots'], hand: null, spread: [spreadSlot, die] as PhaseContext['spread'],
+      minigame: null, event: null, draft: { outcome: die as PhaseContext['draft']['outcome'] }, rng: () => 0,
+    } as PhaseContext;
+    expect(foolReroll.condition(ctx)).toBe(true);
   });
 });
