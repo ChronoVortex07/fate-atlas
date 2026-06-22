@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { consolidateSpread, drawTarotCard, drawTarotSpread, reverseSpread, MAJOR_ARCANA, MINOR_ARCANA, FULL_DECK, DECK_BY_ID, buildFace } from '../../data/tarot';
 import { DIVINATION_PROFILES } from '../../data/divination-profiles';
+import { GameEngine } from '../GameEngine';
 
 describe('tarot data', () => {
   it('has 22 Major Arcana cards', () => {
@@ -172,5 +173,132 @@ describe('consolidateSpread', () => {
   it('multi-card spread name joins card names with middle dot', () => {
     const r = consolidateSpread([F('the-fool', 'upright'), F('the-star', 'upright'), F('cups-2', 'reversed')]);
     expect(r.name).toBe('The Fool · The Star · Two of Cups');
+  });
+});
+
+describe('tarot draft state', () => {
+  it('startTarotDraft deals 9 cards and initializes hand as empty', () => {
+    const engine = new GameEngine();
+    engine.startTarotDraft();
+    const state = engine.getState();
+    const draft = state.minigameState as import('../types').TarotDraftState;
+
+    expect(draft.method).toBe('tarot');
+    expect(draft.table).toHaveLength(9);
+    expect(draft.table.every((t) => t !== null && typeof t.cardId === 'string')).toBe(true);
+    expect(draft.table.every((t) => t !== null && t.faceUp === false)).toBe(true);
+    expect(draft.hand).toEqual([null, null, null]);
+    expect(draft.deck.length).toBe(78 - 9); // 69 remaining
+    expect(draft.phase).toBe('drafting');
+    expect(draft.shufflesRemaining).toBeGreaterThanOrEqual(0);
+  });
+
+  it('pickForHand moves card from table to hand slot', () => {
+    const engine = new GameEngine();
+    engine.startTarotDraft();
+    const state1 = engine.getState();
+    const draft1 = state1.minigameState as import('../types').TarotDraftState;
+    const targetCard = draft1.table[4]!;
+
+    engine.pickForHand(0, 4); // pick card at table index 4 into hand[0] (Past)
+    const state2 = engine.getState();
+    const draft2 = state2.minigameState as import('../types').TarotDraftState;
+
+    expect(draft2.table[4]).toBeNull();
+    expect(draft2.hand[0]).not.toBeNull();
+    expect(draft2.hand[0]!.cardId).toBe(targetCard.cardId);
+    expect(draft2.hand[0]!.tableOriginIndex).toBe(4);
+    expect(draft2.hand[0]!.peeked).toBe(false);
+  });
+
+  it('returnToTable puts card back in its origin slot', () => {
+    const engine = new GameEngine();
+    engine.startTarotDraft();
+    engine.pickForHand(0, 4);
+    engine.returnToTable(0);
+    const state = engine.getState();
+    const draft = state.minigameState as import('../types').TarotDraftState;
+
+    expect(draft.hand[0]).toBeNull();
+    expect(draft.table[4]).not.toBeNull();
+  });
+
+  it('returnToDeck puts card back into deck face-down', () => {
+    const engine = new GameEngine();
+    engine.startTarotDraft();
+    engine.pickForHand(0, 4);
+    const beforeDeck = (engine.getState().minigameState as import('../types').TarotDraftState).deck.length;
+
+    engine.returnToDeck(0);
+    const state = engine.getState();
+    const draft = state.minigameState as import('../types').TarotDraftState;
+
+    expect(draft.hand[0]).toBeNull();
+    expect(draft.deck.length).toBe(beforeDeck + 1);
+  });
+
+  it('shuffleTable flips face-up cards, recollects, and redeals', () => {
+    const engine = new GameEngine();
+    // Stage will to ascendant so shufflesRemaining starts at 1 (baseline is 0)
+    engine.loadState({ affinities: { chaos: 50, order: 50, fate: 50, will: 75, light: 50, shadow: 50 } });
+    engine.startTarotDraft();
+
+    engine.pickForHand(0, 0);
+    const s1 = engine.getState();
+    const draft1 = s1.minigameState as import('../types').TarotDraftState;
+    const dealCountBefore = draft1.dealCount;
+    const shufflesBefore = draft1.shufflesRemaining;
+
+    engine.shuffleTable();
+
+    const s2 = engine.getState();
+    const draft2 = s2.minigameState as import('../types').TarotDraftState;
+    expect(draft2.table.filter((t) => t !== null)).toHaveLength(dealCountBefore);
+    expect(draft2.table.every((t) => t === null || t.faceUp === false)).toBe(true);
+    expect(draft2.shufflesRemaining).toBe(shufflesBefore - 1);
+  });
+
+  it('shuffleTable throws when no shuffles remain', () => {
+    const engine = new GameEngine();
+    engine.startTarotDraft();
+    // exhaust shuffles
+    const s = engine.getState();
+    const draft = s.minigameState as import('../types').TarotDraftState;
+    const remaining = draft.shufflesRemaining;
+    for (let i = 0; i < remaining; i++) engine.shuffleTable();
+
+    expect(() => engine.shuffleTable()).toThrow('No shuffles remaining');
+  });
+
+  it('swapHandCards exchanges two hand positions', () => {
+    const engine = new GameEngine();
+    engine.startTarotDraft();
+    engine.pickForHand(0, 0);
+    engine.pickForHand(1, 1);
+    const card0 = (engine.getState().minigameState as import('../types').TarotDraftState).hand[0]!.cardId;
+    const card1 = (engine.getState().minigameState as import('../types').TarotDraftState).hand[1]!.cardId;
+
+    engine.swapHandCards(0, 1);
+    const draft = engine.getState().minigameState as import('../types').TarotDraftState;
+
+    expect(draft.hand[0]!.cardId).toBe(card1);
+    expect(draft.hand[1]!.cardId).toBe(card0);
+  });
+
+  it('commitDraft builds consolidated result from hand', () => {
+    const engine = new GameEngine();
+    engine.startTurn('self');
+    // Start draft and fill hand
+    engine.startTarotDraft();
+    engine.pickForHand(0, 0);
+    engine.pickForHand(1, 1);
+    engine.pickForHand(2, 2);
+
+    engine.commitDraft(false);
+    const state = engine.getState();
+    expect(state.turnResults).toHaveLength(1);
+    expect(state.turnResults[0].type).toBe('tarot');
+    expect((state.turnResults[0] as any).spread).toHaveLength(3);
+    expect((state.turnResults[0] as any).spread.map((s: any) => s.position)).toEqual(['past', 'present', 'future']);
   });
 });

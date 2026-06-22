@@ -1,5 +1,5 @@
-import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, RollMode, DivinationType, TarotCardFace } from './types';
-import { FULL_DECK, buildFace, pickOrientation, DECK_BY_ID } from '../data/tarot';
+import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, RollMode, DivinationType, TarotCardFace, TableCard, TarotDraftState } from './types';
+import { FULL_DECK, buildFace, pickOrientation, DECK_BY_ID, consolidateSpread, reverseSpread } from '../data/tarot';
 import { EventBus } from './EventBus';
 import { AffinityEngine } from './AffinityEngine';
 import { TurnOrchestrator } from './TurnOrchestrator';
@@ -211,6 +211,12 @@ export class GameEngine {
     this.state.selectedMethod = methodType;
     this.state.activeSlotIndex = null;
     this.state.screen = 'minigame';
+
+    // Start draft state for tarot
+    if (methodType === 'tarot') {
+      this.startTarotDraft();
+    }
+
     this.notify();
   }
 
@@ -544,6 +550,205 @@ export class GameEngine {
     if (fav >= 1) return 'The current leans toward fortune...';
     if (fav <= -1) return 'The current leans toward hardship...';
     return 'The current holds in uneasy balance...';
+  }
+
+  // ── Tarot Draft Minigame ──
+
+  startTarotDraft(): void {
+    const shuffled = [...FULL_DECK].sort(() => Math.random() - 0.5);
+    const dealCount = 9;
+    const dealt = shuffled.splice(0, dealCount);
+    const table: TableCard[] = dealt.map((card, i) => ({
+      cardId: card.id,
+      originIndex: i,
+      faceUp: false,
+    }));
+
+    const draft: TarotDraftState = {
+      method: 'tarot',
+      deck: shuffled.map((c) => c.id),
+      table,
+      hand: [null, null, null],
+      dealCount,
+      shufflesRemaining: this.affinityEngine.getEffects().spreadRedraws,
+      phase: 'drafting',
+    };
+
+    this.state.minigameState = draft;
+    this.dispatchAt('tarot:draft:started', {});
+    this.notify();
+  }
+
+  pickForHand(handIndex: number, tableIndex: number): void {
+    const draft = this.state.minigameState as TarotDraftState | null;
+    if (!draft || draft.method !== 'tarot') throw new Error('No active tarot draft');
+    if (draft.hand[handIndex] !== null) throw new Error(`Hand slot ${handIndex} already filled`);
+    if (handIndex < 0 || handIndex > 2) throw new Error(`Invalid hand index: ${handIndex}`);
+    if (tableIndex < 0 || tableIndex >= draft.table.length) throw new Error(`Invalid table index: ${tableIndex}`);
+
+    const slot = draft.table[tableIndex];
+    if (!slot) throw new Error(`Table slot ${tableIndex} is empty`);
+
+    draft.hand[handIndex] = {
+      cardId: slot.cardId,
+      tableOriginIndex: slot.originIndex,
+      peeked: false,
+    };
+    draft.table[tableIndex] = null;
+
+    this.dispatchAt('tarot:picked', { handIndex, tableIndex });
+    this.notify();
+  }
+
+  returnToTable(handIndex: number): void {
+    const draft = this.state.minigameState as TarotDraftState | null;
+    if (!draft || draft.method !== 'tarot') throw new Error('No active tarot draft');
+    const handCard = draft.hand[handIndex];
+    if (!handCard) throw new Error(`Hand slot ${handIndex} is empty`);
+
+    // Find target: origin slot if free, else lowest open slot, else append
+    let targetIdx = handCard.tableOriginIndex;
+    if (targetIdx >= draft.table.length || draft.table[targetIdx] !== null) {
+      const openIdx = draft.table.findIndex((t) => t === null);
+      if (openIdx >= 0) {
+        targetIdx = openIdx;
+      } else {
+        targetIdx = draft.table.length;
+      }
+    }
+
+    const faceUp = handCard.peeked;
+    const newSlot: TableCard = {
+      cardId: handCard.cardId,
+      originIndex: targetIdx,
+      faceUp,
+      revealedFace: faceUp ? handCard.revealedFace : undefined,
+    };
+
+    if (targetIdx >= draft.table.length) {
+      draft.table.push(newSlot);
+      draft.dealCount = draft.table.length;
+    } else {
+      draft.table[targetIdx] = newSlot;
+    }
+
+    draft.hand[handIndex] = null;
+    this.dispatchAt('tarot:returned:table', { handIndex, tableIndex: targetIdx });
+    this.notify();
+  }
+
+  returnToDeck(handIndex: number): void {
+    const draft = this.state.minigameState as TarotDraftState | null;
+    if (!draft || draft.method !== 'tarot') throw new Error('No active tarot draft');
+    const handCard = draft.hand[handIndex];
+    if (!handCard) throw new Error(`Hand slot ${handIndex} is empty`);
+
+    draft.deck.push(handCard.cardId);
+    // Shuffle deck so the returned card isn't predictably on top
+    for (let i = draft.deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [draft.deck[i], draft.deck[j]] = [draft.deck[j], draft.deck[i]];
+    }
+    draft.hand[handIndex] = null;
+    this.dispatchAt('tarot:returned:deck', { handIndex });
+    this.notify();
+  }
+
+  shuffleTable(): void {
+    const draft = this.state.minigameState as TarotDraftState | null;
+    if (!draft || draft.method !== 'tarot') throw new Error('No active tarot draft');
+    if (draft.shufflesRemaining <= 0) throw new Error('No shuffles remaining');
+
+    // Flip all face-up table cards face-down
+    for (const slot of draft.table) {
+      if (slot && slot.faceUp) {
+        slot.faceUp = false;
+        slot.revealedFace = undefined;
+      }
+    }
+
+    // Collect all non-null table cards + remaining deck, shuffle
+    const collected = draft.table.filter((t): t is TableCard => t !== null);
+    const pool = [
+      ...collected.map((t) => t.cardId),
+      ...draft.deck,
+    ];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+
+    // Redeal
+    const dealCount = draft.dealCount;
+    const dealt = pool.splice(0, Math.min(dealCount, pool.length));
+    draft.table = dealt.map((cardId, i) => ({
+      cardId,
+      originIndex: i,
+      faceUp: false,
+    }));
+    draft.deck = pool;
+    draft.shufflesRemaining--;
+
+    this.affinityEngine.applyAction('take-reroll');
+    this.dispatchAt('tarot:shuffled', {});
+    this.notify();
+  }
+
+  peekHandCard(handIndex: number): { success: boolean; card?: TarotCardFace; message: string } {
+    const draft = this.state.minigameState as TarotDraftState | null;
+    if (!draft || draft.method !== 'tarot') throw new Error('No active tarot draft');
+    const handCard = draft.hand[handIndex];
+    if (!handCard) throw new Error(`Hand slot ${handIndex} is empty`);
+    if (handCard.peeked) throw new Error('Card already peeked');
+
+    const { failed } = this.affinityEngine.usePeek();
+    if (failed) {
+      this.dispatchAt('tarot:peeked', { handIndex, success: false });
+      this.notify();
+      return { success: false, message: 'The vision clouds over — nothing is revealed.' };
+    }
+
+    const cardData = DECK_BY_ID[handCard.cardId];
+    if (!cardData) throw new Error(`Card not found: ${handCard.cardId}`);
+    const face = buildFace(cardData, pickOrientation(this.affinityEngine.getState()));
+    handCard.peeked = true;
+    handCard.revealedFace = face;
+
+    this.dispatchAt('tarot:peeked', { handIndex, success: true });
+    this.notify();
+    return { success: true, card: face, message: `${face.name} — ${face.orientation === 'upright' ? '▲ Upright' : '▼ Reversed'}` };
+  }
+
+  swapHandCards(a: number, b: number): void {
+    const draft = this.state.minigameState as TarotDraftState | null;
+    if (!draft || draft.method !== 'tarot') throw new Error('No active tarot draft');
+    if (a < 0 || a > 2 || b < 0 || b > 2) throw new Error('Invalid hand index');
+    [draft.hand[a], draft.hand[b]] = [draft.hand[b], draft.hand[a]];
+    this.dispatchAt('tarot:swapped', { a, b });
+    this.notify();
+  }
+
+  commitDraft(reverse: boolean = false): void {
+    const draft = this.state.minigameState as TarotDraftState | null;
+    if (!draft || draft.method !== 'tarot') throw new Error('No active tarot draft');
+    if (draft.hand.some((h) => h === null)) throw new Error('Hand is not full');
+
+    draft.phase = 'committing';
+    const faces = draft.hand.map((h) => {
+      if (h!.revealedFace) return h!.revealedFace; // use peeked face (locked orientation)
+      return buildFace(DECK_BY_ID[h!.cardId], pickOrientation(this.affinityEngine.getState()));
+    });
+
+    let result = consolidateSpread(faces);
+    if (reverse) result = reverseSpread(result);
+
+    const meta = reverse
+      ? { reversed: true }
+      : { revealedAsDrawn: true };
+
+    // Reset minigame state before completing (completeMinigame may trigger transitions)
+    this.state.minigameState = null;
+    this.completeMinigame(result, meta);
   }
 
   // ---------- State access ----------
