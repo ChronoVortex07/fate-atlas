@@ -28,6 +28,7 @@ export class GameEngine {
   private usedHappeningIds = new Set<string>();
   private minigamesPerTurn: number;
   private pendingTransition: (() => void) | null = null;
+  private turnEffects: EffectReport[] = []; // per-turn accumulator of all reports (for RunRecord)
 
   constructor(minigamesPerTurn = 3) {
     this.minigamesPerTurn = minigamesPerTurn;
@@ -107,7 +108,10 @@ export class GameEngine {
         forced: this.state.debugConfig.forced.filter((id) => !forcedConsumed.includes(id)),
       };
     }
-    if (reports.length > 0) this.state.eventQueue = [...this.state.eventQueue, ...reports];
+    if (reports.length > 0) {
+      this.state.eventQueue = [...this.state.eventQueue, ...reports];
+      this.turnEffects = [...this.turnEffects, ...reports];
+    }
     return { draft: ctx.draft, reports };
   }
 
@@ -182,6 +186,7 @@ export class GameEngine {
     this.state.happening = null;
     this.state.selectedHappeningChoice = null;
     this.state.eventQueue = [];
+    this.turnEffects = [];
 
     this.narrativeAssembler.resetRotation();
 
@@ -321,6 +326,7 @@ export class GameEngine {
       question: this.state.questionType!,
       turnResults: this.state.turnResults,
       interactions: this.state.interactions,
+      effects: this.turnEffects,
       synthesis: this.state.synthesis!,
       happening: this.state.happening ?? undefined,
       happeningChoice: this.state.selectedHappeningChoice ?? undefined,
@@ -607,7 +613,7 @@ export class GameEngine {
     return this.narrativeAssembler.generateLLMPrompt({
       question,
       slots: results,
-      interactions: this.state.interactions,
+      effects: this.turnEffects,
       affinities,
       aggregated,
     });
@@ -639,6 +645,7 @@ export class GameEngine {
     this.state.happening = null;
     this.state.selectedHappeningChoice = null;
     this.state.eventQueue = [];
+    this.turnEffects = [];
     this.notify();
   }
 

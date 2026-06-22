@@ -1,6 +1,6 @@
 import type {
   AggregatedReading, SynthesisResult, SlotResult, QuestionType,
-  ModifierRole, InteractionEvent, AffinityEffects,
+  ModifierRole, EffectReport, AffinityEffects,
 } from './types';
 import { NARRATIVE_TEMPLATES } from '../data/narrative-templates';
 import { bandOf } from '../data/affinities';
@@ -219,7 +219,7 @@ export class NarrativeAssembler {
   generateLLMPrompt(run: {
     question: QuestionType;
     slots: SlotResult[];
-    interactions: InteractionEvent[];
+    effects: EffectReport[];
     affinities: Record<string, number>;
     aggregated?: AggregatedReading;
   }): string {
@@ -256,10 +256,10 @@ export class NarrativeAssembler {
     lines.push('```');
     lines.push('');
 
-    if (run.interactions.length > 0) {
+    if (run.effects.length > 0) {
       lines.push('### Meta Events');
-      run.interactions.forEach((ev) => {
-        lines.push(`- ${ev.description}`);
+      run.effects.forEach((ev) => {
+        lines.push(`- ${ev.label}: ${ev.description}`);
       });
       lines.push('');
     }

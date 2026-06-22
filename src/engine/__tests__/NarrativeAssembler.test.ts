@@ -205,7 +205,7 @@ describe('NarrativeAssembler', () => {
     const prompt = assembler.generateLLMPrompt({
       question: 'decision' as QuestionType,
       slots: [makeSlot('tarot', { name: 'The Fool', themes: ['renewal'] })],
-      interactions: [],
+      effects: [],
       affinities: { chaos: 40, order: 50 },
       aggregated: baseAggregated,
     });

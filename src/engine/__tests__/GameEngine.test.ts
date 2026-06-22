@@ -202,6 +202,29 @@ describe('GameEngine — dispatch effects', () => {
     expect(engine.getState().screen).toBe('method-select');
     expect(die).toBeDefined();
   });
+
+  it('records the turn effects into the run history', () => {
+    const engine = new GameEngine();
+    engine.startTurn('decision');
+    engine.selectMethod(0);
+    engine.forceEffects(['chaos-second-result'], true);
+    engine.completeMinigame({ type: 'd20', result: 5, threshold: 'low', interpretation: '',
+      tags: [], themes: [], dimensions: { favorability: 0, certainty: 0, volatility: 0 }, modifierRoles: [] } as any);
+    engine.finishEventBatch(); // drain the deferred reading-1 transition
+    // Complete the remaining readings to reach the final synthesis + RunRecord.
+    while (engine.getState().screen !== 'result') {
+      const methods = engine.getState().availableMethods;
+      const idx = methods.findIndex((m) => m !== 'happening');
+      engine.selectMethod(idx);
+      engine.completeMinigame({ type: 'd20', result: 5, threshold: 'low', interpretation: '',
+        tags: [], themes: [], dimensions: { favorability: 0, certainty: 0, volatility: 0 }, modifierRoles: [] } as any);
+      engine.finishEventBatch();
+    }
+    const hist = engine.getState().history;
+    const last = hist[hist.length - 1];
+    expect(last.effects.length).toBeGreaterThan(0);
+    expect(last.effects.some((r) => r.responderId === 'chaos-second-result')).toBe(true);
+  });
 });
 
 function diceResult(): DiceResult {

@@ -252,6 +252,7 @@ export interface RunRecord {
   question: QuestionType;
   turnResults: SlotResult[];
   interactions: InteractionEvent[];
+  effects: EffectReport[];
   synthesis: SynthesisResult;
   happening?: HappeningResult;
   happeningChoice?: number; // index of chosen happening option
