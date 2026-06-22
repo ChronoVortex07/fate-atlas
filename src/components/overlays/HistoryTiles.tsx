@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
 import type { RunRecord } from '../../engine/types';
+import CardSigil from '../cards/CardSigil';
 
 function getTileIcon(run: RunRecord): string {
   if (!run.turnResults || run.turnResults.length === 0) return '*';
@@ -35,19 +36,24 @@ export default function HistoryTiles() {
   return (
     <div style={containerStyle}>
       <div style={scrollStyle}>
-        {history.map((run) => (
-          <motion.div
-            key={run.id}
-            style={tileStyle}
-            title={getTileLabel(run)}
-          >
-            <span style={iconStyle}>{getTileIcon(run)}</span>
-            <span style={labelStyle}>{getTileLabel(run).slice(0, 12)}</span>
-            {run.effects.length > 0 && (
-              <span style={badgeStyle}>{run.effects.length}</span>
-            )}
-          </motion.div>
-        ))}
+        {history.map((run) => {
+          const tileLast = run.turnResults?.[run.turnResults.length - 1];
+          return (
+            <motion.div
+              key={run.id}
+              style={tileStyle}
+              title={getTileLabel(run)}
+            >
+              {tileLast?.type === 'tarot'
+                ? <CardSigil card={tileLast} size={14} color="#d4a854" />
+                : <span style={iconStyle}>{getTileIcon(run)}</span>}
+              <span style={labelStyle}>{getTileLabel(run).slice(0, 12)}</span>
+              {run.effects.length > 0 && (
+                <span style={badgeStyle}>{run.effects.length}</span>
+              )}
+            </motion.div>
+          );
+        })}
       </div>
     </div>
   );

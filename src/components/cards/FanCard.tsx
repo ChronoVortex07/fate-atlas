@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import type { SlotResult } from '../../engine/types';
+import CardSigil from './CardSigil';
 
 export type FanCardState = 'idle' | 'source' | 'target' | 'animating' | 'reroll-target';
 
@@ -27,7 +28,7 @@ function getCardDisplay(result: SlotResult): {
     case 'tarot':
       return {
         symbol: result.symbol,
-        name: result.name,
+        name: result.spread && result.spread.length > 1 ? 'Spread' : result.name,
         detail: result.orientation === 'upright' ? '▲ Upright' : '▼ Reversed',
         borderColor: '#9b6bb0',
       };
@@ -238,7 +239,9 @@ export default function FanCard({
             fontWeight: display.borderColor === '#c75b4a' ? 700 : 400,
           }}
         >
-          {display.symbol}
+          {result.type === 'tarot'
+            ? <CardSigil card={result} size={isDesktop ? 22 : 14} color={isRerollTarget || isSource ? '#d4a854' : display.borderColor} />
+            : display.symbol}
         </span>
         <span
           style={{

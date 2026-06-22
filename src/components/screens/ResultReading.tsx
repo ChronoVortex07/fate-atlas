@@ -6,6 +6,7 @@ import RunicBand from '../shared/RunicBand';
 import OrnamentalBorder from '../shared/OrnamentalBorder';
 import MysticButton from '../shared/MysticButton';
 import HistoryModal from '../overlays/HistoryModal';
+import CardSigil from '../cards/CardSigil';
 import type { SlotResult } from '../../engine/types';
 
 function formatQuestionType(qt: string): string {
@@ -97,7 +98,11 @@ export default function ResultReading() {
               return (
                 <div key={i} style={resultCardStyle}>
                   <div style={resultIndexStyle}>{i + 1}</div>
-                  <div style={resultSymbolStyle}>{d.symbol}</div>
+                  <div style={resultSymbolStyle}>
+                    {r.type === 'tarot'
+                      ? <CardSigil card={r} size={28} color="#d4a854" />
+                      : d.symbol}
+                  </div>
                   <div style={resultNameStyle}>{d.name}</div>
                   <div style={resultSubtitleStyle}>{d.subtitle}</div>
                 </div>

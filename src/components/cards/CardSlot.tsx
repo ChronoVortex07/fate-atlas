@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import type { SlotResult } from '../../engine/types';
+import CardSigil from './CardSigil';
 
 const RUNES = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ';
 
@@ -70,9 +71,29 @@ export default function CardSlot({ slot, index, onReveal }: CardSlotProps) {
 function renderSlotContent(slot: SlotResult) {
   switch (slot.type) {
     case 'tarot':
+      if (slot.spread && slot.spread.length > 1) {
+        return (
+          <div style={contentWrapperStyle}>
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+              {slot.spread.map((s) => (
+                <div key={s.position} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
+                  <span style={{ fontSize: '0.55rem', color: '#7b9ec7', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{s.position}</span>
+                  {s.card.veiled
+                    ? <span style={{ fontSize: '1.5rem', color: '#5b7290' }}>✶</span>
+                    : <CardSigil card={s.card} size={28} color={s.card.orientation === 'reversed' ? '#d4a854' : '#9b6bb0'} />}
+                  <span style={{ fontSize: '0.5rem', color: '#7b9ec7' }}>{s.card.veiled ? 'veiled' : s.card.name}</span>
+                </div>
+              ))}
+            </div>
+            <div style={slotMeaningStyle}>{slot.orientation === 'upright' ? slot.meaningUpright : slot.meaningReversed}</div>
+          </div>
+        );
+      }
       return (
         <div style={contentWrapperStyle}>
-          <div style={slotSymbolStyle}>{slot.symbol}</div>
+          <div style={slotSymbolStyle}>
+            <CardSigil card={slot} size={32} />
+          </div>
           <div style={slotNameStyle}>{slot.name}</div>
           <div style={
             slot.orientation === 'upright'
