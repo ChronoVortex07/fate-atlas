@@ -280,6 +280,13 @@ export class NarrativeAssembler {
   private describeSlotFull(slot: SlotResult): string {
     switch (slot.type) {
       case 'tarot':
+        if (slot.spread && slot.spread.length > 1) {
+          return slot.spread.map((sp) => {
+            const pos = sp.position.charAt(0).toUpperCase() + sp.position.slice(1);
+            if (sp.card.veiled) return `${pos}: (veiled)`;
+            return `${pos}: ${sp.card.name} (${sp.card.orientation})`;
+          }).join('\n');
+        }
         return `The ${slot.name} appears ${slot.orientation} — ${slot.orientation === 'upright' ? slot.meaningUpright : slot.meaningReversed} [themes: ${slot.themes.join(', ')}] [favorability: ${slot.dimensions.favorability}]`;
       case 'd20':
         return `The dice settle on ${slot.result} (${slot.threshold.replace('-', ' ')}) — ${slot.interpretation} [themes: ${slot.themes.join(', ')}] [favorability: ${slot.dimensions.favorability}]`;

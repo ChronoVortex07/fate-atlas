@@ -221,6 +221,82 @@ describe('NarrativeAssembler', () => {
     expect(result.affinityNote).toContain('chaos');
   });
 
+  it('LLM prompt formats spread positions for multi-position tarot slots', () => {
+    const spreadSlot = {
+      type: 'tarot',
+      id: 'spread-test',
+      name: 'Three-Card Spread',
+      number: 0,
+      orientation: 'upright',
+      symbol: '☉',
+      meaningUpright: 'Generic meaning',
+      meaningReversed: 'Reversed meaning',
+      themes: ['mystery'],
+      dimensions: { favorability: 0.0, certainty: 0.0, volatility: 0.0 },
+      modifierRoles: ['subject'],
+      tags: [],
+      spread: [
+        {
+          position: 'past' as const,
+          card: {
+            id: 'fool', name: 'The Fool', arcana: 'major' as const, number: 0,
+            orientation: 'upright' as const, symbol: '☉', themes: ['mystery'],
+            dimensions: { favorability: 0.5, certainty: 0.0, volatility: 0.0 },
+            modifierRoles: [] as string[], meaningUpright: 'New beginnings',
+            meaningReversed: 'Recklessness', tags: [],
+          },
+        },
+        {
+          position: 'present' as const,
+          card: {
+            id: 'cups-2', name: 'Two of Cups', arcana: 'minor' as const, number: 2,
+            orientation: 'reversed' as const, symbol: '♡', themes: ['harmony'],
+            dimensions: { favorability: 0.3, certainty: 0.0, volatility: 0.0 },
+            modifierRoles: [] as string[], meaningUpright: 'Harmony',
+            meaningReversed: 'Division', tags: [],
+          },
+        },
+        {
+          position: 'future' as const,
+          card: {
+            id: 'swords-3', name: 'Three of Swords', arcana: 'minor' as const, number: 3,
+            orientation: 'upright' as const, symbol: '♤', themes: ['upheaval'],
+            dimensions: { favorability: -0.5, certainty: 0.0, volatility: 0.0 },
+            modifierRoles: [] as string[], meaningUpright: 'Heartbreak',
+            meaningReversed: 'Recovery', tags: [], veiled: true,
+          },
+        },
+      ],
+    } as unknown as SlotResult;
+
+    const prompt = assembler.generateLLMPrompt({
+      question: 'decision' as QuestionType,
+      slots: [spreadSlot],
+      effects: [],
+      affinities: { chaos: 40, order: 50 },
+      aggregated: baseAggregated,
+    });
+
+    // Should contain position labels
+    expect(prompt).toContain('Past:');
+    expect(prompt).toContain('Present:');
+    expect(prompt).toContain('Future:');
+
+    // Should contain card names with orientations for non-veiled cards
+    expect(prompt).toContain('The Fool (upright)');
+    expect(prompt).toContain('Two of Cups (reversed)');
+
+    // Should NOT contain the veiled card's name
+    expect(prompt).not.toContain('Three of Swords');
+
+    // Veiled card should show as (veiled)
+    expect(prompt).toContain('(veiled)');
+
+    // Should still contain the regular prompt structure
+    expect(prompt).toContain('Divinations');
+    expect(prompt).toContain('Instructions');
+  });
+
   it('affinity note appears for high order', () => {
     const result = assembler.assemble(baseAggregated, [], 'decision', { chaos: 30, order: 70 });
     expect(result.affinityNote).toContain('Order');
