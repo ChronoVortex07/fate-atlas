@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GameEngine } from '../GameEngine';
 import type { SlotResult, DiceResult } from '../types';
+import { drawAstralCast } from '../../data/astromancy';
 
 const dieResult = (result = 10, tags = ['roll', 'numeric']): SlotResult => ({
   type: 'd20', result, threshold: 'neutral', interpretation: 'Steady',
@@ -253,8 +254,6 @@ describe('GameEngine — affinity effects snapshot', () => {
     expect(result.type).toBe('d20');
   });
 });
-
-import { drawAstralCast } from '../../data/astromancy';
 
 describe('astral cast façade', () => {
   it('planAstralCast returns single when dormant', () => {

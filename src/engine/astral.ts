@@ -1,5 +1,6 @@
-import type { AffinityBand, AffinityId } from './types';
+import type { AffinityBand, AffinityId, AstralCast } from './types';
 import { bandOf, BAND_ORDER, BAND_POWER_STEP, TIER_BASE_CHANCE } from '../data/affinities';
+import { consolidateCast } from '../data/astromancy';
 
 export type AstralCastMode = 'single' | 'favored' | 'clouded' | 'choice';
 
@@ -40,9 +41,6 @@ export function shouldOfferRecast(affinities: Record<string, number>, rng: () =>
   const scaled = TIER_BASE_CHANCE.notable * (1 + (idx - minIdx) * BAND_POWER_STEP);
   return rng() < Math.min(1, scaled);
 }
-
-import type { AstralCast } from './types';
-import { consolidateCast } from '../data/astromancy';
 
 const HARMONY_RANK: Record<string, number> = { trine: 2, sextile: 1, conjunction: 0, minor: -1, square: -2, opposition: -2 };
 

@@ -232,6 +232,10 @@ the condition requires. Open the debug panel (`?debug` or `Ctrl+Shift+D`) to run
 > `happening:start` trigger is only dispatched through the live happening flow, so it may not
 > visibly fire from a cold scenario load (it still validates in the engine test suite).
 
+> Known limitation (astral): astral debug scenarios reliably fire only planet/sign-tag-dependent
+> responders (dignity, debility); omen/house/aspect-dependent scenarios depend on non-deterministic
+> physics landing and may not fire from a cold load.
+
 ---
 
 ## 8. Astromancy
@@ -272,18 +276,18 @@ element and modality also supply theme candidates.
 
 | Sign | Glyph | Element | Modality | Element theme | Modality theme |
 |------|-------|---------|----------|---------------|----------------|
-| Aries | ♈ | fire | cardinal | conflict | authority |
+| Aries | ♈ | fire | cardinal | transformation | authority |
 | Taurus | ♉ | earth | fixed | stagnation | stagnation |
 | Gemini | ♊ | air | mutable | illumination | illumination |
-| Cancer | ♋ | water | cardinal | mystery | authority |
-| Leo | ♌ | fire | fixed | conflict | stagnation |
+| Cancer | ♋ | water | cardinal | harmony | authority |
+| Leo | ♌ | fire | fixed | transformation | stagnation |
 | Virgo | ♍ | earth | mutable | stagnation | illumination |
 | Libra | ♎ | air | cardinal | illumination | authority |
-| Scorpio | ♏ | water | fixed | mystery | stagnation |
-| Sagittarius | ♐ | fire | mutable | conflict | illumination |
+| Scorpio | ♏ | water | fixed | harmony | stagnation |
+| Sagittarius | ♐ | fire | mutable | transformation | illumination |
 | Capricorn | ♑ | earth | cardinal | stagnation | authority |
 | Aquarius | ♒ | air | fixed | illumination | stagnation |
-| Pisces | ♓ | water | mutable | mystery | illumination |
+| Pisces | ♓ | water | mutable | harmony | illumination |
 
 Element dimension leans: **fire** +0.5 vol/+0.5 fav · **earth** +0.5 cer/−0.5 vol ·
 **air** +0.5 cer · **water** +0.5 fav/−0.5 cer.

@@ -104,6 +104,8 @@ describe('consolidateCast', () => {
     const cast: AstralCast = { planet: 'mars', planetHouse: 7, sign: 'aries', signHouse: 7, omens: [] };
     const r = consolidateCast(cast);
     expect(r.tags).toContain('astral');
+    expect(r.tags).toContain('draw');
+    expect(r.tags).toContain('random');
     expect(r.tags).toContain('planet-mars');
     expect(r.tags).toContain('sign-aries');
     expect(r.tags).toContain('house-7');
@@ -127,9 +129,9 @@ describe('consolidateCast', () => {
   });
 
   it('carries through omen tags from the cast', () => {
-    const cast: AstralCast = { planet: 'sun', planetHouse: 1, sign: 'leo', signHouse: 1, omens: ['omen-test' as any] };
+    const cast: AstralCast = { planet: 'sun', planetHouse: 1, sign: 'leo', signHouse: 1, omens: ['errant-star'] };
     const r = consolidateCast(cast);
-    expect(r.tags).toContain('omen-test');
+    expect(r.tags).toContain('errant-star');
   });
 
   it('records the planet, sign, house, aspect in the result', () => {

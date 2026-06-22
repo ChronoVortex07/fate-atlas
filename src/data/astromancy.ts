@@ -109,10 +109,10 @@ export const MODALITY_THEMES: Record<SignDef['modality'], ThemeTag> = {
 };
 
 export const ELEMENT_THEMES: Record<SignDef['element'], ThemeTag> = {
-  fire: 'conflict',
+  fire: 'transformation',
   earth: 'stagnation',
   air: 'illumination',
-  water: 'mystery',
+  water: 'harmony',
 };
 
 // ── Element and modality dimension leans ──

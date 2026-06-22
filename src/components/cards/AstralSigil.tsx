@@ -19,7 +19,11 @@ export default function AstralSigil(props: Props) {
         width: size, height: size, fontSize: size * 0.7, color: '#d4a854',
         fontFamily: "'Cormorant Garamond', serif", lineHeight: 1,
       }}
-      aria-label={props.kind === 'house' ? `House ${props.id}` : props.id}
+      aria-label={
+        props.kind === 'house' ? `House ${props.id}`
+        : props.kind === 'planet' ? PLANETS[props.id].name
+        : SIGNS[props.id].name
+      }
     >
       {glyph}
     </span>

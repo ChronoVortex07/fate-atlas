@@ -24,6 +24,20 @@ describe('astral symbolic responders', () => {
     const changed = (['favorability','certainty','volatility'] as const).some((a) => after[a] !== before[a]);
     expect(changed).toBe(true);
   });
+  it('dignity all-zero-dimensions fallback: dominantAxis defaults to favorability, amplify is +0.5', () => {
+    // When all dimensions are 0, dominantAxis returns 'favorability' (strict > keeps initial).
+    // Math.sign(0 || 1) = +1, so favorability goes from 0 to +0.5.
+    const c = ctx(cast({ sign: 'aries' }));
+    // Force all dimensions to zero on the draft outcome
+    (c.draft.outcome as any).dimensions = { favorability: 0, certainty: 0, volatility: 0 };
+    const r = R('astral-dignity');
+    expect(r.condition(c)).toBe(true);
+    r.apply(c);
+    const dims = (c.draft.outcome as any).dimensions;
+    expect(dims.favorability).toBe(0.5);
+    expect(dims.certainty).toBe(0);
+    expect(dims.volatility).toBe(0);
+  });
   it('debility fires for Mars in Libra and not for a dignified cast', () => {
     expect(R('astral-debility').condition(ctx(cast({ sign: 'libra' })))).toBe(true);
     expect(R('astral-debility').condition(ctx(cast({ sign: 'aries' })))).toBe(false);
