@@ -29,6 +29,14 @@ export const rollModeReducer: CombineReducer = {
   },
 };
 
+export const spreadReducer: CombineReducer = {
+  channel: 'spread',
+  reduce(ctx: PhaseContext): EffectReport[] {
+    return (ctx.draft.spreadReports as EffectReport[] | undefined) ?? [];
+  },
+};
+
 export const REDUCERS: Record<string, CombineReducer> = {
   'roll-mode': rollModeReducer,
+  'spread': spreadReducer,
 };

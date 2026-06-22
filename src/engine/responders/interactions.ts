@@ -11,6 +11,36 @@ function report(id: string, label: string, description: string, animation: strin
   return { responderId: id, label, description, animation, targetSlot };
 }
 
+// ── Spread-internal helpers ──
+
+const spreadOf = (c: { draft: { outcome?: SlotResult } }): TarotResult | null =>
+  c.draft.outcome?.type === 'tarot' && (c.draft.outcome as TarotResult).spread ? (c.draft.outcome as TarotResult) : null;
+const facesOf = (r: TarotResult) => r.spread!.map((s) => s.card);
+const OPPOSED: Record<string, string> = { fire: 'water', water: 'fire', air: 'earth', earth: 'air' };
+const elementsIn = (r: TarotResult) =>
+  new Set(facesOf(r).flatMap((f) => f.tags.filter((t) => t.startsWith('element-')).map((t) => t.slice(8))));
+const primaryAxis: Record<string, keyof TarotResult['dimensions']> =
+  { wands: 'volatility', cups: 'favorability', swords: 'favorability', pentacles: 'certainty' };
+
+function spreadEntry(
+  id: string, fires: (r: TarotResult) => boolean,
+  apply: (r: TarotResult, push: (rep: EffectReport) => void) => void,
+): Responder {
+  return {
+    id, source: 'interaction', triggers: ['tarot:commit'],
+    group: { kind: 'combine', channel: 'spread' },
+    condition: (c) => { const r = spreadOf(c); return !!r && (r.spread!.length > 1) && fires(r); },
+    roll: () => true,
+    apply: (c) => {
+      const r = spreadOf(c)!;
+      const push = (rep: EffectReport) => { (c.draft.spreadReports ??= [] as EffectReport[]).push(rep); };
+      apply(r, push);
+      c.draft.outcome = r;
+      return null;
+    },
+  };
+}
+
 export function buildInteractionResponders(): Responder[] {
   return [
     {
@@ -64,5 +94,29 @@ export function buildInteractionResponders(): Responder[] {
         return report('iching-happening-boost', 'I Ching', 'The changing lines reveal hidden branches — more choices emerge.', 'add-choice');
       },
     },
+    // ── Spread-internal interactions ──
+    spreadEntry('suit-accord',
+      (r) => { const s = facesOf(r).map((f) => f.suit); return s.every((x) => x && x === s[0]); },
+      (r, push) => {
+        const suit = facesOf(r)[0].suit!;
+        const axis = primaryAxis[suit];
+        r.dimensions[axis] = Math.max(-2, Math.min(2, Math.round(r.dimensions[axis] * 1.5 * 2) / 2));
+        push(report('suit-accord', 'Suit Accord', `The ${suit} run pure — their nature deepens.`, 'amplify'));
+      }),
+    spreadEntry('elemental-clash',
+      (r) => { const e = elementsIn(r); return [...e].some((x) => e.has(OPPOSED[x])); },
+      (r, push) => {
+        r.dimensions.volatility = Math.max(-2, Math.min(2, Math.round((r.dimensions.volatility + 1) * 2) / 2));
+        push(report('elemental-clash', 'Elemental Clash', 'Opposing elements grind — the reading turns turbulent.', 'amplify'));
+      }),
+    spreadEntry('major-convergence',
+      (r) => facesOf(r).filter((f) => f.arcana === 'major').length >= 2,
+      (_r, push) => push(report('major-convergence', 'Convergence', 'Two great arcana align — a fated current runs through the spread.', 'second-result'))),
+    spreadEntry('spread-aligned',
+      (r) => facesOf(r).every((f) => f.orientation === 'upright'),
+      (_r, push) => push(report('spread-aligned', 'Order', 'The spread stands wholly upright — clarity settles.', 'anchor'))),
+    spreadEntry('spread-cascade',
+      (r) => facesOf(r).every((f) => f.orientation === 'reversed'),
+      (_r, push) => push(report('spread-cascade', 'Chaos', 'Every card falls reversed — a cascade of upheaval.', 'flip'))),
   ];
 }
