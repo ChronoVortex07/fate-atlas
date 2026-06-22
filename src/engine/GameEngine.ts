@@ -56,14 +56,12 @@ export class GameEngine {
       minigamesCompleted: 0,
       activeSlotIndex: null,
       minigameState: null,
-      interactions: [],
       synthesis: null,
       happening: null,
       selectedHappeningChoice: null,
       history: [],
       eventLog: [],
       debug: false,
-      debugForcedEffect: null,
       affinityEffects: {
         handSize: 3, methodCount: 3, hintClarity: 0,
         readingDetail: 0, poolPreview: 'none', peekAvailable: false,
@@ -181,7 +179,6 @@ export class GameEngine {
     this.state.minigamesCompleted = 0;
     this.state.activeSlotIndex = null;
     this.state.minigameState = null;
-    this.state.interactions = [];
     this.state.synthesis = null;
     this.state.happening = null;
     this.state.selectedHappeningChoice = null;
@@ -325,7 +322,6 @@ export class GameEngine {
       timestamp: Date.now(),
       question: this.state.questionType!,
       turnResults: this.state.turnResults,
-      interactions: this.state.interactions,
       effects: this.turnEffects,
       synthesis: this.state.synthesis!,
       happening: this.state.happening ?? undefined,
@@ -640,7 +636,6 @@ export class GameEngine {
     this.state.minigamesCompleted = 0;
     this.state.activeSlotIndex = null;
     this.state.minigameState = null;
-    this.state.interactions = [];
     this.state.synthesis = null;
     this.state.happening = null;
     this.state.selectedHappeningChoice = null;
