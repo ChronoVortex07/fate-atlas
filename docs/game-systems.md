@@ -17,6 +17,9 @@ the **meta-interactions** between divination results, and the **happenings**.
 > | Dispatch / band ordering / chance scaling | [`src/engine/events/EventDispatcher.ts`](../src/engine/events/EventDispatcher.ts), [`src/engine/events/eligibility.ts`](../src/engine/events/eligibility.ts) |
 > | Happenings | [`src/data/happenings.ts`](../src/data/happenings.ts) |
 > | Debug scenarios | [`src/engine/events/scenarios.ts`](../src/engine/events/scenarios.ts) |
+> | Astromancy data tables (planets, signs, houses, aspects, dignity) | [`src/data/astromancy.ts`](../src/data/astromancy.ts) |
+> | Astromancy cast modes and affinity modifiers | [`src/engine/astral.ts`](../src/engine/astral.ts) |
+> | Astromancy symbolic-resonance + omen responders | [`src/engine/responders/astral.ts`](../src/engine/responders/astral.ts) |
 
 ---
 
@@ -228,3 +231,187 @@ the condition requires. Open the debug panel (`?debug` or `Ctrl+Shift+D`) to run
 > Known limitation: the `iching-happening-boost` scenario stages a happening screen, but its
 > `happening:start` trigger is only dispatched through the live happening flow, so it may not
 > visibly fire from a cold scenario load (it still validates in the engine test suite).
+
+---
+
+## 8. Astromancy
+
+Astromancy (`type: 'astral'`) is the fourth divination method. The cast throws two physical
+dice onto a 12-house zodiac board: a **Planet die** (12 faces) and a **Sign die** (12 faces).
+Where each die lands determines a house; the angle between the two houses produces an
+**aspect**. The reading is **Planet-in-Sign-in-House** plus the aspect between them — four
+signals combined into a single `AstralResult`.
+
+The legacy d20 method coexists with astromancy in the pool; both are available.
+
+Sources of truth: [`src/data/astromancy.ts`](../src/data/astromancy.ts),
+[`src/engine/astral.ts`](../src/engine/astral.ts),
+[`src/engine/responders/astral.ts`](../src/engine/responders/astral.ts).
+
+### 8a. Planet die (12 planets)
+
+| Planet | Glyph | Theme | Modifier role | Favorability | Certainty | Volatility |
+|--------|-------|-------|---------------|:------------:|:---------:|:----------:|
+| Sun | ☉ | illumination | subject | +1.0 | +0.5 | 0 |
+| Moon | ☽ | mystery | subject | +0.5 | −1.0 | +0.5 |
+| Mercury | ☿ | illumination | action | 0 | +0.5 | +0.5 |
+| Venus | ♀ | harmony | subject | +1.5 | 0 | −0.5 |
+| Mars | ♂ | conflict | action | −1.0 | +0.5 | +1.5 |
+| Jupiter | ♃ | renewal | subject | +1.5 | 0 | +0.5 |
+| Saturn | ♄ | authority | effect | −0.5 | +1.5 | −0.5 |
+| Uranus | ♅ | upheaval | effect | 0 | −0.5 | +1.5 |
+| Neptune | ♆ | mystery | effect | 0 | −1.0 | +0.5 |
+| Pluto | ♇ | transformation | effect | −0.5 | 0 | +1.5 |
+| North Node | ☊ | renewal | action | +1.0 | −0.5 | +0.5 |
+| South Node | ☋ | surrender | effect | −1.0 | 0 | 0 |
+
+### 8b. Sign die (12 signs)
+
+Signs contribute **element lean** and **modality lean** to the combined dimensions; their
+element and modality also supply theme candidates.
+
+| Sign | Glyph | Element | Modality | Element theme | Modality theme |
+|------|-------|---------|----------|---------------|----------------|
+| Aries | ♈ | fire | cardinal | conflict | authority |
+| Taurus | ♉ | earth | fixed | stagnation | stagnation |
+| Gemini | ♊ | air | mutable | illumination | illumination |
+| Cancer | ♋ | water | cardinal | mystery | authority |
+| Leo | ♌ | fire | fixed | conflict | stagnation |
+| Virgo | ♍ | earth | mutable | stagnation | illumination |
+| Libra | ♎ | air | cardinal | illumination | authority |
+| Scorpio | ♏ | water | fixed | mystery | stagnation |
+| Sagittarius | ♐ | fire | mutable | conflict | illumination |
+| Capricorn | ♑ | earth | cardinal | stagnation | authority |
+| Aquarius | ♒ | air | fixed | illumination | stagnation |
+| Pisces | ♓ | water | mutable | mystery | illumination |
+
+Element dimension leans: **fire** +0.5 vol/+0.5 fav · **earth** +0.5 cer/−0.5 vol ·
+**air** +0.5 cer · **water** +0.5 fav/−0.5 cer.
+
+Modality dimension leans: **cardinal** +0.5 vol · **fixed** +0.5 cer/−0.5 vol ·
+**mutable** +0.5 vol/−0.5 cer.
+
+### 8c. House board (12 houses)
+
+The Planet die's landing house determines the arena. The Sign die's landing house is used only
+to compute the aspect (see §8d).
+
+| House | Arena | Theme |
+|-------|-------|-------|
+| 1 | Self | authority |
+| 2 | Resources | stagnation |
+| 3 | Communication | illumination |
+| 4 | Roots | harmony |
+| 5 | Creativity | renewal |
+| 6 | Work | stagnation |
+| 7 | Partnership | harmony |
+| 8 | Rebirth | transformation |
+| 9 | Journeys | illumination |
+| 10 | Career | authority |
+| 11 | Community | renewal |
+| 12 | The Hidden | mystery |
+
+### 8d. Aspects
+
+`aspectBetween(houseA, houseB)` computes the minimum arc (0–6 steps of 30°) between the two
+landing houses and maps it to an aspect name. A step of 6 is opposition (180°).
+
+| Step | Aspect | Favorability | Certainty | Volatility | Theme |
+|------|--------|:------------:|:---------:|:----------:|-------|
+| 0 | conjunction | 0 | +1.5 | +0.5 | *(none)* |
+| 2 | sextile | +1.0 | +0.5 | 0 | harmony |
+| 3 | square | −0.5 | 0 | +1.0 | conflict |
+| 4 | trine | +1.0 | +0.5 | 0 | harmony |
+| 6 | opposition | 0 | +1.0 | +1.0 | upheaval |
+| 1, 5 | minor | 0 | −0.5 | +0.5 | mystery |
+
+### 8e. How `consolidateCast` combines the four signals
+
+1. **Dimensions** — sum planet + element lean + modality lean + aspect dims, then halve and
+   clamp to −2 … +2 (in 0.5 steps).
+2. **Themes** — ranked by priority: house → planet → aspect → element; deduplicated, capped
+   at 2.
+3. **Tags** emitted: `draw`, `random`, `astral`, `planet-<id>`, `sign-<id>`,
+   `house-<N>`, `element-<element>`, `aspect-<name>`, `dignified` or `debilitated`
+   (if applicable), plus any omen tags from the cast.
+
+### 8f. Dignity and debility
+
+A planet is **dignified** when it lands in one of its home signs; **debilitated** in a hostile
+sign. Both tag the result and activate dedicated responders (§8h).
+
+| Planet | Dignified in | Debilitated in |
+|--------|-------------|----------------|
+| Sun | Leo | Aquarius |
+| Moon | Cancer | Capricorn |
+| Mercury | Gemini, Virgo | Sagittarius, Pisces |
+| Venus | Taurus, Libra | Scorpio, Aries |
+| Mars | Aries, Scorpio | Libra, Taurus |
+| Jupiter | Sagittarius, Pisces | Gemini, Virgo |
+| Saturn | Capricorn, Aquarius | Cancer, Aries |
+| Uranus | Aquarius | Leo |
+| Neptune | Pisces | Virgo |
+| Pluto | Scorpio | Taurus |
+| North Node | *(none)* | *(none)* |
+| South Node | *(none)* | *(none)* |
+
+### 8g. Cast modes (affinity-driven)
+
+Before the dice are thrown `planAstralCast` resolves a cast mode from the current affinities.
+A **separate** probabilistic check (`shouldOfferRecast`) may additionally offer the player a
+chance to recast.
+
+| Mode | Affinity required | What happens |
+|------|-------------------|--------------|
+| `single` | *(default — no qualifying affinity)* | One cast, auto-accepted |
+| `favored` | Light ascendant+ | Two casts drawn; the one with higher favorability + harmony rank is kept automatically |
+| `clouded` | Shadow ascendant+ | Two casts drawn; the one with *lower* favorability + harmony rank is kept automatically |
+| `choice` | Will dominant | Two casts drawn; the player picks which to keep (suppresses offer-recast) |
+
+`choice` wins over `favored`/`clouded`; among `favored`/`clouded`, the first match in list
+order wins (Will dominant checked first, then Light ascendant, then Shadow ascendant).
+
+**Offer-recast** — when mode is not `choice`, `shouldOfferRecast` may fire: it replicates
+`bandRoll('will', 'stirring', T.notable)` — Will stirring minimum, notable tier base chance
+(0.22), scaling +70% per band above gate.
+
+### 8h. Symbolic-resonance + omen responders
+
+All eight responders trigger at `astral:commit`. All are deterministic (`roll → true`).
+Five compete in the `MUTATE` exclusive band; one (`astral-errant-star`) is in `SPAWN`;
+`astral-conjunction-crowned` is also `MUTATE` but carries weight 2 (beats weight-1 MUTATE
+rivals in a tie).
+
+#### Symbolic-resonance responders (tag-matched, always fire when condition is true)
+
+| Responder | Condition | Band | Effect | Animation |
+|-----------|-----------|------|--------|-----------|
+| `astral-dignity` | result has tag `dignified` | MUTATE | Amplifies the dominant dimension by +0.5 (in the direction of its sign) | `override` |
+| `astral-debility` | result has tag `debilitated` | MUTATE | −0.5 favorability, +0.5 volatility | `shroud` |
+| `astral-great-trine` | `aspect-trine` + planet is Jupiter or Venus | MUTATE | +1.0 favorability; forces `harmony` into themes (index 1) | `add-choice` |
+| `astral-duel` | planet is Mars + aspect is square or opposition | MUTATE | +1.0 volatility, −0.5 favorability; forces `conflict` into themes (index 0) | `flip` |
+| `astral-saturns-gate` | planet is Saturn + house is 1 or 10 | MUTATE | +1.0 certainty, −0.5 favorability; forces `authority` into themes (index 0) | `override` |
+| `astral-conjunction-crowned` | result has omen tag `crowned-conjunction` | MUTATE (weight 2) | Amplifies the dominant dimension by +1.0 | `override` |
+| `astral-veiled-oracle` | result has omen tag `veiled-oracle` | MUTATE | −1.0 certainty; forces `mystery` into themes (index 1) | `shroud` |
+
+#### Omen responder (physics-sourced tag)
+
+| Responder | Condition | Band | Effect | Animation |
+|-----------|-----------|------|--------|-----------|
+| `astral-errant-star` | result has omen tag `errant-star` | SPAWN | Spawns a second astral result (`spawnSecond = 'astral'`) | `second-result` |
+
+**Omen tags** (`OmenTag`) are set by the physics renderer on the `AstralCast` before
+`consolidateCast` is called. Three omens are defined:
+
+| Omen tag | Physics trigger | Responder activated |
+|----------|----------------|---------------------|
+| `errant-star` | A die slides off the board | `astral-errant-star` (SPAWN) |
+| `crowned-conjunction` | Both dice come to rest in the same house | `astral-conjunction-crowned` (MUTATE weight 2) |
+| `veiled-oracle` | A die lands askew / on an edge | `astral-veiled-oracle` (MUTATE) |
+
+> **Physics is presentation only.** The engine-side generator `drawAstralCast` produces a
+> plain `AstralCast` with `omens: []`; the React physics renderer populates the omen tags
+> before passing the cast to `consolidateCast`. Affinities act as physical forces during the
+> throw: **Chaos** adds turbulence (wider scatter, more extreme aspects), **Order** centers
+> the dice (smaller separation between the two landing houses). This is cosmetic — the
+> same affinity influence is already baked into the engine-side `drawAstralCast` fallback.
