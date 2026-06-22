@@ -1,5 +1,5 @@
 import type {
-  PlanetId, SignId, ThemeTag, DimensionValues, ModifierRole,
+  PlanetId, SignId, AspectName, ThemeTag, DimensionValues, ModifierRole,
 } from '../engine/types';
 
 export interface PlanetDef {
@@ -80,4 +80,23 @@ export const DIGNITY: Record<PlanetId, { dignified: SignId[]; debilitated: SignI
   pluto:      { dignified: ['scorpio'],            debilitated: ['taurus'] },
   'north-node': { dignified: [],                   debilitated: [] },
   'south-node': { dignified: [],                   debilitated: [] },
+};
+
+const ASPECT_BY_STEP: Record<number, AspectName> = {
+  0: 'conjunction', 1: 'minor', 2: 'sextile', 3: 'square', 4: 'trine', 5: 'minor', 6: 'opposition',
+};
+
+export function aspectBetween(houseA: number, houseB: number): AspectName {
+  const d = Math.abs(houseA - houseB);
+  const step = Math.min(d, 12 - d); // 0..6
+  return ASPECT_BY_STEP[step];
+}
+
+export const ASPECT_EFFECT: Record<AspectName, { dims: Partial<DimensionValues>; theme?: ThemeTag }> = {
+  conjunction: { dims: { certainty: 1.5, volatility: 0.5 } },
+  sextile:     { dims: { favorability: 1.0, certainty: 0.5 }, theme: 'harmony' },
+  square:      { dims: { favorability: -0.5, volatility: 1.0 }, theme: 'conflict' },
+  trine:       { dims: { favorability: 1.0, certainty: 0.5 }, theme: 'harmony' },
+  opposition:  { dims: { certainty: 1.0, volatility: 1.0 }, theme: 'upheaval' },
+  minor:       { dims: { volatility: 0.5, certainty: -0.5 }, theme: 'mystery' },
 };

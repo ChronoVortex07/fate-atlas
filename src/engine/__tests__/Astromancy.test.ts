@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { AstralResult, AstralCast } from '../types';
-import { PLANETS, SIGNS, HOUSES, DIGNITY } from '../../data/astromancy';
+import { PLANETS, SIGNS, HOUSES, DIGNITY, aspectBetween } from '../../data/astromancy';
 
 describe('astral types', () => {
   it('an AstralResult is assignable with the required surface', () => {
@@ -40,5 +40,22 @@ describe('astromancy tables', () => {
         expect(v).toBeLessThanOrEqual(2);
       }
     }
+  });
+});
+
+describe('aspectBetween', () => {
+  it('maps house separations to the right aspect', () => {
+    expect(aspectBetween(1, 1)).toBe('conjunction');   // 0°
+    expect(aspectBetween(1, 3)).toBe('sextile');        // 60°
+    expect(aspectBetween(1, 4)).toBe('square');         // 90°
+    expect(aspectBetween(1, 5)).toBe('trine');          // 120°
+    expect(aspectBetween(1, 7)).toBe('opposition');     // 180°
+    expect(aspectBetween(1, 2)).toBe('minor');          // 30°
+    expect(aspectBetween(1, 6)).toBe('minor');          // 150°
+  });
+  it('is symmetric and wraps the wheel', () => {
+    expect(aspectBetween(12, 1)).toBe('minor');         // 30° across the wrap
+    expect(aspectBetween(2, 8)).toBe('opposition');     // 180°
+    expect(aspectBetween(7, 1)).toBe(aspectBetween(1, 7));
   });
 });
