@@ -1,4 +1,4 @@
-import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, RollMode, DivinationType } from './types';
+import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, TarotCardFace, DiceResult, RunRecord, RollMode, DivinationType } from './types';
 import { EventBus } from './EventBus';
 import { AffinityEngine } from './AffinityEngine';
 import { TurnOrchestrator } from './TurnOrchestrator';
@@ -426,22 +426,23 @@ export class GameEngine {
     return { mode: draft.rollMode ?? 'single', offerReroll: draft.offerReroll ?? false, reports };
   }
 
-  // Fate may intercept the pick (OVERRIDE band) and substitute another card.
-  resolveTarotPick(chosenIndex: number, hand: TarotResult[]): { card: TarotResult; swapped: boolean } {
-    const chosen = hand[chosenIndex];
-    const { draft } = this.dispatchAt('tarot:pick', { outcome: chosen, pool: hand as unknown as SlotResult[] });
-    const card = (draft.outcome as TarotResult) ?? chosen;
+  // Fate (OVERRIDE) may swap one dealt position for a fresh single card before reveal.
+  resolveTarotDeal(faces: TarotCardFace[]): { faces: TarotCardFace[]; swappedIndex: number | null } {
+    const { draft } = this.dispatchAt('tarot:deal', { faces: [...faces] as unknown as SlotResult[] });
+    const outFaces = (draft.faces as unknown as TarotCardFace[]) ?? faces;
+    const swappedIndex = typeof draft.swappedIndex === 'number' ? draft.swappedIndex : null;
     this.notify();
-    return { card, swapped: card !== chosen };
+    return { faces: outFaces, swappedIndex };
   }
 
-  // Fate may decide the orientation for the player.
-  resolveOrientation(card: TarotResult): { orientation: 'upright' | 'reversed'; auto: boolean } {
-    const { draft } = this.dispatchAt('tarot:orient', { outcome: card });
-    const out = draft.outcome as TarotResult | undefined;
-    const auto = !!out && out.orientation !== card.orientation;
+  // Fate (OVERRIDE) may decide the spread-wide orientation for the player.
+  resolveSpreadOrientation(result: TarotResult): { result: TarotResult; auto: boolean; reversed: boolean } {
+    const originalOrientation = result.orientation;
+    const { draft } = this.dispatchAt('tarot:orient', { outcome: result });
+    const out = (draft.outcome as TarotResult) ?? result;
+    const auto = out.orientation !== originalOrientation;
     this.notify();
-    return { orientation: out?.orientation ?? card.orientation, auto };
+    return { result: out, auto, reversed: out.orientation === 'reversed' };
   }
 
   // Pre-commit dice reroll. Fate (Ascendant+) may make it hollow (same face).

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GameEngine } from '../GameEngine';
+import { buildFace, DECK_BY_ID, consolidateSpread } from '../../data/tarot';
 import type { SlotResult, DiceResult } from '../types';
 
 const dieResult = (result = 10, tags = ['roll', 'numeric']): SlotResult => ({
@@ -234,6 +235,25 @@ function diceResult(): DiceResult {
     themes: ['harmony'], dimensions: { favorability: 0, certainty: -1, volatility: 0 }, modifierRoles: ['effect'],
   };
 }
+
+describe('tarot deal + spread orientation', () => {
+  it('resolveTarotDeal returns the same faces when Fate is dormant', () => {
+    const e = new GameEngine();
+    e.startTurn('self');
+    const faces = [buildFace(DECK_BY_ID['the-fool'], 'upright'), buildFace(DECK_BY_ID['cups-2'], 'upright'), buildFace(DECK_BY_ID['swords-3'], 'upright')];
+    const { faces: out, swappedIndex } = e.resolveTarotDeal(faces);
+    expect(out).toHaveLength(3);
+    expect(swappedIndex).toBeNull();
+  });
+
+  it('resolveSpreadOrientation passes through when Fate is dormant', () => {
+    const e = new GameEngine();
+    e.startTurn('self');
+    const r = consolidateSpread([buildFace(DECK_BY_ID['the-star'], 'upright'), buildFace(DECK_BY_ID['cups-2'], 'upright'), buildFace(DECK_BY_ID['swords-3'], 'upright')]);
+    const { auto } = e.resolveSpreadOrientation(r);
+    expect(auto).toBe(false);
+  });
+});
 
 describe('GameEngine — affinity effects snapshot', () => {
   it('carries affinityEffects in the snapshot and reflects band changes after notify', () => {

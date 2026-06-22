@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { GameEngine } from '../GameEngine';
-import type { TarotResult, DiceResult } from '../types';
+import { buildFace, DECK_BY_ID } from '../../data/tarot';
+import type { TarotCardFace, TarotResult, DiceResult } from '../types';
 
 const tarot = (orientation: 'upright' | 'reversed'): TarotResult => ({
   type: 'tarot', id: 'the-fool', name: 'The Fool', number: 0, orientation, symbol: '☉',
@@ -70,42 +71,33 @@ describe('resolveReroll (pre-commit dice reroll)', () => {
   });
 });
 
-describe('resolveTarotPick (Fate override)', () => {
-  const hand = [
-    tarot('upright'),
-    { ...tarot('reversed'), id: 'the-star', name: 'The Star' },
-    { ...tarot('upright'), id: 'death', name: 'Death' },
+describe('resolveTarotDeal (Fate override)', () => {
+  const faces: TarotCardFace[] = [
+    buildFace(DECK_BY_ID['the-fool'], 'upright'),
+    buildFace(DECK_BY_ID['the-star'], 'reversed'),
+    buildFace(DECK_BY_ID['death'], 'upright'),
   ];
 
-  it('returns the chosen card when nothing fires', () => {
+  it('returns the same faces when nothing fires', () => {
     const e = new GameEngine();
     startMinigame(e);
-    const orig = Math.random; Math.random = () => 0.99;
-    const { card, swapped } = e.resolveTarotPick(0, hand);
-    Math.random = orig;
-    expect(swapped).toBe(false);
-    expect(card.id).toBe('the-fool');
-  });
-
-  it('returns a different card when fate-override-pick is forced', () => {
-    const e = new GameEngine();
-    startMinigame(e);
-    e.forceEffects(['fate-override-pick'], false);
-    const { card, swapped } = e.resolveTarotPick(0, hand);
-    expect(swapped).toBe(true);
-    expect(card.id).not.toBe('the-fool');
+    const { faces: out, swappedIndex } = e.resolveTarotDeal(faces);
+    expect(swappedIndex).toBeNull();
+    expect(out).toHaveLength(3);
+    expect(out.map((f) => f.id)).toEqual(['the-fool', 'the-star', 'death']);
   });
 });
 
 describe('orientation', () => {
-  it('resolveOrientation auto-sets when fate-auto-orient is forced', () => {
+  it('resolveSpreadOrientation auto-sets when fate-auto-orient is forced', () => {
     const e = new GameEngine();
     startMinigame(e);
     e.forceEffects(['fate-auto-orient'], false);
     const orig = Math.random; Math.random = () => 0.0; // force upright deterministically
-    const { orientation } = e.resolveOrientation(tarot('reversed'));
+    const { auto, reversed } = e.resolveSpreadOrientation(tarot('reversed'));
     Math.random = orig;
-    expect(['upright', 'reversed']).toContain(orientation);
+    expect(auto).toBe(true);
+    expect(reversed).toBe(false);
   });
 
   it('setOrientation feeds Will', () => {

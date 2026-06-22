@@ -31,15 +31,13 @@ export default function TarotMinigame() {
   }, [reveal]);
 
   const handlePickCard = useCallback((index: number) => {
-    // Fate may swap the card you picked for another in the hand.
-    const { card, swapped: didSwap } = engine.resolveTarotPick(index, faceDownCards);
-    const actualIndex = faceDownCards.indexOf(card);
-    setChosenIndex(actualIndex >= 0 ? actualIndex : index);
-    setSwapped(didSwap);
-    // Fate may also decide the orientation for you (skip the prompt).
-    const { orientation, auto } = engine.resolveOrientation(card);
+    const card = faceDownCards[index];
+    setChosenIndex(index);
+    setSwapped(false);
+    // Fate may decide the spread-wide orientation for you (skip the prompt).
+    const { auto, reversed } = engine.resolveSpreadOrientation(card);
     setTimeout(() => {
-      if (auto) { setAutoDecided(true); reveal(orientation === 'reversed'); }
+      if (auto) { setAutoDecided(true); reveal(reversed); }
       else setPhase('reversal-prompt');
     }, 600);
   }, [engine, faceDownCards, reveal]);
