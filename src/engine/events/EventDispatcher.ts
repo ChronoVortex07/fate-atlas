@@ -56,7 +56,11 @@ export function dispatch(
       if (r.group.kind === 'combine' && r.group.channel === channel) r.apply(ctx);
     }
     const reducer = REDUCERS[channel];
-    if (reducer) { const rep = reducer.reduce(ctx); if (rep) reports.push(rep); }
+    if (reducer) {
+      const rep = reducer.reduce(ctx);
+      if (Array.isArray(rep)) reports.push(...rep);
+      else if (rep) reports.push(rep);
+    }
   }
 
   return { reports, forcedConsumed };

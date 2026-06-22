@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { REDUCERS } from '../events/reducers';
-import type { PhaseContext } from '../events/types';
+import type { EffectReport, PhaseContext } from '../events/types';
 
 function ctx(rollMods: string[]): PhaseContext {
   return {
@@ -23,7 +23,7 @@ describe('roll-mode reducer', () => {
     const report = REDUCERS['roll-mode'].reduce(c);
     expect(c.draft.rollMode).toBe('choice');
     expect(report).not.toBeNull();
-    expect(report!.animation).toBe('roll-mode');
+    expect((report as EffectReport).animation).toBe('roll-mode');
   });
 
   it('no mods → null and leaves mode single', () => {

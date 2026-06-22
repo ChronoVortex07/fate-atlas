@@ -56,7 +56,7 @@ export interface Responder {
 
 export interface CombineReducer {
   channel: string;
-  reduce(ctx: PhaseContext): EffectReport | null;
+  reduce(ctx: PhaseContext): EffectReport | EffectReport[] | null;
 }
 
 export interface DebugConfig {
