@@ -739,15 +739,16 @@ export class GameEngine {
       return buildFace(DECK_BY_ID[h!.cardId], pickOrientation(this.affinityEngine.getState()));
     });
 
+    // Dispatch pre-consolidation trigger for meta-interactions
+    this.dispatchAt('tarot:committed', { faces: faces as unknown as SlotResult[], reverse });
+
     let result = consolidateSpread(faces);
     if (reverse) result = reverseSpread(result);
 
-    const meta = reverse
+    const meta: MinigameMeta = reverse
       ? { reversed: true }
       : { revealedAsDrawn: true };
 
-    // Reset minigame state before completing (completeMinigame may trigger transitions)
-    this.state.minigameState = null;
     this.completeMinigame(result, meta);
   }
 
