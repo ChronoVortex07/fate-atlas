@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { GameEngine } from '../GameEngine';
 import { buildFace, DECK_BY_ID, consolidateSpread } from '../../data/tarot';
 import type { SlotResult, DiceResult } from '../types';
+import { drawAstralCast } from '../../data/astromancy';
 
 const dieResult = (result = 10, tags = ['roll', 'numeric']): SlotResult => ({
   type: 'd20', result, threshold: 'neutral', interpretation: 'Steady',
@@ -355,5 +356,20 @@ describe('GameEngine — affinity effects snapshot', () => {
     const { result } = engine.resolveReroll(diceResult());
     Math.random = orig;
     expect(result.type).toBe('d20');
+  });
+});
+
+describe('astral cast façade', () => {
+  it('planAstralCast returns single when dormant', () => {
+    const e = new GameEngine();
+    e.startTurn('self');
+    expect(e.planAstralCast().mode).toBe('single');
+  });
+  it('resolveCastSelection delegates to the pure selector', () => {
+    const e = new GameEngine();
+    e.startTurn('self');
+    const a = drawAstralCast({}); const b = drawAstralCast({});
+    const { chosen } = e.resolveCastSelection([a, b], 'single');
+    expect(chosen).toBe(a);
   });
 });

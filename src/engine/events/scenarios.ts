@@ -1,6 +1,7 @@
 import type { AffinityId, SlotResult } from '../types';
 import { defaultAffinityState } from '../../data/affinities';
 import { consolidateSpread, buildFace, DECK_BY_ID } from '../../data/tarot';
+import { consolidateCast } from '../../data/astromancy';
 
 export interface ScenarioStage {
   affinities: Record<AffinityId, number>;
@@ -21,6 +22,7 @@ export interface DebugScenario {
 const atMethodSelect = (s: ScenarioStage) => { s.screen = 'method-select'; };
 const atDice = (s: ScenarioStage) => { s.screen = 'minigame'; s.selectedMethod = 'd20'; };
 const atTarot = (s: ScenarioStage) => { s.screen = 'minigame'; s.selectedMethod = 'tarot'; };
+const atAstral = (s: ScenarioStage) => { s.screen = 'minigame'; s.selectedMethod = 'astral'; };
 const set = (s: ScenarioStage, a: Partial<Record<AffinityId, number>>) => Object.assign(s.affinities, a);
 
 const FOOL: SlotResult = {
@@ -113,6 +115,24 @@ export const DEBUG_SCENARIOS: DebugScenario[] = [
     setup: (s) => { atTarot(s); s.slots = [consolidateSpread([buildFace(DECK_BY_ID['the-sun'], 'upright'), buildFace(DECK_BY_ID['cups-2'], 'upright'), buildFace(DECK_BY_ID['pentacles-3'], 'upright')]) as SlotResult]; } },
   { id: 'spread-cascade', label: 'Spread Cascade (all reversed)', group: 'Interaction', forced: ['spread-cascade'], isolate: true,
     setup: (s) => { atTarot(s); s.slots = [consolidateSpread([buildFace(DECK_BY_ID['the-sun'], 'reversed'), buildFace(DECK_BY_ID['cups-2'], 'reversed'), buildFace(DECK_BY_ID['pentacles-3'], 'reversed')]) as SlotResult]; } },
+  // ── Astral symbolic ──
+  { id: 'astral-dignity', label: 'Astral: dignity (Mars in Aries)', group: 'Astral', forced: ['astral-dignity'], isolate: true,
+    setup: (s) => { atAstral(s); s.slots = [consolidateCast({ planet: 'mars', sign: 'aries', planetHouse: 7, signHouse: 7, omens: [] }) as SlotResult]; } },
+  { id: 'astral-debility', label: 'Astral: debility (Mars in Libra)', group: 'Astral', forced: ['astral-debility'], isolate: true,
+    setup: (s) => { atAstral(s); s.slots = [consolidateCast({ planet: 'mars', sign: 'libra', planetHouse: 7, signHouse: 7, omens: [] }) as SlotResult]; } },
+  { id: 'astral-great-trine', label: 'Astral: great trine (Venus, h1/h5)', group: 'Astral', forced: ['astral-great-trine'], isolate: true,
+    setup: (s) => { atAstral(s); s.slots = [consolidateCast({ planet: 'venus', sign: 'taurus', planetHouse: 1, signHouse: 5, omens: [] }) as SlotResult]; } },
+  { id: 'astral-duel', label: 'Astral: duel (Mars, h1/h7)', group: 'Astral', forced: ['astral-duel'], isolate: true,
+    setup: (s) => { atAstral(s); s.slots = [consolidateCast({ planet: 'mars', sign: 'aries', planetHouse: 1, signHouse: 7, omens: [] }) as SlotResult]; } },
+  { id: 'astral-saturns-gate', label: "Astral: Saturn's Gate (h10)", group: 'Astral', forced: ['astral-saturns-gate'], isolate: true,
+    setup: (s) => { atAstral(s); s.slots = [consolidateCast({ planet: 'saturn', sign: 'capricorn', planetHouse: 10, signHouse: 10, omens: [] }) as SlotResult]; } },
+  // ── Astral omens ──
+  { id: 'astral-errant-star', label: 'Astral: errant star (spawns second)', group: 'Astral', forced: ['astral-errant-star'], isolate: true,
+    setup: (s) => { atAstral(s); s.slots = [consolidateCast({ planet: 'mars', sign: 'aries', planetHouse: 5, signHouse: 5, omens: ['errant-star'] }) as SlotResult]; } },
+  { id: 'astral-conjunction-crowned', label: 'Astral: conjunction crowned', group: 'Astral', forced: ['astral-conjunction-crowned'], isolate: true,
+    setup: (s) => { atAstral(s); s.slots = [consolidateCast({ planet: 'sun', sign: 'leo', planetHouse: 5, signHouse: 5, omens: ['crowned-conjunction'] }) as SlotResult]; } },
+  { id: 'astral-veiled-oracle', label: 'Astral: veiled oracle', group: 'Astral', forced: ['astral-veiled-oracle'], isolate: true,
+    setup: (s) => { atAstral(s); s.slots = [consolidateCast({ planet: 'neptune', sign: 'pisces', planetHouse: 12, signHouse: 12, omens: ['veiled-oracle'] }) as SlotResult]; } },
 ];
 
 export function findScenario(id: string): DebugScenario | undefined {

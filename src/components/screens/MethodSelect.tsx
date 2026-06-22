@@ -6,6 +6,7 @@ const METHOD_CARDS: Record<DivinationType, { symbol: string; title: string; desc
   tarot: { symbol: 'XXI', title: 'Tarot', description: 'Draw from the Major Arcana — the ancient cards reveal hidden truths.', color: '#9b6bb0' },
   d20: { symbol: String.fromCodePoint(0x2685), title: 'Dice', description: 'Cast the twenty-sided die — fate speaks through numbers.', color: '#c75b4a' },
   iching: { symbol: String.fromCodePoint(0x4DC0), title: 'I Ching', description: 'Consult the Book of Changes — the hexagram illuminates your path.', color: '#5b8c5a' },
+  astral: { symbol: '★', title: 'Astral', description: 'Gaze upon the heavens — the celestial bodies reveal their wisdom.', color: '#5b7ec7' },
   happening: { symbol: String.fromCodePoint(0x2726), title: 'Happening', description: 'Something stirs in the weave — a cryptic event awaits.', color: '#d4a854' },
 };
 

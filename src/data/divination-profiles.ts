@@ -36,4 +36,11 @@ export const DIVINATION_PROFILES: Record<string, DivinationProfile> = {
     dimensionStrengths: ['volatility'],
     modifierStrengths: ['action', 'effect', 'subject'],
   },
+  astral: {
+    type: 'astral',
+    themeCoverage: 'all',
+    themePool: ['authority', 'harmony', 'conflict', 'transformation', 'illumination', 'mystery', 'renewal', 'stagnation', 'upheaval', 'surrender'],
+    dimensionStrengths: ['favorability', 'volatility', 'certainty'],
+    modifierStrengths: ['subject', 'action', 'effect'],
+  },
 };
