@@ -116,10 +116,11 @@ Applies to all three minigame types.
 - New method `continueAfterReview()`: guards on `awaitingContinue`, clears it, and
   runs the stored advance (`advanceAfterCommit` → method-select / happening /
   result). Ends with `notify()`.
-- **Final minigame:** when `completed >= minigamesPerTurn`, the advance goes to
-  the Result page, which already affords unlimited viewing — so the gate is
-  **skipped** for the final commit (no redundant double-review). The gate applies
-  to the 1→2 and 2→3 transitions, including before an interrupting happening.
+- **Final minigame:** the gate applies here too, for consistency. After the
+  final commit (and any interactions narrate), the continue beat shows on the
+  minigame screen; **Continue** then advances to the Result page. The gate
+  applies to every commit (1→2, 2→3, and the final 3→result), including before an
+  interrupting happening.
 
 ### 2.2 Component changes
 
@@ -235,7 +236,5 @@ always.
 
 ## Open decisions (resolved as defaults — flag on review if wrong)
 
-1. Final minigame advances straight to the Result page (no separate continue
-   beat), since the Result page already affords unlimited viewing.
-2. Fan math is a pure function verified by running the app, not a unit test
+1. Fan math is a pure function verified by running the app, not a unit test
    (consistent with the repo having no component tests).
