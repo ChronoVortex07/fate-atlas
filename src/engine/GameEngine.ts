@@ -27,6 +27,7 @@ export class GameEngine {
   private listeners = new Set<(state: GameState) => void>();
   private usedHappeningIds = new Set<string>();
   private minigamesPerTurn: number;
+  private pendingTransition: (() => void) | null = null;
 
   constructor(minigamesPerTurn = 3) {
     this.minigamesPerTurn = minigamesPerTurn;
@@ -118,6 +119,27 @@ export class GameEngine {
   clearEventQueue(): void {
     this.state.eventQueue = [];
     this.notify();
+  }
+
+  // Runs the transition now if nothing is queued for narration; otherwise stores
+  // it and lets the sequencer run it once the batch drains (freeze-until-narrated).
+  private runOrDefer(transition: () => void): void {
+    if (this.state.eventQueue.length > 0) {
+      this.pendingTransition = transition;
+      this.notify();
+    } else {
+      transition();
+    }
+  }
+
+  // Called by InteractionSequencer when the queue finishes (or is skipped):
+  // clear the queue and run any transition that was deferred behind it.
+  finishEventBatch(): void {
+    this.state.eventQueue = [];
+    const t = this.pendingTransition;
+    this.pendingTransition = null;
+    if (t) t();
+    else this.notify();
   }
 
   // Refills/generates the pool, routing it through the select draw triggers so
@@ -240,6 +262,12 @@ export class GameEngine {
 
     this.bus.emit('minigame-complete', { result, completed });
 
+    // Resolve-first, narrate-second: if the commit queued any events, freeze on
+    // the current screen until the sequencer drains them, then transition.
+    this.runOrDefer(() => this.advanceAfterCommit(result, completed));
+  }
+
+  private advanceAfterCommit(result: SlotResult, completed: number): void {
     // Final reading?
     if (completed >= this.minigamesPerTurn) {
       this.synthesizeAll();
@@ -258,7 +286,9 @@ export class GameEngine {
     });
 
     if (endDraft.interruptHappening === true) {
-      this.triggerHappening();
+      // The minigame:end dispatch may itself have queued the interrupt report;
+      // narrate it on the current screen, then open the happening.
+      this.runOrDefer(() => this.triggerHappening());
       return;
     }
 

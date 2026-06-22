@@ -177,6 +177,31 @@ describe('GameEngine — dispatch effects', () => {
     expect(plan.reports.some((r) => r.responderId === 'roll-mode')).toBe(true);
     expect(engine.getState().eventQueue.some((r) => r.responderId === 'roll-mode')).toBe(true);
   });
+
+  it('freezes on the minigame screen until the commit event batch is narrated', () => {
+    const engine = new GameEngine();
+    engine.startTurn('decision');
+    engine.selectMethod(0); // not the final reading (minigamesPerTurn = 3)
+    // Force a commit-phase responder so the commit enqueues an EffectReport.
+    engine.forceEffects(['chaos-second-result'], true);
+
+    const die = engine.getState().turnResults; // baseline length
+    engine.completeMinigame({
+      type: 'd20', result: 11, threshold: 'neutral', interpretation: '',
+      tags: [], themes: [], dimensions: { favorability: 0, certainty: 0, volatility: 0 },
+      modifierRoles: [],
+    } as any);
+
+    // Deferred: queue has events, screen has NOT advanced past minigame.
+    expect(engine.getState().eventQueue.length).toBeGreaterThan(0);
+    expect(engine.getState().screen).toBe('minigame');
+
+    // Draining the batch runs the deferred transition.
+    engine.finishEventBatch();
+    expect(engine.getState().eventQueue.length).toBe(0);
+    expect(engine.getState().screen).toBe('method-select');
+    expect(die).toBeDefined();
+  });
 });
 
 function diceResult(): DiceResult {

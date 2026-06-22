@@ -11,6 +11,20 @@ import WidenAnimation from './InteractionAnimations/WidenAnimation';
 import OverrideAnimation from './InteractionAnimations/OverrideAnimation';
 import type { EffectReport } from '../../engine/types';
 
+// Per-animation on-screen durations (ms). Animations with ripples/delays need
+// longer than the old flat 1400 so the reveal lands after the motion settles.
+const DURATION: Record<string, number> = {
+  reroll: 2600,
+  'second-result': 2400,
+  flip: 1800,
+  mirror: 1800,
+  override: 1800,
+  shroud: 1600,
+  widen: 1500,
+  'add-choice': 1800,
+};
+const DEFAULT_DURATION = 1400;
+
 export default function InteractionSequencer() {
   const { state, engine } = useGameEngine();
   const [i, setI] = useState(0);
@@ -20,16 +34,18 @@ export default function InteractionSequencer() {
   useEffect(() => {
     if (queue.length === 0) return;
     if (i >= queue.length) {
-      engine.clearEventQueue();
+      engine.finishEventBatch();
       setI(0);
       return;
     }
-    const t = setTimeout(() => setI((n) => n + 1), 1400);
+    const anim = queue[Math.min(i, queue.length - 1)]?.animation;
+    const ms = DURATION[anim] ?? DEFAULT_DURATION;
+    const t = setTimeout(() => setI((n) => n + 1), ms);
     return () => clearTimeout(t);
   }, [i, queue.length, engine]);
 
   const skip = useCallback(() => {
-    engine.clearEventQueue();
+    engine.finishEventBatch();
     setI(0);
   }, [engine]);
 
