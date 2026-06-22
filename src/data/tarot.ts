@@ -63,6 +63,99 @@ export const MAJOR_ARCANA: TarotCardData[] = [
     themes: ['harmony', 'transformation'], dimensions: { favorability: 2.0, certainty: 2.0, volatility: -2.0 }, arcana: 'major', modifierRoles: ['subject', 'effect'] },
 ];
 
+// ── Minor Arcana ──
+
+type Suit = 'wands' | 'cups' | 'swords' | 'pentacles';
+
+interface SuitDef {
+  suit: Suit;
+  name: string;
+  element: 'fire' | 'water' | 'air' | 'earth';
+  base: DimensionValues;
+  pipRole: ModifierRole;
+  lightThemes: [ThemeTag, ThemeTag];
+  glyph: string;
+  phrase: { up: string; rev: string };
+}
+
+const SUITS: SuitDef[] = [
+  { suit: 'wands', name: 'Wands', element: 'fire', base: { favorability: 0.3, certainty: 0.2, volatility: 0.8 }, pipRole: 'action', lightThemes: ['conflict', 'transformation'] as [ThemeTag, ThemeTag], glyph: '♦', phrase: { up: 'drive, ambition, and the spark of action', rev: 'frustration, delay, and scattered energy' } },
+  { suit: 'cups', name: 'Cups', element: 'water', base: { favorability: 0.8, certainty: -0.3, volatility: 0.2 }, pipRole: 'subject', lightThemes: ['harmony', 'mystery'] as [ThemeTag, ThemeTag], glyph: '♥', phrase: { up: 'emotion, connection, and intuition', rev: 'imbalance, withdrawal, and blocked feeling' } },
+  { suit: 'swords', name: 'Swords', element: 'air', base: { favorability: -0.6, certainty: 0.5, volatility: 0.5 }, pipRole: 'effect', lightThemes: ['conflict', 'illumination'] as [ThemeTag, ThemeTag], glyph: '♠', phrase: { up: 'intellect, conflict, and hard truth', rev: 'confusion, cruelty, and self-defeat' } },
+  { suit: 'pentacles', name: 'Pentacles', element: 'earth', base: { favorability: 0.5, certainty: 0.7, volatility: -0.5 }, pipRole: 'subject', lightThemes: ['stagnation', 'harmony'] as [ThemeTag, ThemeTag], glyph: '♣', phrase: { up: 'work, resources, and the material world', rev: 'insecurity, loss, and misplaced value' } },
+];
+
+export const ELEMENT_BY_SUIT: Record<Suit, string> =
+  Object.fromEntries(SUITS.map((s) => [s.suit, s.element])) as Record<Suit, string>;
+
+const COURTS = ['page', 'knight', 'queen', 'king'] as const;
+const COURT_ROLE: Record<(typeof COURTS)[number], ModifierRole> =
+  { page: 'subject', knight: 'action', queen: 'subject', king: 'action' };
+const RANK_WORD: Record<number, string> =
+  { 1: 'Ace', 2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five', 6: 'Six', 7: 'Seven', 8: 'Eight', 9: 'Nine', 10: 'Ten' };
+const RANK_PHRASE: Record<string, string> = {
+  ace: 'the pure seed of', two: 'a first balance of', three: 'early growth in', four: 'a steadying of',
+  five: 'a struggle within', six: 'a turning toward', seven: 'a testing of', eight: 'swift movement in',
+  nine: 'a near-fullness of', ten: 'the culmination of',
+  page: 'a student of', knight: 'a pursuer of', queen: 'the nurturer of', king: 'the master of',
+};
+
+export function rankKey(rank: TarotCardFace['rank']): string {
+  return typeof rank === 'number' ? (RANK_WORD[rank] ?? String(rank)).toLowerCase() : rank!;
+}
+
+const clampDim = (v: number) => Math.max(-2, Math.min(2, Math.round(v * 2) / 2)) as number;
+const dominantAxis = (d: DimensionValues): keyof DimensionValues =>
+  (['favorability', 'certainty', 'volatility'] as (keyof DimensionValues)[])
+    .reduce((m, a) => (Math.abs(d[a]) > Math.abs(d[m]) ? a : m), 'favorability');
+
+function minorDimensions(def: SuitDef, rank: TarotCardFace['rank']): DimensionValues {
+  const isCourt = typeof rank !== 'number';
+  const intensity = isCourt ? 1.2 : 0.6 + ((rank as number) - 1) / 9 * 1.4;
+  const d: DimensionValues = {
+    favorability: def.base.favorability * intensity,
+    certainty: def.base.certainty * intensity,
+    volatility: def.base.volatility * (isCourt ? 0.6 : 1) * intensity,
+  };
+  if (rank === 1) { const a = dominantAxis(def.base); d[a] += 0.5 * Math.sign(def.base[a]); }
+  if (rank === 10) { d.volatility += 0.5; }
+  return { favorability: clampDim(d.favorability), certainty: clampDim(d.certainty), volatility: clampDim(d.volatility) };
+}
+
+function minorThemes(def: SuitDef, rank: TarotCardFace['rank']): ThemeTag[] {
+  if (rank === 1 || typeof rank !== 'number') return [def.lightThemes[0]];
+  if (rank === 10) return [def.lightThemes[1]];
+  return [];
+}
+
+export function generateMinorArcana(): TarotCardData[] {
+  const out: TarotCardData[] = [];
+  for (const def of SUITS) {
+    const ranks: TarotCardFace['rank'][] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, ...COURTS];
+    for (const rank of ranks) {
+      const key = rankKey(rank);
+      const isCourt = typeof rank !== 'number';
+      out.push({
+        id: `${def.suit}-${typeof rank === 'number' ? rank : rank}`,
+        name: `${isCourt ? key[0].toUpperCase() + key.slice(1) : RANK_WORD[rank as number]} of ${def.name}`,
+        number: typeof rank === 'number' ? rank : undefined,
+        symbol: def.glyph,
+        meaningUpright: `${RANK_PHRASE[key]} ${def.phrase.up}`,
+        meaningReversed: `${RANK_PHRASE[key]} ${def.phrase.rev}`,
+        arcana: 'minor',
+        suit: def.suit,
+        rank,
+        themes: minorThemes(def, rank),
+        dimensions: minorDimensions(def, rank),
+        modifierRoles: [isCourt ? COURT_ROLE[rank as (typeof COURTS)[number]] : def.pipRole],
+      });
+    }
+  }
+  return out;
+}
+
+export const MINOR_ARCANA: TarotCardData[] = generateMinorArcana();
+
 const REVERSAL_THEME_MAP: Partial<Record<ThemeTag, ThemeTag>> = {
   upheaval: 'stagnation',
   renewal: 'stagnation',

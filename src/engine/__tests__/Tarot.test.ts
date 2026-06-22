@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { drawTarotCard, MAJOR_ARCANA } from '../../data/tarot';
+import { drawTarotCard, MAJOR_ARCANA, MINOR_ARCANA } from '../../data/tarot';
 
 describe('tarot data', () => {
   it('has 22 Major Arcana cards', () => {
@@ -58,5 +58,35 @@ describe('drawTarotCard', () => {
 describe('major arcana arcana field', () => {
   it('every major is tagged arcana="major"', () => {
     expect(MAJOR_ARCANA.every((c) => c.arcana === 'major')).toBe(true);
+  });
+});
+
+describe('minor arcana generator', () => {
+  it('produces 56 cards (4 suits x 14 ranks)', () => {
+    expect(MINOR_ARCANA).toHaveLength(56);
+  });
+  it('every minor has unique id, arcana=minor, a suit and a rank', () => {
+    const ids = new Set(MINOR_ARCANA.map((c) => c.id));
+    expect(ids.size).toBe(56);
+    expect(MINOR_ARCANA.every((c) => c.arcana === 'minor' && !!c.suit && c.rank !== undefined)).toBe(true);
+  });
+  it('dimensions stay within [-2,2] at 0.5 granularity', () => {
+    for (const c of MINOR_ARCANA) {
+      for (const v of Object.values(c.dimensions)) {
+        expect(v).toBeGreaterThanOrEqual(-2);
+        expect(v).toBeLessThanOrEqual(2);
+        expect(Math.round(v * 2)).toBe(v * 2);
+      }
+    }
+  });
+  it('Wands lean volatile, Cups lean favorable, Pentacles lean certain', () => {
+    const ten = (s: string) => MINOR_ARCANA.find((c) => c.id === `${s}-10`)!;
+    expect(ten('wands').dimensions.volatility).toBeGreaterThan(0.5);
+    expect(ten('cups').dimensions.favorability).toBeGreaterThan(0.5);
+    expect(ten('pentacles').dimensions.certainty).toBeGreaterThan(0.5);
+  });
+  it('mid pips carry no themes; courts carry one', () => {
+    expect(MINOR_ARCANA.find((c) => c.id === 'wands-5')!.themes).toHaveLength(0);
+    expect(MINOR_ARCANA.find((c) => c.id === 'cups-queen')!.themes).toHaveLength(1);
   });
 });
