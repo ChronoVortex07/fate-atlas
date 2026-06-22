@@ -260,45 +260,34 @@ const REVERSAL_THEME_MAP: Partial<Record<ThemeTag, ThemeTag>> = {
   // transformation stays as transformation (neutral in opposition)
 };
 
-export function drawTarotCard(affinities: Record<string, number>): TarotResult {
-  const index = Math.floor(Math.random() * MAJOR_ARCANA.length);
-  const card = MAJOR_ARCANA[index];
-
+export function pickOrientation(affinities: Record<string, number>): 'upright' | 'reversed' {
   const reversalChance = 0.5 + ((affinities.chaos ?? 0) / 100) * 0.3;
   const orderMod = ((affinities.order ?? 0) / 100) * 0.2;
   const finalChance = Math.max(0.1, Math.min(0.9, reversalChance - orderMod));
-  const orientation = Math.random() < finalChance ? 'reversed' : 'upright';
+  return Math.random() < finalChance ? 'reversed' : 'upright';
+}
 
-  const tags: string[] = [
-    'draw', 'random', 'major-arcana', 'reversible',
-    card.archetypeTag ?? '',
-    orientation === 'reversed' ? 'reversed' : 'upright',
-  ];
+export function reverseFace(face: TarotCardFace): TarotCardFace {
+  return buildFace(DECK_BY_ID[face.id], face.orientation === 'upright' ? 'reversed' : 'upright');
+}
 
-  // Apply reversal to themes and dimensions
-  let themes = card.themes;
-  let dimensions = { ...card.dimensions };
-  if (orientation === 'reversed') {
-    // Flip favorability sign
-    dimensions.favorability = (-dimensions.favorability) as DimensionValues['favorability'];
-    // Swap themes via reversal map
-    themes = themes.map((t) => REVERSAL_THEME_MAP[t] ?? t);
-    // Deduplicate after swap
-    themes = [...new Set(themes)];
+export function reverseSpread(result: TarotResult): TarotResult {
+  const faces = (result.spread ?? []).map((s) => reverseFace(s.card));
+  return consolidateSpread(faces);
+}
+
+export function drawTarotSpread(affinities: Record<string, number>): TarotResult {
+  const pool = [...FULL_DECK];
+  const faces: TarotCardFace[] = [];
+  for (let i = 0; i < 3; i++) {
+    const idx = Math.floor(Math.random() * pool.length);
+    const [card] = pool.splice(idx, 1);
+    faces.push(buildFace(card, pickOrientation(affinities)));
   }
+  return consolidateSpread(faces);
+}
 
-  return {
-    type: 'tarot',
-    id: card.id,
-    name: card.name,
-    number: card.number!,
-    orientation,
-    symbol: card.symbol,
-    meaningUpright: card.meaningUpright,
-    meaningReversed: card.meaningReversed,
-    tags,
-    themes,
-    dimensions,
-    modifierRoles: card.modifierRoles,
-  };
+export function drawTarotCard(affinities: Record<string, number>): TarotResult {
+  const card = MAJOR_ARCANA[Math.floor(Math.random() * MAJOR_ARCANA.length)];
+  return consolidateSpread([buildFace(card, pickOrientation(affinities))]);
 }

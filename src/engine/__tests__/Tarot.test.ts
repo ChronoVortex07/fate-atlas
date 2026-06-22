@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { consolidateSpread, drawTarotCard, MAJOR_ARCANA, MINOR_ARCANA, FULL_DECK, DECK_BY_ID, buildFace } from '../../data/tarot';
+import { consolidateSpread, drawTarotCard, drawTarotSpread, reverseSpread, MAJOR_ARCANA, MINOR_ARCANA, FULL_DECK, DECK_BY_ID, buildFace } from '../../data/tarot';
 
 describe('tarot data', () => {
   it('has 22 Major Arcana cards', () => {
@@ -107,6 +107,27 @@ describe('full deck + buildFace', () => {
     expect(major.tags).toEqual(expect.arrayContaining(['major-arcana', 'fool-archetype', 'upright', 'reversible', 'random']));
     const minor = buildFace(DECK_BY_ID['cups-queen'], 'reversed');
     expect(minor.tags).toEqual(expect.arrayContaining(['minor-arcana', 'suit-cups', 'element-water', 'rank-queen', 'reversed']));
+  });
+});
+
+describe('reverseSpread + drawTarotSpread', () => {
+  const F = (id: string, o: 'upright' | 'reversed') => buildFace(DECK_BY_ID[id], o);
+
+  it('reverseSpread flips every face and recomputes (involutive)', () => {
+    const base = consolidateSpread([F('the-star', 'upright'), F('cups-2', 'upright'), F('swords-3', 'upright')]);
+    const rev = reverseSpread(base);
+    expect(rev.spread!.every((s) => s.card.orientation === 'reversed')).toBe(true);
+    expect(rev.orientation).toBe('reversed');
+    const back = reverseSpread(rev);
+    expect(back.spread!.map((s) => s.card.id)).toEqual(base.spread!.map((s) => s.card.id));
+    expect(back.spread!.every((s) => s.card.orientation === 'upright')).toBe(true);
+  });
+
+  it('drawTarotSpread deals 3 distinct cards into past/present/future', () => {
+    const r = drawTarotSpread({ chaos: 0, order: 0 });
+    expect(r.spread).toHaveLength(3);
+    expect(new Set(r.spread!.map((s) => s.card.id)).size).toBe(3);
+    expect(r.type).toBe('tarot');
   });
 });
 
