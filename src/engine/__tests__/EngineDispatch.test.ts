@@ -106,6 +106,19 @@ describe('engine dispatch wiring', () => {
     expect(state.turnResults[0]).not.toBe(d20Result); // committed slot was replaced by a fresh die
   });
 
+  it('fate-force-method redirects the selected method index when forced', () => {
+    const engine = new GameEngine();
+    engine.startTurn('decision');
+    // ensure at least two distinct methods in availableMethods, else the redirect is a no-op
+    engine.forceEffects(['fate-force-method'], true);
+    const chosen = 0;
+    engine.selectMethod(chosen);
+    const s = engine.getState();
+    // selectedMethod should match availableMethods at the (possibly redirected) index,
+    // and an override report should be queued.
+    expect(s.eventQueue.some((r) => r.responderId === 'fate-force-method')).toBe(true);
+  });
+
   it('chaos-second-result spawns a slot and points its report at the new index', () => {
     const engine = new GameEngine();
     engine.startTurn('decision');

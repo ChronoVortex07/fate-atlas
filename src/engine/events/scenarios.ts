@@ -75,6 +75,8 @@ export const DEBUG_SCENARIOS: DebugScenario[] = [
     setup: (s) => { atTarot(s); set(s, { fate: 75 }); } },
   { id: 'fate-hollow-reroll', label: 'Fate: hollow reroll', group: 'Affinity', forced: ['fate-hollow-reroll'], isolate: true,
     setup: (s) => { atDice(s); set(s, { fate: 90 }); } },
+  { id: 'fate-force-method', label: 'Fate forces the method', group: 'Affinity', forced: ['fate-force-method'], isolate: true,
+    setup: (s) => { atMethodSelect(s); set(s, { fate: 90 }); } },
   { id: 'chaos-happening-interrupt', label: 'Chaos interrupts with a happening', group: 'Affinity', forced: ['chaos-happening-interrupt'], isolate: true,
     setup: (s) => { atDice(s); set(s, { chaos: 75 }); } },
   { id: 'light-advantage', label: 'Light grants advantage', group: 'Affinity', forced: ['light-advantage'], isolate: true,

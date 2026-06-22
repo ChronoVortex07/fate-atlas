@@ -81,8 +81,25 @@ export function buildAffinityResponders(): Responder[] {
       },
     },
     {
-      // 'select:pick' is never dispatched and the method pool is DivinationType[] (not SlotResult[]).
-      // "Fate forces the method" is a deferred follow-up requiring a method-shaped override effect.
+      // Fate forces the method: redirects the chosen method index on select:pick.
+      // The method pool is DivinationType[] (strings), so this works on indices,
+      // not the SlotResult-shaped fate-override-pick below.
+      id: 'fate-force-method', source: 'affinity', triggers: ['select:pick'],
+      group: { kind: 'exclusive', band: 'OVERRIDE' }, weight: w('fate'),
+      condition: (c) => Array.isArray(c.draft.methodPool)
+        && (c.draft.methodPool as unknown[]).length >= 2
+        && typeof c.draft.methodIndex === 'number',
+      roll: (c) => bandRoll(c, 'fate', 'ascendant', T.major),
+      apply: (c) => {
+        const pool = c.draft.methodPool as string[];
+        const chosen = c.draft.methodIndex as number;
+        const others = pool.map((_, i) => i).filter((i) => i !== chosen);
+        if (others.length === 0) return null;
+        c.draft.methodIndex = others[Math.floor(c.rng() * others.length)];
+        return report('fate-force-method', 'Fate', 'The weave moves your hand — another path is chosen for you.', 'override');
+      },
+    },
+    {
       id: 'fate-override-pick', source: 'affinity', triggers: ['tarot:pick'],
       group: { kind: 'exclusive', band: 'OVERRIDE' }, weight: w('fate'),
       condition: (c) => !!c.hand && c.hand.length >= 2 && !!c.draft.outcome,

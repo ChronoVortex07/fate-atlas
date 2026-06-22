@@ -192,11 +192,19 @@ export class GameEngine {
   }
 
   selectMethod(index: number): void {
-    const methodType = this.state.availableMethods[index];
-    if (!methodType) {
+    if (!this.state.availableMethods[index]) {
       throw new Error(`Method index ${index} out of bounds`);
     }
-
+    // Fate (OVERRIDE) may redirect the chosen method.
+    const { draft } = this.dispatchAt('select:pick', {
+      methodIndex: index,
+      methodPool: this.state.availableMethods,
+    });
+    const finalIndex = typeof draft.methodIndex === 'number' ? draft.methodIndex : index;
+    const methodType = this.state.availableMethods[finalIndex];
+    if (!methodType) {
+      throw new Error(`Method index ${finalIndex} out of bounds`);
+    }
     this.state.selectedMethod = methodType;
     this.state.activeSlotIndex = null;
     this.state.screen = 'minigame';
