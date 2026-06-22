@@ -92,4 +92,24 @@ describe('engine dispatch wiring', () => {
     expect(foolFired).toBe(true);
     expect(state.turnResults[0]).not.toBe(d20Result); // committed slot was replaced by a fresh die
   });
+
+  it('chaos-second-result spawns a slot and points its report at the new index', () => {
+    const engine = new GameEngine();
+    engine.startTurn('decision');
+    engine.selectMethod(0);
+    engine.forceEffects(['chaos-second-result'], true);
+
+    const before = engine.getState().turnResults.length;
+    engine.completeMinigame({
+      type: 'd20', result: 7, threshold: 'low', interpretation: '',
+      tags: [], themes: [], dimensions: { favorability: 0, certainty: 0, volatility: 0 },
+      modifierRoles: [],
+    } as any);
+
+    const s = engine.getState();
+    expect(s.turnResults.length).toBe(before + 2); // committed + spawned second
+    const report = s.eventQueue.find((r) => r.responderId === 'chaos-second-result');
+    expect(report).toBeDefined();
+    expect(report!.targetSlot).toBe(s.turnResults.length - 1);
+  });
 });

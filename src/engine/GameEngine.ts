@@ -258,6 +258,12 @@ export class GameEngine {
         affinities,
       );
       this.state.turnResults = [...this.state.turnResults, second];
+      const newIndex = this.state.turnResults.length - 1;
+      // The responder cannot know the post-append index; patch its queued report
+      // so the animation can spotlight the new fan slot.
+      this.state.eventQueue = this.state.eventQueue.map((r) =>
+        r.responderId === 'chaos-second-result' ? { ...r, targetSlot: newIndex } : r,
+      );
     }
 
     this.bus.emit('minigame-complete', { result, completed });

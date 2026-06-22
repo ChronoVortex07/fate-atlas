@@ -91,7 +91,7 @@ export function buildAffinityResponders(): Responder[] {
       roll: (c) => bandRoll(c, 'chaos', 'dominant', T.major),
       apply: (c) => {
         c.draft.spawnSecond = (c.draft.outcome as SlotResult).type;
-        return report('chaos-second-result', 'Chaos', 'Chaos surges — a second possibility emerges from the void.', 'second-result');
+        return report('chaos-second-result', 'Chaos', 'Chaos surges — a second reading manifests.', 'second-result');
       },
     },
     {
