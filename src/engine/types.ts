@@ -253,12 +253,32 @@ export interface RunRecord {
   happeningChoice?: number; // index of chosen happening option
 }
 
-export interface TarotMinigameState {
+// ── Tarot Draft State (card-drafting minigame) ──
+
+export interface TableCard {
+  cardId: string;        // key into DECK_BY_ID
+  originIndex: number;   // stable position on table (for return-to-position)
+  faceUp: boolean;       // true if returned from hand after being peeked
+  revealedFace?: TarotCardFace; // set when faceUp — the built face with orientation
+}
+
+export interface HandCard {
+  cardId: string;
+  tableOriginIndex: number; // so returnToTable puts it back in the right spot
+  peeked: boolean;
+  revealedFace?: TarotCardFace; // set after successful peek — shows orientation
+}
+
+export type HandSlot = HandCard | null; // hand[0]=Past, [1]=Present, [2]=Future
+
+export interface TarotDraftState {
   method: 'tarot';
-  faceDownCards: TarotResult[];
-  chosenIndex: number | null;
-  reversed: boolean;
-  revealed: boolean;
+  deck: string[];              // remaining card IDs (shuffled), face-down
+  table: (TableCard | null)[]; // dealt spread; null where a card was picked
+  hand: [HandSlot, HandSlot, HandSlot];
+  dealCount: number;           // current number of table slots (starts 9, grows with returns)
+  shufflesRemaining: number;   // from affinityEffects.spreadRedraws
+  phase: 'drafting' | 'committing';
 }
 
 export interface DiceMinigameState {
@@ -275,7 +295,7 @@ export interface IChingMinigameState {
 }
 
 export type MinigameState =
-  | TarotMinigameState
+  | TarotDraftState
   | DiceMinigameState
   | IChingMinigameState;
 
