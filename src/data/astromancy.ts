@@ -1,5 +1,5 @@
 import type {
-  PlanetId, SignId, AspectName, ThemeTag, DimensionValues, ModifierRole,
+  PlanetId, SignId, AspectName, ThemeTag, DimensionValues, ModifierRole, AstralCast, AstralResult, Tag,
 } from '../engine/types';
 
 export interface PlanetDef {
@@ -100,3 +100,129 @@ export const ASPECT_EFFECT: Record<AspectName, { dims: Partial<DimensionValues>;
   opposition:  { dims: { certainty: 1.0, volatility: 1.0 }, theme: 'upheaval' },
   minor:       { dims: { volatility: 0.5, certainty: -0.5 }, theme: 'mystery' },
 };
+
+// Lean/theme helper tables
+export const MODALITY_THEMES: Record<SignDef['modality'], ThemeTag> = {
+  cardinal: 'authority',
+  fixed: 'stagnation',
+  mutable: 'illumination',
+};
+
+export const ELEMENT_THEMES: Record<SignDef['element'], ThemeTag> = {
+  fire: 'conflict',
+  earth: 'stagnation',
+  air: 'illumination',
+  water: 'mystery',
+};
+
+// ── Dignity ──
+
+export function dignityOf(planet: PlanetId, sign: SignId): 'dignified' | 'debilitated' | undefined {
+  const d = DIGNITY[planet];
+  if (d.dignified.includes(sign)) return 'dignified';
+  if (d.debilitated.includes(sign)) return 'debilitated';
+  return undefined;
+}
+
+// ── Consolidation ──
+
+function clampDim(v: number): number {
+  // Clamp to [-2, 2] at 0.5 granularity
+  const clamped = Math.max(-2, Math.min(2, v));
+  return Math.round(clamped * 2) / 2;
+}
+
+export function consolidateCast(cast: AstralCast): AstralResult {
+  const planet = PLANETS[cast.planet];
+  const sign = SIGNS[cast.sign];
+  const house = HOUSES[cast.planetHouse - 1];
+  const aspect = aspectBetween(cast.planetHouse, cast.signHouse);
+  const aspectEffect = ASPECT_EFFECT[aspect];
+  const dignity = dignityOf(cast.planet, cast.sign);
+
+  // Sum dimensions: planet + sign(element) + sign(modality) + aspect, then divide by 2
+  const dimensions: DimensionValues = { favorability: 0, certainty: 0, volatility: 0 };
+
+  // Planet dimensions
+  for (const axis of ['favorability', 'certainty', 'volatility'] as const) {
+    dimensions[axis] += planet.dimensions[axis] ?? 0;
+  }
+
+  // Aspect effect
+  for (const axis of ['favorability', 'certainty', 'volatility'] as const) {
+    dimensions[axis] += aspectEffect.dims[axis] ?? 0;
+  }
+
+  // Divide by 2 and clamp to 0.5 granularity
+  for (const axis of ['favorability', 'certainty', 'volatility'] as const) {
+    dimensions[axis] = clampDim(dimensions[axis] / 2);
+  }
+
+  // Build themes: ranked by house → planet → aspect → sign(element), deduped, capped at 2
+  const themes: ThemeTag[] = [];
+  const seenThemes = new Set<ThemeTag>();
+
+  // House theme (highest priority)
+  if (house.theme && !seenThemes.has(house.theme)) {
+    themes.push(house.theme);
+    seenThemes.add(house.theme);
+  }
+
+  // Planet theme
+  if (planet.theme && !seenThemes.has(planet.theme)) {
+    themes.push(planet.theme);
+    seenThemes.add(planet.theme);
+  }
+
+  // Aspect theme
+  if (aspectEffect.theme && !seenThemes.has(aspectEffect.theme)) {
+    themes.push(aspectEffect.theme);
+    seenThemes.add(aspectEffect.theme);
+  }
+
+  // Sign element theme
+  const elementTheme = ELEMENT_THEMES[sign.element];
+  if (elementTheme && !seenThemes.has(elementTheme)) {
+    themes.push(elementTheme);
+    seenThemes.add(elementTheme);
+  }
+
+  // Cap at 2
+  themes.splice(2);
+
+  // Build tags
+  const tags: Tag[] = [
+    'astral',
+    `planet-${cast.planet}`,
+    `sign-${cast.sign}`,
+    `house-${cast.planetHouse}`,
+    `element-${sign.element}`,
+    `aspect-${aspect}`,
+  ];
+
+  if (dignity) {
+    tags.push(dignity);
+  }
+
+  // Add omen tags
+  for (const omen of cast.omens) {
+    tags.push(omen as any);
+  }
+
+  return {
+    type: 'astral',
+    id: `astral:${cast.planet}-${cast.sign}-h${cast.planetHouse}`,
+    name: `${planet.name} in ${sign.name}`,
+    symbol: planet.glyph,
+    interpretation: '', // placeholder
+    planet: cast.planet,
+    sign: cast.sign,
+    house: cast.planetHouse,
+    aspect,
+    themes,
+    dimensions,
+    modifierRoles: [planet.modifierRole],
+    tags,
+    cast,
+  };
+}

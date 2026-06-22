@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { AstralResult, AstralCast } from '../types';
-import { PLANETS, SIGNS, HOUSES, DIGNITY, aspectBetween } from '../../data/astromancy';
+import { PLANETS, SIGNS, HOUSES, DIGNITY, aspectBetween, consolidateCast, dignityOf } from '../../data/astromancy';
 
 describe('astral types', () => {
   it('an AstralResult is assignable with the required surface', () => {
@@ -57,5 +57,111 @@ describe('aspectBetween', () => {
     expect(aspectBetween(12, 1)).toBe('minor');         // 30° across the wrap
     expect(aspectBetween(2, 8)).toBe('opposition');     // 180°
     expect(aspectBetween(7, 1)).toBe(aspectBetween(1, 7));
+  });
+});
+
+describe('dignityOf', () => {
+  it('returns "dignified" when planet is in a dignified sign', () => {
+    expect(dignityOf('mars', 'aries')).toBe('dignified');
+    expect(dignityOf('sun', 'leo')).toBe('dignified');
+  });
+  it('returns "debilitated" when planet is in a debilitated sign', () => {
+    expect(dignityOf('mars', 'libra')).toBe('debilitated');
+    expect(dignityOf('sun', 'aquarius')).toBe('debilitated');
+  });
+  it('returns undefined when neither dignified nor debilitated', () => {
+    expect(dignityOf('mars', 'gemini')).toBeUndefined();
+    expect(dignityOf('sun', 'aries')).toBeUndefined();
+  });
+});
+
+describe('consolidateCast', () => {
+  it('sums dimensions from planet+element+modality+aspect, divides by 2, clamps to 0.5 granularity', () => {
+    const cast: AstralCast = { planet: 'sun', planetHouse: 1, sign: 'leo', signHouse: 1, omens: [] };
+    const r = consolidateCast(cast);
+    // Check that dimensions are at 0.5 granularity
+    for (const v of Object.values(r.dimensions)) {
+      expect(Math.round(v * 2) / 2).toBe(v);
+    }
+    // Check that dimensions are within [-2, 2]
+    for (const v of Object.values(r.dimensions)) {
+      expect(v).toBeGreaterThanOrEqual(-2);
+      expect(v).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('ranks themes by house→planet→aspect→sign element, dedupes, caps at 2', () => {
+    const cast: AstralCast = { planet: 'sun', planetHouse: 1, sign: 'leo', signHouse: 1, omens: [] };
+    const r = consolidateCast(cast);
+    expect(r.themes.length).toBeLessThanOrEqual(2);
+    expect(r.themes).toEqual(expect.arrayContaining(['authority'])); // house 1 theme
+  });
+
+  it('includes all required tags: astral, planet-*, sign-*, house-*, element-*, aspect-*', () => {
+    const cast: AstralCast = { planet: 'mars', planetHouse: 7, sign: 'aries', signHouse: 7, omens: [] };
+    const r = consolidateCast(cast);
+    expect(r.tags).toContain('astral');
+    expect(r.tags).toContain('planet-mars');
+    expect(r.tags).toContain('sign-aries');
+    expect(r.tags).toContain('house-7');
+    expect(r.tags).toContain('element-fire');
+    expect(r.tags).toContain('aspect-conjunction');
+  });
+
+  it('adds dignity tag when dignified or debilitated', () => {
+    const dignified: AstralCast = { planet: 'mars', planetHouse: 3, sign: 'aries', signHouse: 3, omens: [] };
+    const r1 = consolidateCast(dignified);
+    expect(r1.tags).toContain('dignified');
+
+    const debilitated: AstralCast = { planet: 'mars', planetHouse: 4, sign: 'libra', signHouse: 4, omens: [] };
+    const r2 = consolidateCast(debilitated);
+    expect(r2.tags).toContain('debilitated');
+
+    const neutral: AstralCast = { planet: 'mars', planetHouse: 5, sign: 'gemini', signHouse: 5, omens: [] };
+    const r3 = consolidateCast(neutral);
+    expect(r3.tags).not.toContain('dignified');
+    expect(r3.tags).not.toContain('debilitated');
+  });
+
+  it('carries through omen tags from the cast', () => {
+    const cast: AstralCast = { planet: 'sun', planetHouse: 1, sign: 'leo', signHouse: 1, omens: ['omen-test' as any] };
+    const r = consolidateCast(cast);
+    expect(r.tags).toContain('omen-test');
+  });
+
+  it('records the planet, sign, house, aspect in the result', () => {
+    const cast: AstralCast = { planet: 'venus', planetHouse: 5, sign: 'libra', signHouse: 7, omens: [] };
+    const r = consolidateCast(cast);
+    expect(r.planet).toBe('venus');
+    expect(r.sign).toBe('libra');
+    expect(r.house).toBe(5);
+    expect(r.aspect).toBe(aspectBetween(5, 7));
+    expect(r.cast).toEqual(cast);
+  });
+
+  it('generates a unique id and name from planet and sign', () => {
+    const cast: AstralCast = { planet: 'mercury', planetHouse: 3, sign: 'gemini', signHouse: 3, omens: [] };
+    const r = consolidateCast(cast);
+    expect(r.id).toBeTruthy();
+    expect(r.name).toBeTruthy();
+    expect(r.type).toBe('astral');
+  });
+
+  it('derives modifierRoles from the planet', () => {
+    const cast: AstralCast = { planet: 'mars', planetHouse: 1, sign: 'aries', signHouse: 1, omens: [] };
+    const r = consolidateCast(cast);
+    expect(r.modifierRoles).toContain(PLANETS.mars.modifierRole);
+  });
+
+  it('sets the symbol to the planet glyph', () => {
+    const cast: AstralCast = { planet: 'jupiter', planetHouse: 1, sign: 'sagittarius', signHouse: 1, omens: [] };
+    const r = consolidateCast(cast);
+    expect(r.symbol).toBe(PLANETS.jupiter.glyph);
+  });
+
+  it('includes type: astral in the result', () => {
+    const cast: AstralCast = { planet: 'saturn', planetHouse: 1, sign: 'capricorn', signHouse: 1, omens: [] };
+    const r = consolidateCast(cast);
+    expect(r.type).toBe('astral');
   });
 });
