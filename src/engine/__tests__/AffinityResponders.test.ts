@@ -31,11 +31,37 @@ describe('affinity responders via dispatch', () => {
     expect(c.draft.poolTarget).toBe(4);
   });
 
-  it('shadow-shroud marks a pool index when forced', () => {
-    const pool = [{ type: 'tarot' }, { type: 'tarot' }] as any;
-    const c = ctx({ trigger: 'select:draw:end', draft: { pool } });
+  it('shadow-shroud: at Stirring with all rolls passing, shrouds exactly one', () => {
+    const pool = [{ type: 'tarot' }, { type: 'tarot' }, { type: 'tarot' }] as any;
+    const c = ctx({
+      trigger: 'select:draw:end', draft: { pool },
+      affinities: { ...defaultAffinityState(), shadow: 40 }, // Stirring
+      rng: () => 0, // every roll passes
+    });
     dispatch('select:draw:end', c, buildAffinityResponders(), { forced: ['shadow-shroud'], isolate: true });
-    expect(c.draft.shrouded!.length).toBe(1);
+    expect(new Set(c.draft.shrouded!).size).toBe(1);
+  });
+
+  it('shadow-shroud: at Dominant with all rolls passing, shrouds three distinct indices', () => {
+    const pool = [{ type: 'tarot' }, { type: 'tarot' }, { type: 'tarot' }] as any;
+    const c = ctx({
+      trigger: 'select:draw:end', draft: { pool },
+      affinities: { ...defaultAffinityState(), shadow: 95 }, // Dominant
+      rng: () => 0,
+    });
+    dispatch('select:draw:end', c, buildAffinityResponders(), { forced: ['shadow-shroud'], isolate: true });
+    expect(new Set(c.draft.shrouded!).size).toBe(3);
+  });
+
+  it('shadow-shroud: caps shroud count at pool length', () => {
+    const pool = [{ type: 'tarot' }, { type: 'tarot' }] as any; // only 2
+    const c = ctx({
+      trigger: 'select:draw:end', draft: { pool },
+      affinities: { ...defaultAffinityState(), shadow: 95 },
+      rng: () => 0,
+    });
+    dispatch('select:draw:end', c, buildAffinityResponders(), { forced: ['shadow-shroud'], isolate: true });
+    expect(new Set(c.draft.shrouded!).size).toBe(2);
   });
 
   it('fate-override-pick: no reassignment when all hand entries are reference-equal to outcome', () => {
