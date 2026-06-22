@@ -1,2 +1,0 @@
-- [Game loop overhaul before mechanics](game-loop-overhaul-before-mechanics.md) — postpone interaction mechanics until game loop is restructured
-- [Interaction effects unimplemented](interaction-effects-unimplemented.md) — all five interaction actions are flavor-only, no mechanical application yet
