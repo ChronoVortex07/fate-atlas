@@ -10,7 +10,7 @@ const makeSlot = (type: string, overrides: Record<string, unknown> = {}): SlotRe
     ...overrides,
   };
   if (type === 'tarot') {
-    return { ...base, id: 'test', name: 'The Fool', number: 0, orientation: 'upright' as const, symbol: '☉', meaningUpright: 'New beginnings', meaningReversed: 'Recklessness' } as unknown as SlotResult;
+    return { id: 'test', name: 'The Fool', number: 0, orientation: 'upright' as const, symbol: '☉', meaningUpright: 'New beginnings', meaningReversed: 'Recklessness', ...base } as unknown as SlotResult;
   }
   if (type === 'd20') {
     return { ...base, result: 10, threshold: 'neutral' as const, interpretation: 'Steady' } as unknown as SlotResult;
@@ -300,6 +300,46 @@ describe('NarrativeAssembler', () => {
   it('affinity note appears for high order', () => {
     const result = assembler.assemble(baseAggregated, [], 'decision', { chaos: 30, order: 70 });
     expect(result.affinityNote).toContain('Order');
+  });
+
+  describe('NarrativeAssembler.describeSlotBrief', () => {
+    it('describes a single tarot card by name', () => {
+      const slot = makeSlot('tarot', { name: 'The Fool', orientation: 'upright' });
+      const desc = (assembler as any).describeSlotBrief(slot);
+      expect(desc).toBe('The The Fool (upright)');
+    });
+
+    it('describes a multi-card tarot spread by position', () => {
+      const spreadSlot = {
+        type: 'tarot',
+        id: 'spread:test',
+        name: 'The Fool · The Magician · The High Priestess',
+        number: 0,
+        orientation: 'upright',
+        symbol: '☉',
+        meaningUpright: 'Meaning',
+        meaningReversed: 'Reversed',
+        themes: ['mystery'],
+        dimensions: { favorability: 0.0, certainty: 0.0, volatility: 0.0 },
+        modifierRoles: ['subject'],
+        tags: [],
+        spread: [
+          { position: 'past' as const, card: { name: 'The Fool', orientation: 'upright' } },
+          { position: 'present' as const, card: { name: 'The Magician', orientation: 'upright' } },
+          { position: 'future' as const, card: { name: 'The High Priestess', orientation: 'upright' } },
+        ],
+      } as unknown as SlotResult;
+      const desc = (assembler as any).describeSlotBrief(spreadSlot);
+      expect(desc).toContain('Past: The Fool (upright)');
+      expect(desc).toContain('Present: The Magician (upright)');
+      expect(desc).toContain('Future: The High Priestess (upright)');
+    });
+
+    it('single card tarot result with reversed uses original format', () => {
+      const slot = makeSlot('tarot', { name: 'Death', orientation: 'reversed' });
+      const desc = (assembler as any).describeSlotBrief(slot);
+      expect(desc).toBe('The Death (reversed)');
+    });
   });
 });
 

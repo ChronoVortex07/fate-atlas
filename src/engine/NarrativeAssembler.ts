@@ -200,6 +200,12 @@ export class NarrativeAssembler {
   private describeSlotBrief(slot: SlotResult): string {
     switch (slot.type) {
       case 'tarot':
+        if (slot.spread && slot.spread.length > 1) {
+          return slot.spread.map((sp) => {
+            const pos = sp.position.charAt(0).toUpperCase() + sp.position.slice(1);
+            return `${pos}: ${sp.card.name} (${sp.card.orientation})`;
+          }).join('; ');
+        }
         return `The ${slot.name} (${slot.orientation})`;
       case 'd20':
         return `The dice settle on ${slot.result} (${slot.threshold.replace('-', ' ')})`;
