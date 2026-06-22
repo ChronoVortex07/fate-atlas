@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { AstralResult, AstralCast } from '../types';
-import { PLANETS, SIGNS, HOUSES, DIGNITY, aspectBetween, consolidateCast, dignityOf } from '../../data/astromancy';
+import { PLANETS, SIGNS, HOUSES, DIGNITY, aspectBetween, consolidateCast, dignityOf, drawAstralCast } from '../../data/astromancy';
 
 describe('astral types', () => {
   it('an AstralResult is assignable with the required surface', () => {
@@ -166,6 +166,7 @@ describe('consolidateCast', () => {
   });
 
   // Regression: element+modality lean must contribute to dimensions.
+
   // Mercury in Gemini (air/mutable), house 3 vs house 3 (conjunction).
   // Hand-computed from the brief's formula:
   //   planet Mercury: {fav:0, cert:0.5, vol:0.5}
@@ -189,5 +190,27 @@ describe('consolidateCast', () => {
     expect(rAries.dimensions).toEqual({ favorability: 0.5, certainty: 1.0, volatility: 1.0 });
     // The two casts must differ, proving element lean is active
     expect(rGemini.dimensions.favorability).not.toBe(rAries.dimensions.favorability);
+  });
+});
+
+describe('drawAstralCast', () => {
+  it('produces a valid, consolidatable cast', () => {
+    const c = drawAstralCast({ chaos: 0, order: 0 });
+    expect(c.planetHouse).toBeGreaterThanOrEqual(1);
+    expect(c.planetHouse).toBeLessThanOrEqual(12);
+    expect(c.signHouse).toBeGreaterThanOrEqual(1);
+    expect(c.signHouse).toBeLessThanOrEqual(12);
+    expect(() => consolidateCast(c)).not.toThrow();
+    expect(c.omens).toEqual([]);
+  });
+  it('order biases the two houses toward the same arena (tighter aspects)', () => {
+    const orig = Math.random;
+    try {
+      // force the raw houses far apart; order should pull signHouse toward planetHouse
+      let calls = 0;
+      Math.random = () => { calls++; return calls === 3 ? 0.99 : 0.01; };
+      const c = drawAstralCast({ order: 100, chaos: 0 });
+      expect(Math.abs(c.planetHouse - c.signHouse)).toBeLessThanOrEqual(6);
+    } finally { Math.random = orig; }
   });
 });

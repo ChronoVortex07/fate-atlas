@@ -206,3 +206,26 @@ export function consolidateCast(cast: AstralCast): AstralResult {
     cast,
   };
 }
+
+const PLANET_IDS = Object.keys(PLANETS) as PlanetId[];
+const SIGN_IDS = Object.keys(SIGNS) as SignId[];
+const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+const house = () => Math.floor(Math.random() * 12) + 1;
+
+// Engine-side generator (no physics). Order tightens the two houses (calmer aspects);
+// chaos widens them (more extreme aspects). Faces are uniform.
+export function drawAstralCast(affinities: Record<string, number>): AstralCast {
+  const order = (affinities.order ?? 0) / 100;
+  const chaos = (affinities.chaos ?? 0) / 100;
+  const planetHouse = house();
+  let signHouse = house();
+  if (order > chaos && Math.random() < order - chaos) {
+    // pull signHouse toward planetHouse (smaller separation)
+    const toward = planetHouse + (Math.random() < 0.5 ? 1 : -1);
+    signHouse = ((toward + 11) % 12) + 1;
+  } else if (chaos > order && Math.random() < chaos - order) {
+    // push toward opposition
+    signHouse = ((planetHouse + 5) % 12) + 1;
+  }
+  return { planet: pick(PLANET_IDS), planetHouse, sign: pick(SIGN_IDS), signHouse, omens: [] };
+}
