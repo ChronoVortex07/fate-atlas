@@ -40,3 +40,27 @@ export function shouldOfferRecast(affinities: Record<string, number>, rng: () =>
   const scaled = TIER_BASE_CHANCE.notable * (1 + (idx - minIdx) * BAND_POWER_STEP);
   return rng() < Math.min(1, scaled);
 }
+
+import type { AstralCast } from './types';
+import { consolidateCast } from '../data/astromancy';
+
+const HARMONY_RANK: Record<string, number> = { trine: 2, sextile: 1, conjunction: 0, minor: -1, square: -2, opposition: -2 };
+
+export function resolveCastSelection(
+  casts: AstralCast[],
+  mode: AstralCastMode,
+): { chosen: AstralCast; index: 0 | 1; auto: boolean } {
+  if (mode === 'single' || casts.length === 1) return { chosen: casts[0], index: 0, auto: true };
+  if (mode === 'choice') return { chosen: casts[0], index: 0, auto: false };
+
+  const score = (c: AstralCast) => {
+    const r = consolidateCast(c);
+    return r.dimensions.favorability * 10 + (HARMONY_RANK[r.aspect] ?? 0);
+  };
+  const s0 = score(casts[0]);
+  const s1 = score(casts[1]);
+  const keepFirst = mode === 'favored' ? s0 >= s1 : s0 <= s1;
+  return keepFirst
+    ? { chosen: casts[0], index: 0, auto: true }
+    : { chosen: casts[1], index: 1, auto: true };
+}
