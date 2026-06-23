@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { castHexagram, HEXAGRAMS, HEX_BY_BINARY, hexagramByBinary } from '../../data/iching';
+import { describe, it, expect, vi } from 'vitest';
+import { castHexagram, HEXAGRAMS, HEX_BY_BINARY, hexagramByBinary, drawHexagramCast, consolidateHexagram } from '../../data/iching';
 
 describe('I Ching data', () => {
   it('has 64 hexagrams', () => {
@@ -68,5 +68,34 @@ describe('castHexagram', () => {
     }
     // Should find at least one with changing lines in 50 attempts
     expect(hadChanging).toBe(true);
+  });
+});
+
+describe('drawHexagramCast', () => {
+  it('builds a primary hexagram from the six tossed lines', () => {
+    // Force all coins heads (3) → every line sum 9 (old yang, solid+changing)
+    const seq = Array(18).fill(0); let i = 0;
+    vi.spyOn(Math, 'random').mockImplementation(() => seq[i++ % seq.length]); // 0 < .5 → 2? see lineToBit note
+    const cast = drawHexagramCast({});
+    expect(cast.lines).toHaveLength(6);
+    expect(cast.primaryNumber).toBeGreaterThanOrEqual(1);
+    expect(cast.primaryNumber).toBeLessThanOrEqual(64);
+    vi.restoreAllMocks();
+  });
+  it('relating == primary when there are no changing lines', () => {
+    const cast: any = { lines: [7,7,7,7,7,7], primaryNumber: 1, relatingNumber: 1, changingLines: [] };
+    expect(cast.relatingNumber).toBe(cast.primaryNumber);
+  });
+  it('consolidateHexagram returns the governing hexagram with reversible tag when changing', () => {
+    const cast = { lines: [9,7,7,7,7,9] as any, primaryNumber: 1, relatingNumber: 2, changingLines: [1,6] };
+    const res = consolidateHexagram(cast, 'primary');
+    expect(res.hexagramNumber).toBe(1);
+    expect(res.relatingNumber).toBe(2);
+    expect(res.tags).toContain('changing-lines');
+    expect(res.tags).toContain('reversible');
+    expect(res.tags).toContain('governing-primary');
+    const rel = consolidateHexagram(cast, 'relating');
+    expect(rel.hexagramNumber).toBe(2);
+    expect(rel.tags).toContain('governing-relating');
   });
 });

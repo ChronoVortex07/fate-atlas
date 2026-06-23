@@ -1,4 +1,4 @@
-import type { IChingResult, ThemeTag, DimensionValues, ModifierRole } from '../engine/types';
+import type { IChingResult, LineValue, HexagramCast, ThemeTag, DimensionValues, ModifierRole } from '../engine/types';
 
 export interface HexagramData {
   number: number;
@@ -152,50 +152,78 @@ export function hexagramByBinary(binary: string): HexagramData {
   return h;
 }
 
-export function castHexagram(affinities: Record<string, number>): IChingResult {
-  const changingLines: number[] = [];
+export const lineToBit = (v: LineValue): '0' | '1' => (v === 7 || v === 9 ? '1' : '0');
+const flipBit = (b: string) => (b === '1' ? '0' : '1');
 
+export function drawHexagramCast(affinities: Record<string, number>): HexagramCast {
   const changingBias = ((affinities.chaos ?? 0) / 100) * 0.2;
-
+  const lines: LineValue[] = [];
+  const changingLines: number[] = [];
   for (let line = 0; line < 6; line++) {
     let sum = 0;
-    for (let coin = 0; coin < 3; coin++) {
-      sum += Math.random() < 0.5 ? 2 : 3;
-    }
-    if (Math.random() < changingBias && (sum === 7 || sum === 8)) {
-      sum = sum === 7 ? 6 : 9;
-    }
-    if (sum === 6 || sum === 9) {
-      changingLines.push(line + 1);
-    }
+    for (let coin = 0; coin < 3; coin++) sum += Math.random() < 0.5 ? 2 : 3;
+    // Chaos promotes a young line to its changing counterpart
+    if (Math.random() < changingBias && (sum === 7 || sum === 8)) sum = sum === 7 ? 9 : 6;
+    lines.push(sum as LineValue);
+    if (sum === 6 || sum === 9) changingLines.push(line + 1);
   }
+  const primaryBinary = lines.map(lineToBit).join('');
+  const relatingBin = lines
+    .map((v, idx) => (changingLines.includes(idx + 1) ? flipBit(lineToBit(v)) : lineToBit(v)))
+    .join('');
+  return {
+    lines,
+    primaryNumber: hexagramByBinary(primaryBinary).number,
+    relatingNumber: hexagramByBinary(relatingBin).number,
+    changingLines,
+  };
+}
 
-  const hexagramIndex = Math.floor(Math.random() * 64);
-  const hexagram = HEXAGRAMS[hexagramIndex];
+export function relatingBinary(cast: HexagramCast): string {
+  return cast.lines
+    .map((v, idx) => (cast.changingLines.includes(idx + 1) ? flipBit(lineToBit(v)) : lineToBit(v)))
+    .join('');
+}
 
-  const tags: string[] = ['draw', 'random', 'binary'];
-  if (changingLines.length > 0) {
-    tags.push('changing-lines');
-  }
+export function consolidateHexagram(
+  cast: HexagramCast,
+  governing: 'primary' | 'relating',
+): IChingResult {
+  const num = governing === 'primary' ? cast.primaryNumber : cast.relatingNumber;
+  const hex = HEXAGRAMS.find((h) => h.number === num)!;
+  const relNum = cast.relatingNumber;
+  const rel = HEXAGRAMS.find((h) => h.number === relNum)!;
 
-  // Changing lines push volatility toward +2.0
-  let dimensions = { ...hexagram.dimensions };
-  if (changingLines.length > 0) {
-    const shift = Math.min(2.0, changingLines.length * 0.5);
-    dimensions.volatility = Math.min(2.0, Math.max(-2.0,
-      dimensions.volatility + shift));
+  const tags: string[] = ['draw', 'random', 'binary', `governing-${governing}`];
+  if (cast.changingLines.length > 0) { tags.push('changing-lines'); tags.push('reversible'); }
+
+  let dimensions = { ...hex.dimensions };
+  if (cast.changingLines.length > 0) {
+    const shift = Math.min(2.0, cast.changingLines.length * 0.5);
+    dimensions.volatility = Math.min(2.0, Math.max(-2.0, dimensions.volatility + shift));
   }
 
   return {
     type: 'iching',
-    hexagramNumber: hexagram.number,
-    name: hexagram.name,
-    symbol: hexagram.symbol,
-    judgment: hexagram.judgment,
-    changingLines,
+    hexagramNumber: hex.number,
+    name: hex.name,
+    symbol: hex.symbol,
+    judgment: hex.judgment,
+    changingLines: cast.changingLines,
     tags,
-    themes: hexagram.themes,
+    themes: hex.themes,
     dimensions,
-    modifierRoles: hexagram.modifierRoles,
+    modifierRoles: hex.modifierRoles,
+    governing,
+    relatingNumber: relNum,
+    relatingName: rel.name,
+    relatingSymbol: rel.symbol,
+    cast,
   };
+}
+
+// Back-compat wrapper for non-minigame callers (drawSingleResult, chaos-second-result).
+export function castHexagram(affinities: Record<string, number>): IChingResult {
+  const cast = drawHexagramCast(affinities);
+  return consolidateHexagram(cast, 'relating');
 }
