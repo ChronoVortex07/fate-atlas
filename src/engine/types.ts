@@ -9,6 +9,12 @@ export type AffinityId =
   | 'light'
   | 'shadow';
 
+export interface AffinityMandate {
+  gainMult: Partial<Record<AffinityId, number>>; // per-affinity factor
+  globalMult: number;                            // factor for ids absent from gainMult
+  source: string;
+}
+
 export type AffinityBand = 'latent' | 'stirring' | 'ascendant' | 'dominant';
 
 export interface AffinityState {
