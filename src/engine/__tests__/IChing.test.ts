@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { castHexagram, HEXAGRAMS } from '../../data/iching';
+import { castHexagram, HEXAGRAMS, HEX_BY_BINARY, hexagramByBinary } from '../../data/iching';
 
 describe('I Ching data', () => {
   it('has 64 hexagrams', () => {
@@ -19,6 +19,27 @@ describe('I Ching data', () => {
   it('all hexagram numbers are unique', () => {
     const numbers = HEXAGRAMS.map((h) => h.number);
     expect(new Set(numbers).size).toBe(64);
+  });
+});
+
+describe('King Wen binary table', () => {
+  it('has 64 unique 6-bit binary patterns covering all hexagrams', () => {
+    const set = new Set(HEXAGRAMS.map((h) => h.binary));
+    expect(set.size).toBe(64);
+    for (const h of HEXAGRAMS) expect(h.binary).toMatch(/^[01]{6}$/);
+  });
+  it('maps the canonical anchor hexagrams correctly', () => {
+    expect(hexagramByBinary('111111').number).toBe(1);
+    expect(hexagramByBinary('000000').number).toBe(2);
+    expect(hexagramByBinary('111000').number).toBe(11);
+    expect(hexagramByBinary('000111').number).toBe(12);
+    expect(hexagramByBinary('010010').number).toBe(29);
+    expect(hexagramByBinary('101101').number).toBe(30);
+    expect(hexagramByBinary('101010').number).toBe(63);
+    expect(hexagramByBinary('010101').number).toBe(64);
+  });
+  it('round-trips every hexagram through the lookup', () => {
+    for (const h of HEXAGRAMS) expect(HEX_BY_BINARY[h.binary].number).toBe(h.number);
   });
 });
 
