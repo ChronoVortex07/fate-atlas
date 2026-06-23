@@ -11,6 +11,7 @@ import { dispatch } from './events/EventDispatcher';
 import { buildAffinityResponders } from './responders/affinity';
 import { buildInteractionResponders } from './responders/interactions';
 import { buildAstralResponders } from './responders/astral';
+import { buildIChingResponders } from './responders/iching';
 import { findScenario, freshStage, DEBUG_SCENARIOS } from './events/scenarios';
 import type { Responder, PhaseContext, PhaseDraft, EffectReport } from './events/types';
 import { planAstralCast as planAstralCastPure, resolveCastSelection as resolveCastSelectionPure, shouldOfferRecast } from './astral';
@@ -44,7 +45,7 @@ export class GameEngine {
     this.orchestrator = new TurnOrchestrator(this.bus);
     this.readingPlanner = new ReadingPlanner();
     this.narrativeAssembler = new NarrativeAssembler();
-    this.responders = [...buildAffinityResponders(), ...buildInteractionResponders(), ...buildAstralResponders()];
+    this.responders = [...buildAffinityResponders(), ...buildInteractionResponders(), ...buildAstralResponders(), ...buildIChingResponders()];
     this.state = this.defaultState();
     this.cachedSnapshot = JSON.parse(JSON.stringify(this.state)) as GameState;
   }
@@ -487,6 +488,14 @@ export class GameEngine {
   // current affinities and whether the drawn cast has changing lines. Pure read.
   planHexagramCast(hasChangingLines: boolean): { mode: HexagramMode; offerRecast: boolean } {
     return planHexagramResolution(this.affinityEngine.getState(), hasChangingLines);
+  }
+
+  // Runs chaos/order line-mutation responders against a consolidated IChingResult
+  // before it is committed. Chaos may add a changing line; Order may remove one.
+  // Returns the (possibly mutated) result for the minigame to hand to completeMinigame.
+  runHexagramTransform(result: IChingResult): IChingResult {
+    const { draft } = this.dispatchAt('iching:transform', { outcome: result });
+    return (draft.outcome as IChingResult) ?? result;
   }
 
   // Resolves every active roll modifier into one plan for the dice minigame.

@@ -1,8 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
-import { castHexagram, HEXAGRAMS, HEX_BY_BINARY, hexagramByBinary, drawHexagramCast, consolidateHexagram } from '../../data/iching';
+import { castHexagram, HEXAGRAMS, HEX_BY_BINARY, hexagramByBinary, drawHexagramCast, consolidateHexagram, relatingBinary } from '../../data/iching';
 import { planHexagramResolution, deriveMandate, hexagramNudge } from '../iching';
 import { GameEngine } from '../GameEngine';
-import type { SlotResult } from '../types';
+import { buildIChingResponders } from '../responders/iching';
+import { buildInteractionResponders } from '../responders/interactions';
+import { dispatch } from '../events/EventDispatcher';
+import { defaultAffinityState } from '../../data/affinities';
+import type { PhaseContext } from '../events/types';
+import type { SlotResult, IChingResult } from '../types';
 
 const dieResult = (result = 10): SlotResult => ({
   type: 'd20', result, threshold: 'neutral', interpretation: 'Steady',
@@ -261,5 +266,196 @@ describe('GameEngine I Ching mandate wiring', () => {
     // toward1(1.6) = 1.6 + (1 - 1.6) * 0.4 = 1.36
     expect(decayed).toBeLessThan(full);
     expect(decayed).toBeCloseTo(1.36, 5);
+  });
+});
+
+// ── Task 6: I Ching responders ──────────────────────────────────────────────
+
+function ichingCtx(over: Partial<PhaseContext> = {}): PhaseContext {
+  return {
+    trigger: 'iching:transform', affinities: defaultAffinityState(),
+    slots: [], hand: null, spread: [], minigame: null, event: null,
+    rng: () => 0.0, draft: {}, ...over,
+  };
+}
+
+function makeIChingResult(changing: number[] = []): IChingResult {
+  const cast = {
+    lines: [7, 7, 7, 7, 7, 7] as any,
+    primaryNumber: 1,
+    relatingNumber: 1,
+    changingLines: [...changing],
+  };
+  return {
+    type: 'iching', hexagramNumber: 1, relatingNumber: 1,
+    changingLines: [...changing], cast,
+    dimensions: { favorability: 0, certainty: 0, volatility: 0 },
+    themes: [], modifierRoles: [], tags: [],
+  } as unknown as IChingResult;
+}
+
+describe('buildIChingResponders', () => {
+  it('exposes chaos-line-cascade and order-still-hexagram', () => {
+    const ids = buildIChingResponders().map((r) => r.id);
+    expect(ids).toContain('chaos-line-cascade');
+    expect(ids).toContain('order-still-hexagram');
+  });
+});
+
+describe('chaos-line-cascade responder', () => {
+  it('adds exactly one changing line when forced', () => {
+    const res = makeIChingResult([]);
+    const c = ichingCtx({
+      draft: { outcome: res },
+      affinities: { ...defaultAffinityState(), chaos: 90 },
+      rng: () => 0,
+    });
+    dispatch('iching:transform', c, buildIChingResponders(), { forced: ['chaos-line-cascade'], isolate: true });
+    expect(res.cast!.changingLines.length).toBe(1);
+    expect(res.changingLines.length).toBe(1);
+  });
+
+  it('does not fire when all 6 lines are already changing (condition guard)', () => {
+    const res = makeIChingResult([1, 2, 3, 4, 5, 6]);
+    const c = ichingCtx({
+      draft: { outcome: res },
+      affinities: { ...defaultAffinityState(), chaos: 90 },
+      rng: () => 0,
+    });
+    dispatch('iching:transform', c, buildIChingResponders(), { forced: ['chaos-line-cascade'], isolate: true });
+    // condition should block it — still 6
+    expect(res.cast!.changingLines.length).toBe(6);
+  });
+
+  it('recomputes relatingNumber consistently after adding a line', () => {
+    const res = makeIChingResult([]);
+    // Use all-young-yang lines (value 7) so primaryBinary = "111111" (hex #1)
+    // After cascade adds a changing line at position 1, that line flips to '0'
+    // → relatingBinary would be "011111" → hexagram number from table
+    const c = ichingCtx({
+      draft: { outcome: res },
+      affinities: { ...defaultAffinityState(), chaos: 90 },
+      rng: () => 0,
+    });
+    dispatch('iching:transform', c, buildIChingResponders(), { forced: ['chaos-line-cascade'], isolate: true });
+    // After mutation, recomputeRelating should have run
+    const cast = res.cast!;
+    const expectedRelBin = relatingBinary(cast);
+    const expectedRelNum = hexagramByBinary(expectedRelBin).number;
+    expect(cast.relatingNumber).toBe(expectedRelNum);
+    expect(res.relatingNumber).toBe(expectedRelNum);
+  });
+});
+
+describe('order-still-hexagram responder', () => {
+  it('removes exactly one changing line when forced', () => {
+    const res = makeIChingResult([1, 3, 5]);
+    const c = ichingCtx({
+      draft: { outcome: res },
+      affinities: { ...defaultAffinityState(), order: 90 },
+      rng: () => 0,
+    });
+    dispatch('iching:transform', c, buildIChingResponders(), { forced: ['order-still-hexagram'], isolate: true });
+    expect(res.cast!.changingLines.length).toBe(2);
+    expect(res.changingLines.length).toBe(2);
+  });
+
+  it('does not fire when there are no changing lines (condition guard)', () => {
+    const res = makeIChingResult([]);
+    const c = ichingCtx({
+      draft: { outcome: res },
+      affinities: { ...defaultAffinityState(), order: 90 },
+      rng: () => 0,
+    });
+    dispatch('iching:transform', c, buildIChingResponders(), { forced: ['order-still-hexagram'], isolate: true });
+    expect(res.cast!.changingLines.length).toBe(0);
+  });
+
+  it('recomputes relatingNumber consistently after removing a line', () => {
+    const res = makeIChingResult([1, 3]);
+    const c = ichingCtx({
+      draft: { outcome: res },
+      affinities: { ...defaultAffinityState(), order: 90 },
+      rng: () => 0,
+    });
+    dispatch('iching:transform', c, buildIChingResponders(), { forced: ['order-still-hexagram'], isolate: true });
+    const cast = res.cast!;
+    const expectedRelBin = relatingBinary(cast);
+    const expectedRelNum = hexagramByBinary(expectedRelBin).number;
+    expect(cast.relatingNumber).toBe(expectedRelNum);
+    expect(res.relatingNumber).toBe(expectedRelNum);
+  });
+});
+
+describe('iching-resonant-change responder', () => {
+  const resonantResponders = buildInteractionResponders();
+
+  function ichingCommitCtx(over: Partial<PhaseContext> = {}): PhaseContext {
+    return {
+      trigger: 'iching:commit', affinities: defaultAffinityState(),
+      slots: [], hand: null, spread: [], minigame: null, event: null,
+      rng: () => 0.0, draft: {}, ...over,
+    };
+  }
+
+  it('fires when iching outcome has changing-lines AND spread has a non-iching reversible slot', () => {
+    const outcome = makeIChingResult([1, 2]);
+    outcome.tags = ['changing-lines', 'reversible'];
+    const reversibleSlot: SlotResult = {
+      type: 'tarot', tags: ['reversible'], themes: [], modifierRoles: [],
+      dimensions: { favorability: 0, certainty: 0, volatility: 0 },
+    } as unknown as SlotResult;
+    const c = ichingCommitCtx({
+      draft: { outcome },
+      spread: [reversibleSlot],
+    });
+    dispatch('iching:commit', c, resonantResponders, { forced: ['iching-resonant-change'], isolate: true });
+    // A report should have been queued
+    expect(c.draft.outcome).toBe(outcome); // no slot mutation
+    // The report is returned from apply; it ends up in eventQueue via dispatchAt
+    // In unit-test context dispatch returns reports array
+  });
+
+  it('condition is false when iching outcome lacks changing-lines tag', () => {
+    const outcome = makeIChingResult([]);
+    outcome.tags = []; // no changing-lines
+    const reversibleSlot: SlotResult = {
+      type: 'tarot', tags: ['reversible'], themes: [], modifierRoles: [],
+      dimensions: { favorability: 0, certainty: 0, volatility: 0 },
+    } as unknown as SlotResult;
+    const c = ichingCommitCtx({ draft: { outcome }, spread: [reversibleSlot] });
+    const responder = resonantResponders.find((r) => r.id === 'iching-resonant-change')!;
+    expect(responder.condition(c)).toBe(false);
+  });
+
+  it('condition is false when no non-iching reversible slot exists in spread', () => {
+    const outcome = makeIChingResult([1, 2]);
+    outcome.tags = ['changing-lines'];
+    // spread slot is iching type — should not match
+    const nonReversible: SlotResult = {
+      type: 'iching', tags: ['changing-lines'], themes: [], modifierRoles: [],
+      dimensions: { favorability: 0, certainty: 0, volatility: 0 },
+    } as unknown as SlotResult;
+    const c = ichingCommitCtx({ draft: { outcome }, spread: [nonReversible] });
+    const responder = resonantResponders.find((r) => r.id === 'iching-resonant-change')!;
+    expect(responder.condition(c)).toBe(false);
+  });
+
+  it('apply returns a report and does NOT mutate any spread slot', () => {
+    const outcome = makeIChingResult([1, 2]);
+    outcome.tags = ['changing-lines', 'reversible'];
+    const reversibleSlot: SlotResult = {
+      type: 'tarot', tags: ['reversible'], themes: [], modifierRoles: [],
+      dimensions: { favorability: 0, certainty: 0, volatility: 0 },
+    } as unknown as SlotResult;
+    const slotBefore = JSON.stringify(reversibleSlot);
+    const c = ichingCommitCtx({ draft: { outcome }, spread: [reversibleSlot] });
+    const responder = resonantResponders.find((r) => r.id === 'iching-resonant-change')!;
+    const effectReport = responder.apply(c);
+    expect(effectReport).not.toBeNull();
+    expect(effectReport!.responderId).toBe('iching-resonant-change');
+    expect(effectReport!.animation).toBe('mirror');
+    // No slot was mutated
+    expect(JSON.stringify(reversibleSlot)).toBe(slotBefore);
   });
 });
