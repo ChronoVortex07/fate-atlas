@@ -1,5 +1,5 @@
 import type { Responder, EffectReport } from '../events/types';
-import type { SlotResult, TarotResult, DiceResult } from '../types';
+import type { SlotResult, TarotResult, DiceResult, IChingResult } from '../types';
 import { reverseSpread } from '../../data/tarot';
 
 const has = (s: SlotResult, ...tags: string[]) => tags.every((t) => s.tags.includes(t));
@@ -118,5 +118,15 @@ export function buildInteractionResponders(): Responder[] {
     spreadEntry('spread-cascade',
       (r) => facesOf(r).every((f) => f.orientation === 'reversed'),
       (_r, push) => push(report('spread-cascade', 'Chaos', 'Every card falls reversed — a cascade of upheaval.', 'flip'))),
+    {
+      id: 'iching-resonant-change', source: 'interaction', triggers: ['iching:commit'],
+      group: { kind: 'exclusive', band: 'MUTATE' }, weight: () => 1,
+      condition: (c) =>
+        c.draft.outcome?.type === 'iching'
+        && (c.draft.outcome as IChingResult).tags.includes('changing-lines')
+        && c.spread.some((s) => s.type !== 'iching' && s.tags.includes('reversible')),
+      roll: () => true,
+      apply: () => report('iching-resonant-change', 'I Ching', 'The changing lines resonate outward — a kindred force stirs in sympathy.', 'mirror'),
+    },
   ];
 }

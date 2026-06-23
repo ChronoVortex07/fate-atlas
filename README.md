@@ -38,7 +38,7 @@ npm run dev        # → http://localhost:5173
 |--------|----------|------|
 | **Tarot** | 78 cards (22 Major Arcana + 56 Minor Arcana by suit×rank), three-card Past/Present/Future spread consolidated into one result, upright or reversed per face. Complete standardized geometric **sigil system** — 22 bespoke major line-art sigils + composed minors (suit emblem + rank cartouche, court crowns) — with a constellation-crest card back, replacing the old emoji/rune placeholders | `major-arcana` `minor-arcana` `reversible` `fool-archetype` `suit-*` `element-*` ... |
 | **d20 Dice** | 1d20 roll, 5-tier thresholds (critical-low → critical-high) | `roll` `numeric` `threshold` |
-| **I Ching** | 64 hexagrams, 3-coin casting method, changing lines | `binary` `reversible` `changing-lines` |
+| **I Ching** | 64 hexagrams (King Wen), authentic 3-coin casting per line. Changing lines (old yang/yin) transform the **primary hexagram** into a **relating hexagram**. Affinities gate whether the player chooses which to commit (Will ascendant), fate chooses (Fate ascendant), or a re-cast is offered (unaligned). The committed hexagram sets a lingering **Mandate of Change** (per-affinity multiplier on all future shift magnitude) that decays 40%/commit toward ×1.0. | `draw` `random` `binary` `governing-primary\|relating` · `changing-lines` `reversible` *(only when changing lines exist)* |
 | **Astromancy** | Planet die + Sign die thrown onto a 12-house zodiac board | `draw` `random` `astral` `planet-<id>` `sign-<id>` `house-<N>` ... |
 | **Happenings** | 8 authored cryptic scenes with 2-3 choices each | `event` `choice` `affinity-shift` |
 
@@ -125,6 +125,7 @@ new entity with the right tags automatically participates.
 | **Critical Resonance** | cross-slot | upright spread + critical-low die (or reversed + critical-high) | Flips the whole spread |
 | **The Mirror** | cross-slot | exactly two reversible entities present | Both flip orientation (85%) |
 | **I Ching Boost** | cross-slot | an I Ching with changing lines is present | Adds a hidden happening choice |
+| **I Ching Resonant Change** | cross-slot | committed I Ching has changing lines + another reversible entity in the spread | Narrates that the changing lines resonated outward (report-only) |
 | **Suit Accord** | spread-internal | all three spread faces share the same suit | Amplifies the suit's primary dimension |
 | **Elemental Clash** | spread-internal | opposing elements are present in the spread | Increases volatility |
 | **Major Convergence** | spread-internal | two or more Major Arcana in the spread | Emits a fated-current report |

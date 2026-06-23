@@ -20,6 +20,9 @@ the **meta-interactions** between divination results, and the **happenings**.
 > | Astromancy data tables (planets, signs, houses, aspects, dignity) | [`src/data/astromancy.ts`](../src/data/astromancy.ts) |
 > | Astromancy cast modes and affinity modifiers | [`src/engine/astral.ts`](../src/engine/astral.ts) |
 > | Astromancy symbolic-resonance + omen responders | [`src/engine/responders/astral.ts`](../src/engine/responders/astral.ts) |
+> | I Ching hexagram data (King Wen table, cast, consolidation) | [`src/data/iching.ts`](../src/data/iching.ts) |
+> | I Ching resolution modes, Mandate derivation, nudge | [`src/engine/iching.ts`](../src/engine/iching.ts) |
+> | I Ching line-mutation responders | [`src/engine/responders/iching.ts`](../src/engine/responders/iching.ts) |
 
 ---
 
@@ -345,6 +348,8 @@ higher bands (§1).
 | `order-anchor` | `tarot:orient` | MUTATE | Order ascendant · notable | Sets every reversed face upright — coerces the spread to full upright | `anchor` |
 | `fate-hollow-reroll` | `dice:reroll` | OVERRIDE | Fate ascendant · major | A reroll returns the previous die unchanged | `override` |
 | `chaos-second-result` | `dice/tarot/iching:commit` | SPAWN | Chaos dominant · major | Spawns a second result of the same type (targets the new fan slot) | `second-result` |
+| `chaos-line-cascade` | `iching:transform` | MUTATE | Chaos ascendant · notable | Adds one new changing line (chosen from the still lines) and recomputes the relating hexagram | `amplify` |
+| `order-still-hexagram` | `iching:transform` | MUTATE | Order ascendant · notable | Removes one changing line (chosen at random) and recomputes the relating hexagram | `anchor` |
 | `chaos-happening-interrupt` | `minigame:end` | SPAWN | Chaos ascendant · major | A happening interrupts before the next method (never on the last reading) | `interrupt` |
 | `light-advantage` | `dice:roll` | combine `roll-mode` | Light ascendant · ambient | Adds an **advantage** modifier | *(roll-mode)* |
 | `shadow-disadvantage` | `dice:roll` | combine `roll-mode` | Shadow ascendant · ambient | Adds a **disadvantage** modifier | *(roll-mode)* |
@@ -390,6 +395,7 @@ automatically participates). All are deterministic (`roll → true`) except **Mi
 | **Critical Resonance** (`critical-resonance`) | `tarot:commit` | cross-slot | Committed tarot majority orientation is **upright + critical-low** die present, or **reversed + critical-high** die present | Flips the whole spread via `reverseSpread` | `flip` |
 | **The Mirror** (`mirror`) | any `*:commit` | cross-slot | Exactly **two** `reversible` entities in the spread | Flips orientation on both via `reverseSpread` (85% chance) | `mirror` |
 | **I Ching Boost** (`iching-happening-boost`) | `happening:start` | cross-slot | An I Ching with `changing-lines` is in the spread | Adds a hidden bonus choice to the happening | `add-choice` |
+| **I Ching Resonant Change** (`iching-resonant-change`) | `iching:commit` | cross-slot | The committed I Ching has `changing-lines` **and** another `reversible` entity (non-I Ching) is in the spread | Report-only: narrates that the changing lines resonated outward through the spread | `mirror` |
 | **Suit Accord** (`suit-accord`) | `tarot:commit` (spread) | spread-internal | All faces share the same suit (Wands/Cups/Swords/Pentacles) | Amplifies the suit's primary dimension by ×1.5 | `amplify` |
 | **Elemental Clash** (`elemental-clash`) | `tarot:commit` (spread) | spread-internal | Two opposing elements are present (fire↔water, air↔earth) | Increases volatility dimension | `amplify` |
 | **Major Convergence** (`major-convergence`) | `tarot:commit` (spread) | spread-internal | Two or more Major Arcana faces in the spread | Emits a fated-current report | `second-result` |
@@ -625,3 +631,169 @@ weight-1 MUTATE rivals in a tie); the rest are weight 1.
 > throw: **Chaos** adds turbulence (wider scatter, more extreme aspects), **Order** centers
 > the dice (smaller separation between the two landing houses). This is cosmetic — the
 > same affinity influence is already baked into the engine-side `drawAstralCast` fallback.
+
+---
+
+## 9. I Ching
+
+I Ching (`type: 'iching'`) is the third divination method. The seeker casts three coins
+six times to build a **primary hexagram** from the bottom line up; changing lines transform
+it into a **relating hexagram** that shows where the present moment is moving.
+
+Sources of truth: [`src/data/iching.ts`](../src/data/iching.ts),
+[`src/engine/iching.ts`](../src/engine/iching.ts),
+[`src/engine/responders/iching.ts`](../src/engine/responders/iching.ts).
+
+### 9a. Authentic coin-cast (`drawHexagramCast`)
+
+Each of the six lines is determined by summing three virtual coin tosses (heads=3, tails=2),
+producing a line value of **6, 7, 8, or 9**:
+
+| Sum | Line type | Yang/Yin | Changing? |
+|-----|-----------|----------|-----------|
+| 6 | old yin | yin | yes → transforms to yang |
+| 7 | young yang | yang | no |
+| 8 | young yin | yin | no |
+| 9 | old yang | yang | yes → transforms to yin |
+
+Lines 6 and 9 are **changing lines** (their position recorded, 1-indexed bottom-up). The
+primary hexagram reads the current state; the relating hexagram flips every changing line
+to its opposite, revealing where the situation is heading.
+
+**Chaos bias** — when Chaos is above 0, there is up to a 20% chance per line that a young
+(stable) line is promoted to its changing counterpart (Chaos ×0.2 probability). This makes
+changing lines more frequent as Chaos rises.
+
+### 9b. King Wen mapping
+
+Primary and relating hexagrams are identified by mapping the six bits (bottom→top,
+yang=`1`, yin=`0`) against the **King Wen binary table** (`HEX_BY_BINARY` in
+`src/data/iching.ts`). All 64 hexagrams are authored with hand-tuned dimensions
+(favorability, certainty, volatility in −2 … +2) and 1–3 themes drawn from the shared
+theme vocabulary.
+
+### 9c. Primary → Relating transformation
+
+When a cast has no changing lines, only the primary hexagram is produced. When changing
+lines exist, the relating hexagram is also computed. The player's choice of which to commit
+determines the **governing hexagram** — the single `IChingResult` that enters the spread.
+
+Changing lines also shift the governing hexagram's **volatility dimension** upward
+(`+0.5 × changingLineCount`, capped at +2.0) before the result is consolidated.
+
+Tags emitted by `consolidateHexagram`:
+
+| Tag | Always emitted? | Meaning |
+|-----|-----------------|---------|
+| `draw` | yes | result was drawn (not authored) |
+| `random` | yes | result involves randomness |
+| `binary` | yes | result is a binary (hexagram) structure |
+| `governing-primary` | if governing = primary | primary hexagram was chosen |
+| `governing-relating` | if governing = relating | relating hexagram was chosen |
+| `changing-lines` | only if ≥1 changing line | cast produced changing lines |
+| `reversible` | only if ≥1 changing line | can participate in Mirror / Resonant Change |
+
+> Note: `reversible` and `changing-lines` are emitted together and only when the cast
+> actually produced changing lines — they are not always present on an I Ching result.
+
+### 9d. Resolution modes (`planHexagramResolution`)
+
+The UI offers different choices depending on which affinities are ascendant. Will takes
+priority over Fate when both qualify.
+
+| Mode | Condition | What the player experiences |
+|------|-----------|------------------------------|
+| `willed` | Will ascendant+ (and changing lines present) | **Accept the Change** (commits relating; feeds Will+Chaos via `reversed`) · **Hold the Moment** (commits primary; feeds Fate via `revealedAsDrawn`) |
+| `fated` | Fate ascendant+ (Will below ascendant; and changing lines present) | Fate carries the cast forward — the relating hexagram is committed automatically (feeds Fate via `revealedAsDrawn`) |
+| `unaligned` | Neither Will nor Fate ascendant (or no changing lines) | One **Re-cast** offer is extended; if declined or absent the engine resolves automatically |
+
+When there are no changing lines, `mode` is always `unaligned` and no re-cast is offered.
+
+After a successful re-cast the affinity feed action `viaReroll` applies (`take-reroll`
+→ Will).
+
+### 9e. New event triggers
+
+| Trigger | Fires when |
+|---------|-----------|
+| `iching:cast` | Reserved — fires when the cast is drawn (currently unused by responders) |
+| `iching:transform` | Before commit — `chaos-line-cascade` and `order-still-hexagram` compete here to mutate the changing-line set |
+| `iching:commit` | The governing hexagram is committed — `mirror`, `iching-resonant-change`, and `chaos-second-result` fire here |
+
+### 9f. The Mandate of Change
+
+When an I Ching result is committed, two effects are applied to the `AffinityEngine`:
+
+**1 — One-time nudge (`hexagramNudge`):** Direct signed shifts applied *before* the mandate
+is set, so the nudge itself is not scaled by the freshly-created mandate. The nudge is
+derived from the governing hexagram's dimensions:
+
+| Dimension | Direction | Affinity shifted | Scale |
+|-----------|-----------|-----------------|-------|
+| volatility > 0 | positive | Chaos | `round(volatility × 4)` |
+| volatility < 0 | negative | Order | `round(−volatility × 4)` |
+| favorability > 0 | positive | Light | `round(favorability × 3)` |
+| favorability < 0 | negative | Shadow | `round(−favorability × 3)` |
+| certainty > 0 | positive | Order | `round(certainty × 2)` |
+| certainty < 0 | negative | Shadow | `round(−certainty × 2)` |
+
+**2 — Lingering Mandate (`deriveMandate` → `AffinityEngine.setMandate`):** Sets a
+per-affinity multiplier on the `baseDelta` of every future `shift()` call — scaling both
+gains **and** penalties until the mandate decays. The player never sees the mandate
+as numbers; it surfaces only as atmospheric flavor.
+
+#### Global multiplier formula
+
+Derived from the governing hexagram's **volatility** dimension, clamped to [0.5, 1.6]:
+
+```
+volatility >= 0 : globalMult = 1 + (volatility / 2) * 0.6   → range [1.0, 1.6]
+volatility < 0  : globalMult = 1 + (volatility / 2) * 0.5   → range [0.5, 1.0]
+```
+
+All six per-affinity factors start at `globalMult`, then thematic tilts are applied
+(each tilt is clamped independently to [0.4, 2.0]):
+
+| Governing hexagram has… | Affinity tilted up | Affinity tilted down |
+|-------------------------|--------------------|----------------------|
+| A change theme (`transformation`, `upheaval`, `renewal`) | Chaos ×1.25, Will ×1.20 | Order ×0.80 |
+| An order theme (`stagnation`, `harmony`, `authority`) | Order ×1.20, Fate ×1.15 | Chaos ×0.85 |
+| favorability > 0 | Light ×1.15 | Shadow ×0.90 |
+| favorability < 0 | Shadow ×1.15 | Light ×0.90 |
+| certainty > 0 | Order ×1.10, Light ×1.05 | — |
+| certainty < 0 | Chaos ×1.05, Shadow ×1.10 | — |
+
+Multiple tilt conditions stack multiplicatively (applied in order above).
+
+#### Decay and lifecycle
+
+- **No-op on the commit that sets it** (`mandateFresh = true`): the first subsequent
+  commit after the I Ching is when decay begins.
+- **Decay rate:** each commit (via `decayMandate()` in `advanceAfterCommit`) moves every
+  factor **40% of the way toward 1.0**: `factor → factor + (1 − factor) × 0.4`.
+- **Turn-scoped:** the mandate is **never serialized** to localStorage; it is cleared by
+  `beginRun()` at the start of every run and does not carry over between turns.
+- **Replacement:** a second I Ching cast in the same turn replaces the mandate entirely.
+- **Cleared at run start:** `AffinityEngine.beginRun()` calls `clearMandate()`.
+- **Secrecy:** the mandate values are not exposed in the game UI. Only atmospheric flavor
+  text hints at the hexagram's influence on the reading.
+
+### 9g. Line-mutation responders (`iching:transform`)
+
+Before the result is committed, `GameEngine.runHexagramTransform` dispatches the
+`iching:transform` trigger, allowing Chaos or Order to alter the cast:
+
+| Responder | Min band / tier | Condition | Effect |
+|-----------|-----------------|-----------|--------|
+| `chaos-line-cascade` | Chaos ascendant · notable | Cast has ≥1 still line (< 6 changing lines) | Adds one new changing line (random from the still lines); recomputes relating hexagram |
+| `order-still-hexagram` | Order ascendant · notable | Cast has ≥1 changing line | Removes one changing line (random); recomputes relating hexagram |
+
+Both compete in the `MUTATE` exclusive band (weighted by their affinity value); at most one
+fires per transform. The relating hexagram is always recomputed after any line change
+(`recomputeRelating`).
+
+Note: `chaos-line-cascade` can *create* a transformation from scratch — its condition is
+`< 6 changing lines` (not `≥ 1`), so Chaos can add the very first changing line to an
+otherwise stable cast, producing a relating hexagram where none would have existed.
+
+See §5 for the full responder catalog entry.

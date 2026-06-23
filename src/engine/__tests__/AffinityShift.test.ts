@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   bandOf,
   defaultAffinityState,
@@ -137,5 +137,70 @@ describe('bands, reach-up, and run boundary', () => {
     const g = e.shift('order', 10, 't'); // dr back to 1.0
     Math.random = o;
     expect(g).toBeCloseTo(10, 5);
+  });
+});
+
+describe('AffinityMandate', () => {
+  it('scales a gain by the per-affinity factor', () => {
+    const e = make();
+    e.setState({ chaos: 50 });
+    const baseline = make(); baseline.setState({ chaos: 50 });
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    e.setMandate({ gainMult: { chaos: 2.0 }, globalMult: 1.0, source: 'test' });
+    const gMandate = e.shift('chaos', 10, 'test');
+    const gBase = baseline.shift('chaos', 10, 'test');
+    expect(gMandate).toBeCloseTo(gBase * 2.0, 5);
+    vi.restoreAllMocks();
+  });
+
+  it('scales a direct penalty by the per-affinity factor', () => {
+    const e = make(); e.setState({ light: 50 });
+    e.setMandate({ gainMult: { light: 2.0 }, globalMult: 1.0, source: 'test' });
+    const d = e.shift('light', -10, 'test');
+    expect(d).toBe(-20);
+  });
+
+  it('uses globalMult for affinities absent from gainMult', () => {
+    const e = make();
+    e.setMandate({ gainMult: { chaos: 2.0 }, globalMult: 0.5, source: 'test' });
+    expect(e.getMandate()!.globalMult).toBe(0.5);
+  });
+
+  it('decays each factor 40% toward 1.0, skipping the set turn', () => {
+    const e = make();
+    e.setMandate({ gainMult: { chaos: 2.0 }, globalMult: 1.0, source: 'test' });
+    e.decayMandate(); // fresh → no decay
+    expect(e.getMandate()!.gainMult.chaos).toBeCloseTo(2.0, 5);
+    e.decayMandate(); // 2.0 → 2.0 + (1-2.0)*0.4 = 1.6
+    expect(e.getMandate()!.gainMult.chaos).toBeCloseTo(1.6, 5);
+  });
+
+  it('globalMult scales an affinity absent from gainMult', () => {
+    // Mandate with only globalMult: 0.5 and no per-affinity entries.
+    // A shift on 'order' (not in gainMult) should be scaled by globalMult (0.5).
+    const e = make(); e.setState({ order: 50 });
+    const baseline = make(); baseline.setState({ order: 50 });
+    vi.spyOn(Math, 'random').mockReturnValue(0.5); // no jitter
+    e.setMandate({ gainMult: {}, globalMult: 0.5, source: 'test' });
+    const gMandate = e.shift('order', 10, 'test');
+    const gBase = baseline.shift('order', 10, 'test');
+    expect(gMandate).toBeCloseTo(gBase * 0.5, 5);
+    vi.restoreAllMocks();
+  });
+
+  it('decays globalMult 40% toward 1.0, skipping the set turn', () => {
+    const e = make();
+    e.setMandate({ gainMult: {}, globalMult: 0.5, source: 'test' });
+    e.decayMandate(); // fresh → no decay
+    expect(e.getMandate()!.globalMult).toBeCloseTo(0.5, 5);
+    e.decayMandate(); // 0.5 → 0.5 + (1-0.5)*0.4 = 0.7
+    expect(e.getMandate()!.globalMult).toBeCloseTo(0.7, 5);
+  });
+
+  it('clears the mandate on beginRun', () => {
+    const e = make();
+    e.setMandate({ gainMult: { chaos: 2 }, globalMult: 1, source: 'test' });
+    e.beginRun();
+    expect(e.getMandate()).toBeNull();
   });
 });

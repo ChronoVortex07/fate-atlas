@@ -9,6 +9,12 @@ export type AffinityId =
   | 'light'
   | 'shadow';
 
+export interface AffinityMandate {
+  gainMult: Partial<Record<AffinityId, number>>; // per-affinity factor
+  globalMult: number;                            // factor for ids absent from gainMult
+  source: string;
+}
+
 export type AffinityBand = 'latent' | 'stirring' | 'ascendant' | 'dominant';
 
 export interface AffinityState {
@@ -184,6 +190,15 @@ export interface DiceResult extends ThematicData {
   tags: Tag[];
 }
 
+export type LineValue = 6 | 7 | 8 | 9; // 6 old-yin, 7 young-yang, 8 young-yin, 9 old-yang
+
+export interface HexagramCast {
+  lines: LineValue[];        // length 6, bottom→top
+  primaryNumber: number;     // 1..64
+  relatingNumber: number;    // 1..64 (== primaryNumber when no changing lines)
+  changingLines: number[];   // 1..6
+}
+
 export interface IChingResult extends ThematicData {
   type: 'iching';
   hexagramNumber: number; // 1-64
@@ -192,6 +207,11 @@ export interface IChingResult extends ThematicData {
   judgment: string;
   changingLines: number[]; // 0-6 line indices that are changing
   tags: Tag[];
+  governing?: 'primary' | 'relating';
+  relatingNumber?: number;
+  relatingName?: string;
+  relatingSymbol?: string;
+  cast?: HexagramCast;
 }
 
 // ── Astromancy Types ──

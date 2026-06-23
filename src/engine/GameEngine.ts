@@ -1,4 +1,4 @@
-import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, RollMode, DivinationType, TarotCardFace, TableCard, TarotDraftState, AstralCast } from './types';
+import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, RollMode, DivinationType, TarotCardFace, TableCard, TarotDraftState, AstralCast, IChingResult } from './types';
 import { FULL_DECK, buildFace, pickOrientation, DECK_BY_ID, consolidateSpread, reverseSpread } from '../data/tarot';
 import { EventBus } from './EventBus';
 import { AffinityEngine } from './AffinityEngine';
@@ -11,10 +11,13 @@ import { dispatch } from './events/EventDispatcher';
 import { buildAffinityResponders } from './responders/affinity';
 import { buildInteractionResponders } from './responders/interactions';
 import { buildAstralResponders } from './responders/astral';
+import { buildIChingResponders } from './responders/iching';
 import { findScenario, freshStage, DEBUG_SCENARIOS } from './events/scenarios';
 import type { Responder, PhaseContext, PhaseDraft, EffectReport } from './events/types';
 import { planAstralCast as planAstralCastPure, resolveCastSelection as resolveCastSelectionPure, shouldOfferRecast } from './astral';
 import type { AstralCastMode } from './astral';
+import { deriveMandate, hexagramNudge, planHexagramResolution } from './iching';
+import type { HexagramMode } from './iching';
 
 const STORAGE_KEY = 'fate-atlas-save';
 
@@ -42,7 +45,7 @@ export class GameEngine {
     this.orchestrator = new TurnOrchestrator(this.bus);
     this.readingPlanner = new ReadingPlanner();
     this.narrativeAssembler = new NarrativeAssembler();
-    this.responders = [...buildAffinityResponders(), ...buildInteractionResponders(), ...buildAstralResponders()];
+    this.responders = [...buildAffinityResponders(), ...buildInteractionResponders(), ...buildAstralResponders(), ...buildIChingResponders()];
     this.state = this.defaultState();
     this.cachedSnapshot = JSON.parse(JSON.stringify(this.state)) as GameState;
   }
@@ -253,6 +256,17 @@ export class GameEngine {
       if (meta.viaReroll) this.affinityEngine.applyAction('take-reroll');
     }
 
+    // I Ching: one-time nudge (direct shifts) THEN set the lingering Mandate of
+    // Change. The nudge runs BEFORE setMandate so its shifts are not scaled by
+    // the freshly-set mandate — the mandate only affects FUTURE commits.
+    if (result.type === 'iching') {
+      const gov = result as IChingResult;
+      for (const [id, delta] of hexagramNudge(gov)) {
+        this.affinityEngine.shift(id, delta, `iching-nudge:${gov.hexagramNumber}`);
+      }
+      this.affinityEngine.setMandate(deriveMandate(gov));
+    }
+
     // Post-commit dispatch: interaction matchers + chaos second-result responders.
     // Responders namespace dice as 'dice', not the data-layer 'd20' type.
     const commitFamily = result.type === 'd20' ? 'dice' : result.type;
@@ -306,6 +320,11 @@ export class GameEngine {
   }
 
   private advanceAfterCommit(result: SlotResult, completed: number): void {
+    // Decay the Mandate of Change once per completed minigame. No-op the commit
+    // that SET it (mandateFresh), so the immediate next reading feels the full
+    // mandate; each later commit weakens it toward 1.0.
+    this.affinityEngine.decayMandate();
+
     // Final reading?
     if (completed >= this.minigamesPerTurn) {
       this.synthesizeAll();
@@ -463,6 +482,27 @@ export class GameEngine {
 
   resolveCastSelection(casts: AstralCast[], mode: AstralCastMode): { chosen: AstralCast; index: 0 | 1; auto: boolean } {
     return resolveCastSelectionPure(casts, mode);
+  }
+
+  // Resolves the I Ching transformation fork (willed/fated/unaligned) from the
+  // current affinities and whether the drawn cast has changing lines. Pure read.
+  planHexagramCast(hasChangingLines: boolean): { mode: HexagramMode; offerRecast: boolean } {
+    return planHexagramResolution(this.affinityEngine.getState(), hasChangingLines);
+  }
+
+  // Runs chaos/order line-mutation responders against a consolidated IChingResult
+  // before it is committed. Chaos may add a changing line; Order may remove one.
+  // Returns the (possibly mutated) result AND the EffectReports so the minigame
+  // can narrate them inline at the transform beat rather than at commit time.
+  // The reports are stripped from eventQueue here (they stay in turnEffects for
+  // the RunRecord); the caller is responsible for displaying them.
+  runHexagramTransform(result: IChingResult): { result: IChingResult; reports: EffectReport[] } {
+    const before = this.state.eventQueue.length;
+    const { draft, reports } = this.dispatchAt('iching:transform', { outcome: result });
+    // Narrated inline by the minigame's transform beat — keep them out of the
+    // commit-time queue (they stay in turnEffects for the run record).
+    if (reports.length > 0) this.state.eventQueue = this.state.eventQueue.slice(0, before);
+    return { result: (draft.outcome as IChingResult) ?? result, reports };
   }
 
   // Resolves every active roll modifier into one plan for the dice minigame.

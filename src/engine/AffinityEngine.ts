@@ -1,4 +1,4 @@
-import type { AffinityId, AffinityBand, AffinityAction, AffinityEffects, Taggable } from './types';
+import type { AffinityId, AffinityBand, AffinityAction, AffinityEffects, Taggable, AffinityMandate } from './types';
 import type { AffinityDefinition } from '../data/affinities';
 import {
   AFFINITY_IDS,
@@ -28,6 +28,8 @@ export class AffinityEngine {
   private peekLocked = false;
   private definitions: AffinityDefinition[];
   private defById: Record<string, AffinityDefinition>;
+  private mandate: AffinityMandate | null = null;
+  private mandateFresh = false;
 
   constructor(definitions: AffinityDefinition[]) {
     this.definitions = definitions;
@@ -41,10 +43,29 @@ export class AffinityEngine {
     for (const def of definitions) this.defById[def.id] = def;
   }
 
+  // ── Mandate of Change ──
+  setMandate(m: AffinityMandate): void { this.mandate = m; this.mandateFresh = true; }
+  getMandate(): AffinityMandate | null { return this.mandate; }
+  clearMandate(): void { this.mandate = null; this.mandateFresh = false; }
+  decayMandate(): void {
+    if (!this.mandate) return;
+    if (this.mandateFresh) { this.mandateFresh = false; return; }
+    const toward1 = (f: number) => f + (1 - f) * 0.4;
+    this.mandate.globalMult = toward1(this.mandate.globalMult);
+    for (const id of Object.keys(this.mandate.gainMult) as AffinityId[]) {
+      this.mandate.gainMult[id] = toward1(this.mandate.gainMult[id]!);
+    }
+  }
+  private mandateFactor(id: AffinityId): number {
+    if (!this.mandate) return 1;
+    return this.mandate.gainMult[id] ?? this.mandate.globalMult;
+  }
+
   // ── The single mutation chokepoint ──
   // Returns the realized delta actually applied to `id` (signed).
   shift(id: AffinityId, baseDelta: number, _sourceId: string): number {
     if (baseDelta === 0) return 0;
+    baseDelta *= this.mandateFactor(id);  // mandate scales both gains AND penalties
 
     // Penalty: direct subtraction, no fan-out.
     if (baseDelta < 0) {
@@ -141,6 +162,7 @@ export class AffinityEngine {
     }
     this.peeksThisRun = 0;
     this.peekLocked = false;
+    this.clearMandate();
   }
 
   bandOf(id: AffinityId): AffinityBand {
