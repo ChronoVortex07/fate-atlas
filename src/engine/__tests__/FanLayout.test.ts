@@ -2,10 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { restCenters, computeFanLayout, type FanLayoutParams } from '../fanLayout';
 
 const P: FanLayoutParams = {
-  count: 7, containerWidth: 600, cardWidth: 58, restStep: 42, minStep: 30, radius: 140,
+  count: 7, containerWidth: 600, cardWidth: 58, restStep: 42, radius: 140,
 };
-const envLeft = (p: FanLayoutParams) => p.containerWidth / 2 - (p.count * p.cardWidth) / 2;
-const envRight = (p: FanLayoutParams) => p.containerWidth / 2 + (p.count * p.cardWidth) / 2;
 
 describe('restCenters', () => {
   it('is symmetric about the container center with restStep spacing', () => {
@@ -44,19 +42,11 @@ describe('computeFanLayout', () => {
     }
   });
 
-  it('R3: ends never pass the fixed envelope', () => {
-    const rest = restCenters({ count: P.count, containerWidth: P.containerWidth, restStep: P.restStep });
-    for (const cursor of [rest[0] - 50, rest[0], rest[6], rest[6] + 50, 300]) {
-      const out = computeFanLayout(cursor, true, P);
-      expect(out[0] - P.cardWidth / 2).toBeGreaterThanOrEqual(envLeft(P) - 1e-6);
-      expect(out[out.length - 1] + P.cardWidth / 2).toBeLessThanOrEqual(envRight(P) + 1e-6);
-    }
-  });
-
-  it('R4: far from the cursor, cards compress below rest spacing', () => {
+  it('R3: far from the cursor, gaps stay at rest spacing (no compression)', () => {
     const rest = restCenters({ count: P.count, containerWidth: P.containerWidth, restStep: P.restStep });
     const out = computeFanLayout(rest[0], true, P); // cursor at far-left card
     const farGap = out[out.length - 1] - out[out.length - 2]; // rightmost gap
-    expect(farGap).toBeLessThan(P.restStep);
+    // Gaussian falloff never truly hits zero, but the far gap should be within 1px of restStep
+    expect(Math.abs(farGap - P.restStep)).toBeLessThan(1);
   });
 });

@@ -238,41 +238,82 @@ export default function FanCard({
           padding: '0 4px',
         }}
       >
-        <span
-          style={{
-            fontSize: symbolFontSize,
-            color: isRerollTarget || isSource ? '#d4a854' : display.borderColor,
-            lineHeight: 1,
-            textShadow: isRerollTarget
-              ? '0 0 10px rgba(212,168,84,0.4)'
-              : 'none',
-            fontFamily: display.borderColor === '#c75b4a'
-              ? "'Cormorant Garamond', serif"
-              : 'inherit',
-            fontWeight: display.borderColor === '#c75b4a' ? 700 : 400,
-          }}
-        >
-          {result.type === 'tarot'
-            ? <CardSigil card={result} size={isDesktop ? 22 : 14} color={isRerollTarget || isSource ? '#d4a854' : display.borderColor} />
-            : display.symbol}
-        </span>
-        <span
-          style={{
-            fontFamily: "'Cormorant Garamond', serif",
-            fontWeight: 600,
-            fontSize: nameFontSize,
-            color: isRerollTarget ? '#d4a854' : '#c8d8f0',
-            letterSpacing: '0.04em',
-            textAlign: 'center',
-            lineHeight: 1.1,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: nameMaxWidth,
-          }}
-        >
-          {display.name}
-        </span>
+        {result.type === 'tarot' && display.subCards && display.subCards.length > 1 ? (
+          /* Equilateral triangle: vertices at (cx,0), (0,h), (w,h) where h = s·√3/2 */
+          (() => {
+            const sigil = isDesktop ? 16 : 10;
+            const s = isDesktop ? 34 : 22;               // triangle side length in px
+            const h = Math.round(s * Math.sqrt(3) / 2);   // triangle height
+            const nameH = isDesktop ? 5 : 4;              // approx name line height
+            const cw = s + sigil;                         // container width
+            const ch = h + sigil + nameH;                 // container height
+            const nameStyle: React.CSSProperties = {
+              fontFamily: "'Cormorant Garamond', serif", fontWeight: 500,
+              fontSize: isDesktop ? '0.33rem' : '0.26rem', color: '#c8d8f0',
+              textAlign: 'center', lineHeight: 1.1,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              maxWidth: isDesktop ? '26px' : '16px',
+            };
+            const sigilColor = isRerollTarget || isSource ? '#d4a854' : '#7b9ec7';
+            return (
+              <div style={{ position: 'relative', width: cw, height: ch, lineHeight: 1 }}>
+                {/* Top — Past (apex) */}
+                <div style={{ position: 'absolute', left: (cw - sigil) / 2, top: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px' }}>
+                  <CardSigil card={display.subCards[0].face} size={sigil} color={sigilColor} />
+                  <span title={display.subCards[0].name} style={nameStyle}>{display.subCards[0].name}</span>
+                </div>
+                {/* Bottom-left — Present */}
+                <div style={{ position: 'absolute', left: 0, top: h, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px' }}>
+                  <CardSigil card={display.subCards[1].face} size={sigil} color={sigilColor} />
+                  <span title={display.subCards[1].name} style={nameStyle}>{display.subCards[1].name}</span>
+                </div>
+                {/* Bottom-right — Future */}
+                <div style={{ position: 'absolute', right: 0, top: h, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px' }}>
+                  <CardSigil card={display.subCards[2].face} size={sigil} color={sigilColor} />
+                  <span title={display.subCards[2].name} style={nameStyle}>{display.subCards[2].name}</span>
+                </div>
+              </div>
+            );
+          })()
+        ) : (
+          <span
+            style={{
+              fontSize: symbolFontSize,
+              color: isRerollTarget || isSource ? '#d4a854' : display.borderColor,
+              lineHeight: 1,
+              textShadow: isRerollTarget
+                ? '0 0 10px rgba(212,168,84,0.4)'
+                : 'none',
+              fontFamily: display.borderColor === '#c75b4a'
+                ? "'Cormorant Garamond', serif"
+                : 'inherit',
+              fontWeight: display.borderColor === '#c75b4a' ? 700 : 400,
+            }}
+          >
+            {result.type === 'tarot'
+              ? <CardSigil card={result} size={isDesktop ? 22 : 14} color={isRerollTarget || isSource ? '#d4a854' : display.borderColor} />
+              : display.symbol}
+          </span>
+        )}
+        {!(result.type === 'tarot' && display.subCards && display.subCards.length > 1) && (
+          <span
+            style={{
+              fontFamily: "'Cormorant Garamond', serif",
+              fontWeight: 600,
+              fontSize: nameFontSize,
+              color: isRerollTarget ? '#d4a854' : '#c8d8f0',
+              letterSpacing: '0.04em',
+              textAlign: 'center',
+              lineHeight: 1.1,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              maxWidth: nameMaxWidth,
+            }}
+          >
+            {display.name}
+          </span>
+        )}
         {display.detail && (
           <span
             style={{

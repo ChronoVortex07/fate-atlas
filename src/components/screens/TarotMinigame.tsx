@@ -12,8 +12,7 @@ import { GiCardRandom, GiCardPickup, GiEyeball } from 'react-icons/gi';
 
 const TABLE_CARD_WIDTH = 58;          // px per card face (max repulsion = side by side)
 const TABLE_REST_STEP = 42;           // center-to-center at rest (overlapped)
-const TABLE_MIN_STEP = 30;            // deepest compression center-to-center
-const FAN_RADIUS = 140;               // px — proximity falloff
+const FAN_RADIUS = 140;               // px — proximity falloff for gap expansion
 
 type FanState = { centerX: number; active: boolean };
 
@@ -181,7 +180,7 @@ export default function TarotMinigame() {
     const count = activeTableCards.length;
     const params = {
       count, containerWidth, cardWidth: TABLE_CARD_WIDTH,
-      restStep: TABLE_REST_STEP, minStep: TABLE_MIN_STEP, radius: FAN_RADIUS,
+      restStep: TABLE_REST_STEP, radius: FAN_RADIUS,
     };
     const rest = restCenters({ count, containerWidth, restStep: TABLE_REST_STEP });
     const live = computeFanLayout(fan.centerX, fan.active, params);
@@ -215,6 +214,8 @@ export default function TarotMinigame() {
         </motion.h1>
         <OrnamentalBorder width="120px" />
 
+        <RunicBand color="#d4a854" opacity={0.22} fontSize="0.7rem" />
+
         {/* Deck rail + table spread in a horizontal row */}
         <div style={tableRowStyle}>
           {/* Deck rail */}
@@ -240,7 +241,6 @@ export default function TarotMinigame() {
 
           {/* Spread column */}
           <div style={spreadColStyle}>
-            <RunicBand color="#d4a854" opacity={0.22} fontSize="0.7rem" />
             <div
               ref={tableRef}
               style={{
@@ -337,9 +337,10 @@ export default function TarotMinigame() {
             </motion.div>
           </AnimatePresence>
             </div>
-            <RunicBand color="#d4a854" opacity={0.22} fontSize="0.7rem" />
           </div>
         </div>
+
+        <RunicBand color="#d4a854" opacity={0.22} fontSize="0.7rem" />
 
         {/* Shuffle button */}
         <motion.button
