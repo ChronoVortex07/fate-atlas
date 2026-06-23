@@ -8,6 +8,7 @@ import CardBack from '../cards/CardBack';
 import OrnamentalBorder from '../shared/OrnamentalBorder';
 import RunicBand from '../shared/RunicBand';
 import { restCenters, computeFanLayout } from '../../engine/fanLayout';
+import { GiCardRandom, GiCardPickup, GiEyeball } from 'react-icons/gi';
 
 const TABLE_CARD_WIDTH = 58;          // px per card face (max repulsion = side by side)
 const TABLE_REST_STEP = 42;           // center-to-center at rest (overlapped)
@@ -15,6 +16,12 @@ const TABLE_MIN_STEP = 30;            // deepest compression center-to-center
 const FAN_RADIUS = 140;               // px — proximity falloff
 
 type FanState = { centerX: number; active: boolean };
+
+const SLOT_THEMES = [
+  { key: 'past',    accent: '#7b9ec7', label: 'Past',    glow: 'rgba(123,158,199,0.30)' },
+  { key: 'present', accent: '#d4a854', label: 'Present', glow: 'rgba(212,168,84,0.30)' },
+  { key: 'future',  accent: '#9b6bb0', label: 'Future',  glow: 'rgba(155,107,176,0.30)' },
+] as const;
 
 export default function TarotMinigame() {
   const { state, engine } = useGameEngine();
@@ -337,13 +344,14 @@ export default function TarotMinigame() {
           initial={false}
           animate={draft.shufflesRemaining > 0 ? { opacity: 1 } : { opacity: 0.4 }}
         >
-          ↻ Shuffle ({draft.shufflesRemaining})
+          <GiCardRandom style={{ verticalAlign: '-2px' }} /> Shuffle ({draft.shufflesRemaining})
         </motion.button>
 
         {/* Hand */}
         <div style={handAreaStyle}>
           <div style={handSlotsStyle}>
-            {(['Past', 'Present', 'Future'] as const).map((label, i) => {
+            {SLOT_THEMES.map((theme, i) => {
+              const label = theme.label;
               const card = draft.hand[i];
               const isReturning = animatingReturn === i;
               const revealed = committedSpread?.[i]?.card;
@@ -354,17 +362,24 @@ export default function TarotMinigame() {
                   onDragOver={handleHandDragOver}
                   onDrop={(e) => handleHandDrop(e, i)}
                 >
-                  <div style={handLabelStyle}>{label}</div>
+                  <div style={{ ...handLabelStyle, color: theme.accent, textShadow: `0 0 8px ${theme.glow}` }}>
+                    {label}
+                  </div>
                   <AnimatePresence mode="wait">
                     {revealed ? (
                       <motion.div
                         key={`revealed-${revealed.id}-${i}`}
-                        style={{ ...handCardStyle, cursor: 'default', borderColor: '#7b9ec7' }}
+                        style={{ ...slotCardStyle(theme.accent), cursor: 'default' }}
                         initial={{ opacity: 0, rotateY: 90 }}
                         animate={{ opacity: 1, rotateY: 0 }}
                         transition={{ type: 'spring', stiffness: 260, damping: 22, delay: i * 0.12 }}
                       >
-                        <CardSigil card={revealed} size={22} color="#7b9ec7" />
+                        <svg width="14" height="14" viewBox="0 0 22 22" aria-hidden
+                          style={{ position: 'absolute', top: 4, left: 4, color: theme.accent, opacity: 0.6 }}>
+                          <path d="M1 1 H9 M1 1 V9 M1 1 Q11 11 21 11 M1 1 Q11 11 11 21"
+                            stroke="currentColor" strokeWidth="0.8" fill="none" strokeLinecap="round" />
+                        </svg>
+                        <CardSigil card={revealed} size={22} color={theme.accent} />
                         <div style={handCardNameStyle}>{revealed.name}</div>
                         <div style={handCardOrientStyle}>
                           {revealed.orientation === 'upright' ? '▲ Upright' : '▼ Reversed'}
@@ -376,10 +391,15 @@ export default function TarotMinigame() {
                         draggable
                         onDragStart={(e) => handleHandDragStart(e as unknown as React.DragEvent, i)}
                         style={{
-                          ...handCardStyle,
+                          ...slotCardStyle(theme.accent),
                           opacity: draggingHandIdx === i ? 0.5 : 1,
                         }}
                       >
+                        <svg width="14" height="14" viewBox="0 0 22 22" aria-hidden
+                          style={{ position: 'absolute', top: 4, left: 4, color: theme.accent, opacity: 0.6 }}>
+                          <path d="M1 1 H9 M1 1 V9 M1 1 Q11 11 21 11 M1 1 Q11 11 11 21"
+                            stroke="currentColor" strokeWidth="0.8" fill="none" strokeLinecap="round" />
+                        </svg>
                         <motion.div
                           key={`hand-${card.cardId}-${card.tableOriginIndex}`}
                           style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
@@ -394,7 +414,7 @@ export default function TarotMinigame() {
                         >
                         {card.peeked && card.revealedFace ? (
                           <>
-                            <CardSigil card={card.revealedFace} size={22} color="#7b9ec7" />
+                            <CardSigil card={card.revealedFace} size={22} color={theme.accent} />
                             <div style={handCardNameStyle}>{card.revealedFace.name}</div>
                             <div style={handCardOrientStyle}>
                               {card.revealedFace.orientation === 'upright' ? '▲ Upright' : '▼ Reversed'}
@@ -413,7 +433,7 @@ export default function TarotMinigame() {
                               onClick={(e) => { e.stopPropagation(); handlePeek(i); }}
                               title="Peek"
                             >
-                              👁
+                              <GiEyeball />
                             </motion.button>
                           )}
                           <motion.button
@@ -422,7 +442,7 @@ export default function TarotMinigame() {
                             onClick={(e) => { e.stopPropagation(); handleReturnToDeck(i); }}
                             title="Return to deck"
                           >
-                            ↩
+                            <GiCardPickup />
                           </motion.button>
                         </div>
                       </motion.div>
@@ -430,7 +450,7 @@ export default function TarotMinigame() {
                     ) : (
                       <motion.div
                         key={`empty-${i}`}
-                        style={emptyHandSlotStyle}
+                        style={slotEmptyStyle(theme.accent)}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 0.4 }}
                       >
@@ -642,9 +662,23 @@ const handAffordanceStyle: React.CSSProperties = {
 };
 
 const handIconBtnStyle: React.CSSProperties = {
-  fontFamily: 'inherit', fontSize: '0.7rem', background: 'none', border: 'none',
+  fontFamily: 'inherit', fontSize: '0.85rem', background: 'none', border: 'none',
   color: '#7b9ec7', cursor: 'pointer', padding: '0.15rem', lineHeight: 1, outline: 'none',
 };
+
+function slotCardStyle(accent: string): React.CSSProperties {
+  return {
+    ...handCardStyle, borderColor: accent,
+    boxShadow: `0 0 14px ${accent}33, inset 0 0 18px rgba(8,13,24,0.6)`,
+  };
+}
+
+function slotEmptyStyle(accent: string): React.CSSProperties {
+  return {
+    ...emptyHandSlotStyle, borderColor: accent,
+    background: `radial-gradient(60% 60% at 50% 40%, ${accent}1f, transparent)`,
+  };
+}
 
 const emptyHandSlotStyle: React.CSSProperties = {
   width: '90px', height: '130px', border: '1px dashed #3a2a50', borderRadius: '8px',
