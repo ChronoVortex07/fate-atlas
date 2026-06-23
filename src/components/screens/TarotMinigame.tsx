@@ -292,24 +292,32 @@ export default function TarotMinigame() {
                       left: `${restLeft}px`,
                       marginLeft: `${-TABLE_CARD_WIDTH / 2}px`,
                       width: `${TABLE_CARD_WIDTH}px`,
-                      transform: `translateX(${dx}px) scale(${scale})`,
-                      transition: 'transform 70ms ease-out',
                       zIndex: fan.active ? Math.max(1, Math.round(1000 - dist)) : 1,
                       background: card.faceUp ? '#0d1220' : '#080d18',
                       borderColor: card.faceUp ? '#7b9ec7' : '#1a2440',
                       cursor: handFull ? 'default' : 'pointer',
-                      opacity: handFull ? 0.5 : 1,
                     }}
                     whileHover={!handFull ? { y: -3, boxShadow: '0 0 14px rgba(212,168,84,0.5)' } : {}}
                     onClick={() => !handFull && !animatingPick && handlePick(card.originIndex)}
                     initial={shuffleKey > 0 ? { opacity: 0, y: -30 } : { opacity: 0, y: -20 }}
-                    animate={isPicking ? { opacity: 0, y: 40 } : { opacity: handFull ? 0.5 : 1, y: 0 }}
-                    exit={{ opacity: 0, y: -30, transition: { duration: 0.2 } }}
+                    animate={
+                      isPicking
+                        ? { opacity: 0, y: 40, x: dx, scale: 0.5 }
+                        : { opacity: handFull ? 0.5 : 1, y: 0, x: dx, scale }
+                    }
+                    exit={{ opacity: 0, y: -30, scale: 0.8, transition: { duration: 0.2 } }}
                     transition={{
-                      type: 'spring',
-                      stiffness: 300,
-                      damping: 25,
-                      delay: shuffleKey > 0 ? i * 0.04 : i * 0.03,
+                      // Fan displacement/scale track the cursor snappily; everything
+                      // else (enter/pick/opacity) keeps the staggered spring. Framer
+                      // owns the transform so it never fights an inline style.transform.
+                      x: { type: 'tween', duration: 0.07, ease: 'easeOut' },
+                      scale: { type: 'tween', duration: 0.07, ease: 'easeOut' },
+                      default: {
+                        type: 'spring',
+                        stiffness: 300,
+                        damping: 25,
+                        delay: shuffleKey > 0 ? i * 0.04 : i * 0.03,
+                      },
                     }}
                   >
                     {card.faceUp && card.revealedFace ? (
