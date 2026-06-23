@@ -133,6 +133,13 @@ export const DEBUG_SCENARIOS: DebugScenario[] = [
     setup: (s) => { atAstral(s); s.slots = [consolidateCast({ planet: 'sun', sign: 'leo', planetHouse: 5, signHouse: 5, omens: ['crowned-conjunction'] }) as SlotResult]; } },
   { id: 'astral-veiled-oracle', label: 'Astral: veiled oracle', group: 'Astral', forced: ['astral-veiled-oracle'], isolate: true,
     setup: (s) => { atAstral(s); s.slots = [consolidateCast({ planet: 'neptune', sign: 'pisces', planetHouse: 12, signHouse: 12, omens: ['veiled-oracle'] }) as SlotResult]; } },
+  // ── I Ching affinity + interaction (Task 7) ──
+  { id: 'chaos-line-cascade', label: 'Chaos: line cascade', group: 'Affinity', forced: ['chaos-line-cascade'], isolate: true,
+    setup: (s) => { s.screen = 'minigame'; s.selectedMethod = 'iching'; set(s, { chaos: 90 }); } },
+  { id: 'order-still-hexagram', label: 'Order: still hexagram', group: 'Affinity', forced: ['order-still-hexagram'], isolate: true,
+    setup: (s) => { s.screen = 'minigame'; s.selectedMethod = 'iching'; set(s, { order: 90 }); } },
+  { id: 'iching-resonant-change', label: 'I Ching: resonant change', group: 'Interaction', forced: ['iching-resonant-change'], isolate: true,
+    setup: (s) => { s.screen = 'minigame'; s.selectedMethod = 'iching'; s.slots = [reversibleCardA]; } },
 ];
 
 export function findScenario(id: string): DebugScenario | undefined {
