@@ -150,24 +150,43 @@ export class ReadingPlanner {
     const dominantTheme: ThemeTag = sortedThemes[0]?.[0] ?? 'mystery';
     const secondaryTheme: ThemeTag | null = sortedThemes[1]?.[0] ?? null;
 
-    // ── Dimension profiling (weighted average) ──
+    // ── Dimension profiling over atomic signals ──
     const primaryRole = PRIMARY_ROLE[question];
-    const dimKeys: (keyof DimensionValues)[] = ['favorability', 'certainty', 'volatility'];
-    const dimensionProfile: DimensionValues = { favorability: 0, certainty: 0, volatility: 0 };
-    const dimDivisor = { favorability: 0, certainty: 0, volatility: 0 };
+    const signals = this.atomicSignals(nonHappening);
+    const clampDim = (x: number) => Math.max(-2, Math.min(2, Math.round(x * 2) / 2));
 
-    for (const r of nonHappening) {
-      const weight = r.modifierRoles.includes(primaryRole) ? 2 : 1;
-      for (const axis of dimKeys) {
-        dimensionProfile[axis] += r.dimensions[axis] * weight;
-        dimDivisor[axis] += weight;
-      }
+    // Favorability: magnitude-weighted so strong pulls dominate rather than cancel.
+    let favNum = 0, favDen = 0;
+    for (const s of signals) {
+      const w = Math.abs(s.dimensions.favorability);
+      favNum += s.dimensions.favorability * w;
+      favDen += w;
     }
-    for (const axis of dimKeys) {
-      dimensionProfile[axis] = dimDivisor[axis] > 0
-        ? Math.max(-2, Math.min(2,
-            Math.round((dimensionProfile[axis] / dimDivisor[axis]) * 2) / 2))
-        : 0;
+
+    // Certainty & volatility: primary-role weighted average over atomic signals.
+    const weightedAxis = (axis: 'certainty' | 'volatility') => {
+      let num = 0, den = 0;
+      for (const s of signals) {
+        const w = s.modifierRoles.includes(primaryRole) ? 2 : 1;
+        num += s.dimensions[axis] * w;
+        den += w;
+      }
+      return den > 0 ? clampDim(num / den) : 0;
+    };
+
+    const dimensionProfile: DimensionValues = {
+      favorability: favDen > 0 ? clampDim(favNum / favDen) : 0,
+      certainty: weightedAxis('certainty'),
+      volatility: weightedAxis('volatility'),
+    };
+
+    // ── Opposing forces (strongest favorable / adverse atomic signals) ──
+    let strongestFavor: { label: string; value: number } | null = null;
+    let strongestAdverse: { label: string; value: number } | null = null;
+    for (const s of signals) {
+      const v = s.dimensions.favorability;
+      if (v > 0 && (!strongestFavor || v > strongestFavor.value)) strongestFavor = { label: s.label, value: v };
+      if (v < 0 && (!strongestAdverse || v < strongestAdverse.value)) strongestAdverse = { label: s.label, value: v };
     }
 
     // ── Modifier assignment ──
@@ -224,6 +243,8 @@ export class ReadingPlanner {
       modifierAssignments,
       hasTension,
       tensionPair,
+      strongestFavor,
+      strongestAdverse,
     };
   }
 
@@ -242,5 +263,40 @@ export class ReadingPlanner {
     return Math.abs(result.dimensions.favorability) +
       Math.abs(result.dimensions.certainty) +
       Math.abs(result.dimensions.volatility);
+  }
+
+  /**
+   * Flatten results into atomic signals for dimension profiling: each die, each
+   * hexagram, each astral cast, and each individual card in a multi-card spread.
+   * Removes the double-average where a 3-card spread was pre-averaged to ~0.
+   */
+  private atomicSignals(results: SlotResult[]): {
+    label: string; themes: ThemeTag[]; dimensions: DimensionValues; modifierRoles: ModifierRole[];
+  }[] {
+    const signals: { label: string; themes: ThemeTag[]; dimensions: DimensionValues; modifierRoles: ModifierRole[] }[] = [];
+    for (const r of results) {
+      if (r.type === 'happening') continue;
+      if (r.type === 'tarot' && r.spread && r.spread.length > 1) {
+        for (const sp of r.spread) {
+          signals.push({
+            label: `the ${sp.card.name} (${sp.card.orientation})`,
+            themes: sp.card.themes,
+            dimensions: sp.card.dimensions,
+            modifierRoles: sp.card.modifierRoles,
+          });
+        }
+      } else if (r.type === 'd20') {
+        signals.push({ label: `the dice (${r.result})`, themes: r.themes, dimensions: r.dimensions, modifierRoles: r.modifierRoles });
+      } else if (r.type === 'iching') {
+        signals.push({ label: `Hexagram ${r.hexagramNumber}`, themes: r.themes, dimensions: r.dimensions, modifierRoles: r.modifierRoles });
+      } else {
+        // single-card tarot or astral: use the result itself
+        const label = r.type === 'tarot' && r.spread?.[0]
+          ? `the ${r.spread[0].card.name} (${r.spread[0].card.orientation})`
+          : `the ${(r as { name?: string }).name ?? r.type}`;
+        signals.push({ label, themes: r.themes, dimensions: r.dimensions, modifierRoles: r.modifierRoles });
+      }
+    }
+    return signals;
   }
 }

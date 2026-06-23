@@ -142,6 +142,8 @@ export interface AggregatedReading {
   modifierAssignments: Record<ModifierRole, SlotResult[]>;
   hasTension: boolean;
   tensionPair: [ThemeTag, ThemeTag] | null;
+  strongestFavor: { label: string; value: number } | null;
+  strongestAdverse: { label: string; value: number } | null;
 }
 
 // ── Narrative Template Types ──

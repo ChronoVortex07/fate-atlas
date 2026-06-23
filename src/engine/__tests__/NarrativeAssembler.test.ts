@@ -28,6 +28,8 @@ const baseAggregated: AggregatedReading = {
   modifierAssignments: { subject: [], action: [], effect: [] },
   hasTension: false,
   tensionPair: null,
+  strongestFavor: null,
+  strongestAdverse: null,
 };
 
 describe('NarrativeAssembler', () => {

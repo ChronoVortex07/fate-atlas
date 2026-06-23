@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ReadingPlanner } from '../ReadingPlanner';
-import type { SlotResult } from '../types';
+import type { SlotResult, TarotCardFace } from '../types';
 
 // Test fixtures
 const makeTarot = (overrides: Partial<SlotResult> = {}): SlotResult => ({
@@ -34,6 +34,14 @@ const makeIChing = (overrides: Partial<SlotResult> = {}): SlotResult => ({
   modifierRoles: ['action'],
   ...overrides,
 } as SlotResult);
+
+const faceLike = (o: { favorability: number; themes?: string[]; name?: string; orientation?: 'upright' | 'reversed' }): TarotCardFace => ({
+  id: (o.name ?? 'card').toLowerCase().replace(/\s+/g, '-'),
+  name: o.name ?? 'Card', arcana: 'minor', orientation: o.orientation ?? 'upright', symbol: '✦',
+  themes: (o.themes ?? ['mystery']) as TarotCardFace['themes'],
+  dimensions: { favorability: o.favorability, certainty: 0, volatility: 0 },
+  modifierRoles: ['subject'], meaningUpright: '', meaningReversed: '', tags: [],
+});
 
 describe('ReadingPlanner', () => {
   const planner = new ReadingPlanner();
@@ -166,6 +174,51 @@ describe('ReadingPlanner', () => {
       const agg = planner.aggregate([weak, strong], 'self');
       expect(agg.modifierAssignments.subject[0]).toBe(strong); // stronger first
       expect(agg.modifierAssignments.subject[1]).toBe(weak);
+    });
+
+    it('a balanced spread does not wash favorability to zero (magnitude-weighted)', () => {
+      // A 3-card spread: strong +fav past, neutral present, mild -fav future.
+      const spread = {
+        type: 'tarot', id: 's', name: 'Spread', number: 0, orientation: 'upright' as const,
+        symbol: '✦', meaningUpright: '', meaningReversed: '', tags: [],
+        themes: ['renewal'] as const, modifierRoles: ['subject'] as const,
+        dimensions: { favorability: 0.0, certainty: 0, volatility: 0 }, // consolidated ~0
+        spread: [
+          { position: 'past' as const, card: faceLike({ favorability: 2.0, themes: ['renewal'] }) },
+          { position: 'present' as const, card: faceLike({ favorability: 0.0, themes: ['harmony'] }) },
+          { position: 'future' as const, card: faceLike({ favorability: -0.5, themes: ['conflict'] }) },
+        ],
+      } as unknown as SlotResult;
+      const agg = planner.aggregate([spread], 'self');
+      // Magnitude weighting: (2.0*2.0 + 0 + (-0.5*0.5)) / (2.0 + 0.5) = 3.75/2.5 = 1.5
+      expect(agg.dimensionProfile.favorability).toBe(1.5);
+    });
+
+    it('surfaces strongest favor and adverse poles from atomic signals', () => {
+      const spread = {
+        type: 'tarot', id: 's', name: 'Spread', number: 0, orientation: 'upright' as const,
+        symbol: '✦', meaningUpright: '', meaningReversed: '', tags: [],
+        themes: ['renewal'] as const, modifierRoles: ['subject'] as const,
+        dimensions: { favorability: 0.0, certainty: 0, volatility: 0 },
+        spread: [
+          { position: 'past' as const, card: faceLike({ favorability: 1.5, name: 'Ace of Cups' }) },
+          { position: 'present' as const, card: faceLike({ favorability: 0.0, name: 'Two of Coins' }) },
+          { position: 'future' as const, card: faceLike({ favorability: -1.5, name: 'Nine of Wands', orientation: 'reversed' }) },
+        ],
+      } as unknown as SlotResult;
+      const agg = planner.aggregate([spread], 'self');
+      expect(agg.strongestFavor).toEqual({ label: 'the Ace of Cups (upright)', value: 1.5 });
+      expect(agg.strongestAdverse).toEqual({ label: 'the Nine of Wands (reversed)', value: -1.5 });
+    });
+
+    it('labels die and hexagram atomic signals', () => {
+      const agg = planner.aggregate(
+        [makeDice({ dimensions: { favorability: 1.0, certainty: 0, volatility: 0 } }),
+         makeIChing({ hexagramNumber: 42, dimensions: { favorability: -1.0, certainty: 0, volatility: 0 } })],
+        'self',
+      );
+      expect(agg.strongestFavor).toEqual({ label: 'the dice (10)', value: 1.0 });
+      expect(agg.strongestAdverse).toEqual({ label: 'Hexagram 42', value: -1.0 });
     });
   });
 });
