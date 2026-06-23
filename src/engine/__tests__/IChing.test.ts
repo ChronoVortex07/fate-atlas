@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { castHexagram, HEXAGRAMS, HEX_BY_BINARY, hexagramByBinary, drawHexagramCast, consolidateHexagram } from '../../data/iching';
+import { planHexagramResolution, deriveMandate, hexagramNudge } from '../iching';
 
 describe('I Ching data', () => {
   it('has 64 hexagrams', () => {
@@ -111,5 +112,78 @@ describe('drawHexagramCast', () => {
     const rel = consolidateHexagram(cast, 'relating');
     expect(rel.hexagramNumber).toBe(2);
     expect(rel.tags).toContain('governing-relating');
+  });
+});
+
+// ── Task 4: transformation resolution + mandate derivation ──────────────────
+
+const ASC = 65, BASE = 50;
+const fakeCast = (primary: number, relating = primary, changing: number[] = []) =>
+  ({ lines: [7,7,7,7,7,7] as any, primaryNumber: primary, relatingNumber: relating, changingLines: changing });
+
+describe('planHexagramResolution', () => {
+  it('willed when Will ascendant+', () => {
+    expect(planHexagramResolution({ will: ASC, fate: BASE }, true).mode).toBe('willed');
+  });
+  it('fated when Fate ascendant+ and Will not', () => {
+    expect(planHexagramResolution({ will: BASE, fate: ASC }, true).mode).toBe('fated');
+  });
+  it('Will wins ties when both ascendant+', () => {
+    // DOM = 90 for fate, ASC = 65 for will — Will still wins
+    expect(planHexagramResolution({ will: ASC, fate: 90 }, true).mode).toBe('willed');
+  });
+  it('unaligned with a recast offer when neither ascendant', () => {
+    const p = planHexagramResolution({ will: BASE, fate: BASE }, true);
+    expect(p.mode).toBe('unaligned');
+    expect(p.offerRecast).toBe(true);
+  });
+  it('no fork when there are no changing lines', () => {
+    expect(planHexagramResolution({ will: ASC }, false).mode).toBe('unaligned');
+    expect(planHexagramResolution({ will: ASC }, false).offerRecast).toBe(false);
+  });
+});
+
+describe('deriveMandate', () => {
+  it('amplifies gains for a volatile hexagram (globalMult > 1)', () => {
+    // Hexagram #49 Revolution: volatility +2.0 → globalMult = 1 + (2/2)*0.6 = 1.6
+    const revolution = consolidateHexagram(fakeCast(49) as any, 'primary');
+    const m = deriveMandate(revolution);
+    expect(m.globalMult).toBeGreaterThan(1.0);
+    expect(m.gainMult.chaos!).toBeGreaterThanOrEqual(m.globalMult);
+  });
+  it('dampens gains for a still hexagram (globalMult < 1)', () => {
+    // Hexagram #52 Keeping Still: volatility -2.0 → globalMult = 1 + (-2/2)*0.5 = 0.5
+    const stillness = consolidateHexagram(fakeCast(52) as any, 'primary');
+    expect(deriveMandate(stillness).globalMult).toBeLessThan(1.0);
+  });
+  it('source is formatted as iching:<number>', () => {
+    const result = consolidateHexagram(fakeCast(1) as any, 'primary');
+    expect(deriveMandate(result).source).toBe('iching:1');
+  });
+});
+
+describe('hexagramNudge', () => {
+  it('volatile hexagram nudges chaos positively', () => {
+    // Hexagram #49: volatility +2.0 → chaos nudge = round(2.0*4) = 8
+    const revolution = consolidateHexagram(fakeCast(49) as any, 'primary');
+    const nudges = hexagramNudge(revolution);
+    const chaos = nudges.find(([id]) => id === 'chaos');
+    expect(chaos).toBeDefined();
+    expect(chaos![1]).toBeGreaterThan(0);
+  });
+  it('still hexagram nudges order positively', () => {
+    // Hexagram #52: volatility -2.0 → order nudge = round(2.0*4) = 8
+    const stillness = consolidateHexagram(fakeCast(52) as any, 'primary');
+    const nudges = hexagramNudge(stillness);
+    const order = nudges.find(([id]) => id === 'order');
+    expect(order).toBeDefined();
+    expect(order![1]).toBeGreaterThan(0);
+  });
+  it('filters out zero nudges', () => {
+    // Hexagram #1 Creative: favorability +2.0, certainty +1.5, volatility 0.0
+    // volatility = 0 → no chaos/order nudge; favorability > 0 → light nudge; certainty > 0 → order nudge
+    const creative = consolidateHexagram(fakeCast(1) as any, 'primary');
+    const nudges = hexagramNudge(creative);
+    expect(nudges.every(([, n]) => n !== 0)).toBe(true);
   });
 });
