@@ -277,16 +277,26 @@ strongest).
 
 ### 4f. SVG sigils
 
-Each card has an SVG sigil rendered by the `CardSigil` component:
+Sigil **resolution** lives in the pure, framework-free module `src/data/sigils.ts`
+(`resolveSigil`), which the engine test suite covers (`src/engine/__tests__/Sigils.test.ts`
+asserts completeness). `CardSigil` is a thin SVG renderer over `resolveSigil`. All sigils
+share one drawing contract: `viewBox 0 0 48 48`, `stroke=currentColor`, `fill=none`,
+`stroke-width ≈ 1.5`, rounded caps/joins.
 
-- **Major Arcana** -- a unique per-card sigil drawn from `MAJOR_SIGILS` (with a `GENERIC`
-  fallback for cards without authored art).
-- **Minor Arcana** -- the suit's emblem glyph (Wands DIAMOND, Cups HEART, Swords SPADE,
-  Pentacles CLUB) with rank-based embellishments.
-- **Spread icon** -- the consolidated result uses a stellar `SPREAD_GLYPH` glyph.
+- **Major Arcana** -- all 22 majors have a **bespoke geometric line-art** sigil
+  (`MAJOR_SIGILS`, an array of strokes per card). There is **no generic-circle fallback** for
+  a real card — the completeness test fails if any major is missing.
+- **Minor Arcana** -- composed as a refined **suit emblem** (`SUIT_EMBLEMS`) plus a small
+  corner **rank cartouche**: a roman numeral (`A` for aces, `II`–`X` for pips) or a court
+  letter (`P/N/Q/K`); courts also render a small **crown** above the emblem.
+- **Spread crest** -- a multi-card spread resolves to the refined three-overlapping-cards
+  `SPREAD_CREST`.
+- **Reversed** cards keep the 180° rotation convention.
 
-Sigils appear in the fan (method select), slot views (Past/Present/Future), history
-tiles, and result readings.
+Tarot no longer renders the emoji `symbol` data field — the Result page sub-cards use
+`CardSigil`. Face-down cards across the draft (table, hand, deck) and the fan use a
+standardized **constellation-crest** `CardBack`. Sigils appear in the fan (method select),
+slot views (Past/Present/Future), history tiles, and result readings.
 
 ### 4g. Spread coherence affinity feeds
 

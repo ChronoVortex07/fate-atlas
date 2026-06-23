@@ -82,9 +82,6 @@ function getDieFace(n: number): string {
   return faces[n] ?? String(n);
 }
 
-// Rune sets for variety across cards
-const RUNE_SETS = ['ᚠᚢᚦᚨ', 'ᚱᚲᚷᚹ', 'ᚺᚾᛁᛃ', 'ᛇᛈᛉᛊ', 'ᛏᛒᛖᛗ', 'ᛚᛜᛞᛟ'];
-
 export default function FanCard({
   result,
   index,
@@ -127,7 +124,6 @@ export default function FanCard({
   const nameMaxWidth = isDesktop ? '74px' : '46px';
 
   const display = getCardDisplay(result);
-  const runes = RUNE_SETS[index % RUNE_SETS.length];
 
   // --- Animate target ---
   // Mobile: rotate + vertical stack offset (unchanged)
@@ -227,7 +223,7 @@ export default function FanCard({
           userSelect: 'none',
         }}
       >
-        {runes}
+        ·····
       </div>
 
       {/* Content area */}
@@ -310,7 +306,7 @@ export default function FanCard({
           userSelect: 'none',
         }}
       >
-        {runes}
+        ·····
       </div>
 
       {/* Sub-card spread (expanded tarot) */}

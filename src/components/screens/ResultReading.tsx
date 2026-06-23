@@ -25,7 +25,7 @@ function getResultDisplay(result: SlotResult): {
   symbol: string;
   name: string;
   subtitle: string;
-  subCards?: { position: string; name: string; orientation: string; symbol: string; meaning: string }[];
+  subCards?: { position: string; name: string; orientation: string; symbol: string; meaning: string; face: import('../../engine/types').TarotCardFace }[];
 } {
   switch (result.type) {
     case 'tarot': {
@@ -41,6 +41,7 @@ function getResultDisplay(result: SlotResult): {
             orientation: sp.card.orientation === 'upright' ? '▲ Upright' : '▼ Reversed',
             symbol: sp.card.symbol,
             meaning: (sp.card.orientation === 'upright' ? sp.card.meaningUpright : sp.card.meaningReversed).slice(0, 80),
+            face: sp.card,
           })),
         };
       }
@@ -175,12 +176,11 @@ export default function ResultReading() {
                           }}>
                             {sc.position}
                           </span>
-                          <span style={{
-                            fontSize: '1.2rem',
-                            color: sc.orientation === '▲ Upright' ? '#7b9ec7' : '#d4a854',
-                          }}>
-                            {sc.symbol}
-                          </span>
+                          <CardSigil
+                            card={sc.face}
+                            size={26}
+                            color={sc.orientation === '▲ Upright' ? '#7b9ec7' : '#d4a854'}
+                          />
                           <span style={{
                             fontFamily: "'Cormorant Garamond', serif",
                             fontWeight: 600,

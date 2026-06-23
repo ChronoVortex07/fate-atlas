@@ -4,6 +4,9 @@ import { useGameEngine } from '../../hooks/useGameEngine';
 import type { TarotDraftState, TableCard } from '../../engine/types';
 import { DECK_BY_ID } from '../../data/tarot';
 import CardSigil from '../cards/CardSigil';
+import CardBack from '../cards/CardBack';
+import OrnamentalBorder from '../shared/OrnamentalBorder';
+import RunicBand from '../shared/RunicBand';
 
 const TABLE_CARD_WIDTH = 58; // px per card face
 const TABLE_OVERLAP = 16;   // px overlap between adjacent cards
@@ -219,13 +222,18 @@ export default function TarotMinigame() {
           {draft.phase === 'drafting' && handFull && 'Your spread awaits'}
           {draft.phase === 'committing' && 'The cards are cast'}
         </motion.h1>
+        <OrnamentalBorder width="120px" />
 
         {/* Deck visual */}
         <motion.div style={deckStyle} layout>
           <div style={deckStackStyle}>
-            {draft.deck.length > 0 && <div style={deckCardBack(0)} />}
             {draft.deck.length > 1 && <div style={deckCardBack(1)} />}
             {draft.deck.length > 2 && <div style={deckCardBack(2)} />}
+            {draft.deck.length > 0 && (
+              <div style={{ ...deckCardBack(0), display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none' }}>
+                <CardBack size={46} />
+              </div>
+            )}
           </div>
           <motion.span
             key={`count-${draft.deck.length}`}
@@ -238,6 +246,7 @@ export default function TarotMinigame() {
         </motion.div>
 
         {/* Table spread */}
+        <RunicBand color="#d4a854" opacity={0.22} fontSize="0.7rem" />
         <div
           ref={tableRef}
           style={{
@@ -251,6 +260,23 @@ export default function TarotMinigame() {
           onDragLeave={handleTableDragLeave}
           onDrop={handleTableDrop}
         >
+          {/* Celestial backdrop + arcane corner flourishes */}
+          <svg
+            viewBox="0 0 200 100" preserveAspectRatio="none" aria-hidden
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', opacity: 0.5 }}
+          >
+            {TABLE_STARS.map((s, i) => (
+              <circle key={i} cx={s.x} cy={s.y} r={s.r} fill={s.gold ? '#d4a854' : '#7b9ec7'} opacity={s.o} />
+            ))}
+          </svg>
+          {CORNER_FLOURISHES.map((transform, i) => (
+            <svg
+              key={i} width="22" height="22" viewBox="0 0 22 22" aria-hidden
+              style={{ position: 'absolute', pointerEvents: 'none', color: '#d4a854', opacity: 0.55, ...cornerPos(i), transform }}
+            >
+              <path d="M1 1 H9 M1 1 V9 M1 1 Q11 11 21 11 M1 1 Q11 11 11 21" stroke="currentColor" strokeWidth="0.8" fill="none" strokeLinecap="round" />
+            </svg>
+          ))}
           <AnimatePresence mode="popLayout">
             <motion.div key={`table-${shuffleKey}`} style={tableInnerStyle}>
               {activeTableCards.map((card, i) => {
@@ -281,7 +307,7 @@ export default function TarotMinigame() {
                       cursor: handFull ? 'default' : 'pointer',
                       opacity: handFull ? 0.5 : 1,
                     }}
-                    whileHover={!handFull ? { borderColor: '#d4a854', y: -3 } : {}}
+                    whileHover={!handFull ? { borderColor: '#d4a854', y: -3, boxShadow: '0 0 14px rgba(212,168,84,0.5)' } : {}}
                     whileTap={!handFull ? { scale: Math.min(scale, 1) * 1.05 } : {}}
                     onClick={() => !handFull && !animatingPick && handlePick(card.originIndex)}
                     initial={
@@ -311,10 +337,7 @@ export default function TarotMinigame() {
                         </div>
                       </>
                     ) : (
-                      <>
-                        <span style={tableRuneStyle}>ᚠᚢᚦ</span>
-                        <span style={tableStarStyle}>✧</span>
-                      </>
+                      <CardBack size={44} />
                     )}
                   </motion.div>
                 );
@@ -322,6 +345,7 @@ export default function TarotMinigame() {
             </motion.div>
           </AnimatePresence>
         </div>
+        <RunicBand color="#d4a854" opacity={0.22} fontSize="0.7rem" />
 
         {/* Shuffle button */}
         <motion.button
@@ -398,10 +422,7 @@ export default function TarotMinigame() {
                             </div>
                           </>
                         ) : (
-                          <>
-                            <span style={handRuneStyle}>ᚠᚢᚦᚨ</span>
-                            <span style={handStarStyle}>✧</span>
-                          </>
+                          <CardBack size={64} />
                         )}
 
                         {/* Affordances: peek + return-to-deck */}
@@ -538,6 +559,25 @@ export function computeFanOffsets(
   return offsets.map((o) => o - mean);
 }
 
+// Static decorative starfield for the tableau backdrop (viewBox 0 0 200 100).
+const TABLE_STARS: { x: number; y: number; r: number; o: number; gold?: boolean }[] = [
+  { x: 18, y: 22, r: 0.7, o: 0.7 }, { x: 46, y: 12, r: 0.5, o: 0.5 },
+  { x: 80, y: 30, r: 0.6, o: 0.6, gold: true }, { x: 120, y: 18, r: 0.5, o: 0.55 },
+  { x: 150, y: 36, r: 0.7, o: 0.65 }, { x: 182, y: 24, r: 0.5, o: 0.5, gold: true },
+  { x: 30, y: 70, r: 0.6, o: 0.55 }, { x: 70, y: 82, r: 0.5, o: 0.5 },
+  { x: 110, y: 74, r: 0.7, o: 0.6, gold: true }, { x: 160, y: 80, r: 0.5, o: 0.5 },
+  { x: 100, y: 50, r: 0.4, o: 0.4 }, { x: 138, y: 58, r: 0.5, o: 0.45 },
+];
+
+// Four corner flourish rotations (TL, TR, BL, BR).
+const CORNER_FLOURISHES = ['none', 'scaleX(-1)', 'scaleY(-1)', 'scale(-1,-1)'];
+
+function cornerPos(i: number): React.CSSProperties {
+  const v = i < 2 ? { top: '6px' } : { bottom: '6px' };
+  const h = i % 2 === 0 ? { left: '6px' } : { right: '6px' };
+  return { ...v, ...h };
+}
+
 /** Cards closer to the cursor get a higher z-index so the opened-up card layers above its neighbors. */
 function cardIndexZ(cardCenterAbs: number, fan: FanState): number {
   if (!fan.active) return 1;
@@ -567,6 +607,7 @@ const deckStyle: React.CSSProperties = {
 
 const deckStackStyle: React.CSSProperties = {
   position: 'relative', width: '50px', height: '60px',
+  filter: 'drop-shadow(0 0 8px rgba(212,168,84,0.35))',
 };
 
 const deckCardBack = (i: number): React.CSSProperties => ({
@@ -583,9 +624,15 @@ const deckCountStyle: React.CSSProperties = {
 };
 
 const tableAreaStyle: React.CSSProperties = {
-  width: '100%', minHeight: '120px', border: '1px dashed #1a2440',
-  borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+  width: '100%', minHeight: '120px', border: '1px solid #1a2440',
+  borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
   padding: '1rem', transition: 'border-color 0.3s ease', overflow: 'hidden',
+  position: 'relative',
+  background:
+    'radial-gradient(120% 90% at 50% 0%, rgba(42,21,69,0.28), transparent 60%),' +
+    'radial-gradient(80% 70% at 20% 100%, rgba(15,31,61,0.25), transparent 70%),' +
+    '#070b14',
+  boxShadow: 'inset 0 0 36px rgba(8,13,24,0.9)',
 };
 
 const tableInnerStyle: React.CSSProperties = {
@@ -599,14 +646,6 @@ const tableCardStyle: React.CSSProperties = {
   gap: '0.2rem', cursor: 'pointer', userSelect: 'none',
 };
 
-const tableRuneStyle: React.CSSProperties = {
-  fontFamily: "'Noto Sans', sans-serif", fontSize: '0.4rem', color: '#5b7290',
-  letterSpacing: '0.2em',
-};
-
-const tableStarStyle: React.CSSProperties = {
-  fontSize: '0.9rem', color: '#9b6bb0', opacity: 0.5,
-};
 
 const tableCardNameStyle: React.CSSProperties = {
   fontFamily: "'Cormorant Garamond', serif", fontWeight: 600,
@@ -638,8 +677,9 @@ const handSlotColumnStyle: React.CSSProperties = {
 };
 
 const handLabelStyle: React.CSSProperties = {
-  fontFamily: "'Cormorant Garamond', serif", fontWeight: 600,
-  fontSize: '0.75rem', color: '#7b9ec7', letterSpacing: '0.08em', textTransform: 'uppercase',
+  fontFamily: "'Cormorant Garamond', serif", fontWeight: 700,
+  fontSize: '0.78rem', color: '#d4a854', letterSpacing: '0.18em', textTransform: 'uppercase',
+  textShadow: '0 0 8px rgba(212,168,84,0.25)',
 };
 
 const handCardStyle: React.CSSProperties = {
@@ -659,13 +699,6 @@ const handCardOrientStyle: React.CSSProperties = {
   fontSize: '0.5rem', color: '#7b9ec7', letterSpacing: '0.05em',
 };
 
-const handRuneStyle: React.CSSProperties = {
-  fontFamily: "'Noto Sans', sans-serif", fontSize: '0.5rem', color: '#5b7290', letterSpacing: '0.25em',
-};
-
-const handStarStyle: React.CSSProperties = {
-  fontSize: '1.2rem', color: '#9b6bb0', opacity: 0.5,
-};
 
 const handAffordanceStyle: React.CSSProperties = {
   position: 'absolute', bottom: '4px', display: 'flex', gap: '0.25rem',
@@ -677,8 +710,9 @@ const handIconBtnStyle: React.CSSProperties = {
 };
 
 const emptyHandSlotStyle: React.CSSProperties = {
-  width: '90px', height: '130px', border: '1px dashed #1a2440', borderRadius: '6px',
-  display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.4,
+  width: '90px', height: '130px', border: '1px dashed #3a2a50', borderRadius: '8px',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.5,
+  background: 'radial-gradient(60% 60% at 50% 40%, rgba(155,107,176,0.08), transparent)',
 };
 
 const emptySlotSymbolStyle: React.CSSProperties = {
