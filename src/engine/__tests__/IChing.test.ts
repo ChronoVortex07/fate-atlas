@@ -72,19 +72,33 @@ describe('castHexagram', () => {
 });
 
 describe('drawHexagramCast', () => {
-  it('builds a primary hexagram from the six tossed lines', () => {
-    // Force all coins heads (3) → every line sum 9 (old yang, solid+changing)
-    const seq = Array(18).fill(0); let i = 0;
-    vi.spyOn(Math, 'random').mockImplementation(() => seq[i++ % seq.length]); // 0 < .5 → 2? see lineToBit note
+  it('all-changing: all old-yin lines (sum 6) yield primaryNumber=2, relatingNumber=1, changingLines=[1..6]', () => {
+    // Each line: 3 coins (random < 0.5 → 2 each, so 2+2+2=6 = old yin, changing) + 1 bias call (chaos=0 → never fires).
+    // Math.random always returns 0: 0 < 0.5 → coin=2; bias check 0 < 0 → false.
+    vi.spyOn(Math, 'random').mockReturnValue(0);
     const cast = drawHexagramCast({});
-    expect(cast.lines).toHaveLength(6);
-    expect(cast.primaryNumber).toBeGreaterThanOrEqual(1);
-    expect(cast.primaryNumber).toBeLessThanOrEqual(64);
+    expect(cast.lines.every((v) => v === 6)).toBe(true);
+    expect(cast.changingLines).toEqual([1, 2, 3, 4, 5, 6]);
+    // primary: all bits '0' → binary "000000" → hexagram #2
+    expect(cast.primaryNumber).toBe(2);
+    // relating: all changing → flip every '0' to '1' → "111111" → hexagram #1
+    expect(cast.relatingNumber).toBe(1);
+    expect(cast.relatingNumber).not.toBe(cast.primaryNumber);
     vi.restoreAllMocks();
   });
-  it('relating == primary when there are no changing lines', () => {
-    const cast: any = { lines: [7,7,7,7,7,7], primaryNumber: 1, relatingNumber: 1, changingLines: [] };
+  it('no-changing: all young-yang lines (sum 7) yield primaryNumber=1, relatingNumber=primaryNumber, changingLines=[]', () => {
+    // Per-line sequence [0, 0, 0.9, 0]: coin1=0<0.5→2, coin2=0<0.5→2, coin3=0.9<0.5→3 → sum=7 (young yang, not changing).
+    // 4th value (0) is the chaos bias call; chaos=0 so changingBias=0 and the check never fires.
+    const seq = [0, 0, 0.9, 0]; let i = 0;
+    vi.spyOn(Math, 'random').mockImplementation(() => seq[i++ % seq.length]);
+    const cast = drawHexagramCast({});
+    expect(cast.lines.every((v) => v === 7)).toBe(true);
+    expect(cast.changingLines).toEqual([]);
+    // primary: all bits '1' → binary "111111" → hexagram #1
+    expect(cast.primaryNumber).toBe(1);
+    // no changing lines → relating binary identical to primary
     expect(cast.relatingNumber).toBe(cast.primaryNumber);
+    vi.restoreAllMocks();
   });
   it('consolidateHexagram returns the governing hexagram with reversible tag when changing', () => {
     const cast = { lines: [9,7,7,7,7,9] as any, primaryNumber: 1, relatingNumber: 2, changingLines: [1,6] };
