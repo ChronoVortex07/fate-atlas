@@ -4,9 +4,8 @@ import { useGameEngine } from '../../hooks/useGameEngine';
 import { drawHexagramCast, consolidateHexagram } from '../../data/iching';
 import HexagramPillar from '../cards/HexagramPillar';
 import CoinCast from '../cards/CoinCast';
-import type { HexagramCast, IChingResult } from '../../engine/types';
-
-type HexagramMode = 'willed' | 'fated' | 'unaligned';
+import type { HexagramCast, IChingResult, EffectReport } from '../../engine/types';
+import type { HexagramMode } from '../../engine/iching';
 
 type Phase =
   | 'idle'
@@ -30,6 +29,7 @@ export default function IChingMinigame() {
   const [tossing, setTossing] = useState(false);     // a CoinCast is in flight
   const [result, setResult] = useState<IChingResult | null>(null); // transformed (working) result
   const [plan, setPlan] = useState<{ mode: HexagramMode; offerRecast: boolean } | null>(null);
+  const [transformReports, setTransformReports] = useState<EffectReport[]>([]); // inline transform banners
 
   const committedRef = useRef(false);
   const recastUsedRef = useRef(false);
@@ -81,10 +81,14 @@ export default function IChingMinigame() {
   useEffect(() => {
     if (phase !== 'casting' || !cast || lineIndex < 6) return;
     // Always run the transform (chaos-line-cascade can add a line even at 0).
-    const transformed = engine.runHexagramTransform(consolidateHexagram(cast, 'relating'));
-    const workingCast = transformed.cast ?? cast;
+    // Reports are returned here for inline display at the transforming beat
+    // rather than being queued for commit-time narration.
+    const { result: transformed, reports } = engine.runHexagramTransform(consolidateHexagram(cast, 'relating'));
+    // consolidateHexagram always sets .cast, so the non-null assert is safe
+    const workingCast = transformed.cast!;
     setCast(workingCast);
     setResult(transformed);
+    setTransformReports(reports);
     setPlan(engine.planHexagramCast(workingCast.changingLines.length > 0));
     setPhase('primary-revealed');
   }, [phase, cast, lineIndex, engine]);
@@ -159,6 +163,7 @@ export default function IChingMinigame() {
     setCast(drawn);
     setResult(null);
     setPlan(null);
+    setTransformReports([]);
     setLineIndex(0);
     setTossing(false);
     setPhase('casting');
@@ -180,7 +185,7 @@ export default function IChingMinigame() {
 
   const primaryHex = cast ? consolidateHexagram(cast, 'primary') : null;
   const displayHex: IChingResult | null =
-    committedIChing ?? (cast ? consolidateHexagram(cast, displayGoverning) : null) ?? result;
+    committedIChing ?? (cast ? consolidateHexagram(cast, displayGoverning) : null);
 
   // Which hexagram drives the silk-banner flavor (governing one).
   const mandateFlavor = (() => {
@@ -246,7 +251,7 @@ export default function IChingMinigame() {
         {/* Pillar (building / formed / morphing) */}
         {phase !== 'idle' && cast && (
           <HexagramPillar
-            lines={builtLines.length ? builtLines : cast.lines.slice(0, lineIndex)}
+            lines={builtLines}
             changingLines={phase === 'casting' ? [] : cast.changingLines}
             phase={pillarPhase as 'building' | 'primary' | 'transforming' | 'relating'}
           />
@@ -295,6 +300,19 @@ export default function IChingMinigame() {
               {phase === 'transforming' && primaryHex && (
                 <div style={morphNoteStyle}>
                   {primaryHex.symbol} {primaryHex.name} → {displayHex.symbol} {displayHex.name}
+                </div>
+              )}
+
+              {/* Inline transform effect captions (chaos-line-cascade / order-still-hexagram) */}
+              {phase === 'transforming' && transformReports.length > 0 && (
+                <div style={transformReportStyle}>
+                  {transformReports.map((r) => (
+                    <div key={r.responderId} style={transformReportItemStyle}>
+                      <span style={transformReportLabelStyle}>{r.label}</span>
+                      {' — '}
+                      {r.description}
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -640,4 +658,25 @@ const progressDotStyle: React.CSSProperties = {
   height: '8px',
   borderRadius: '50%',
   transition: 'background 0.3s ease',
+};
+
+const transformReportStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.2rem',
+  marginTop: '0.3rem',
+};
+
+const transformReportItemStyle: React.CSSProperties = {
+  fontFamily: "'Inter', sans-serif",
+  fontWeight: 400,
+  fontSize: '0.75rem',
+  color: '#7b9ec7',
+  fontStyle: 'italic',
+  textAlign: 'center',
+};
+
+const transformReportLabelStyle: React.CSSProperties = {
+  fontWeight: 600,
+  fontStyle: 'normal',
 };

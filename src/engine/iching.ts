@@ -11,8 +11,8 @@ export function planHexagramResolution(
   hasChangingLines: boolean,
 ): { mode: HexagramMode; offerRecast: boolean } {
   if (!hasChangingLines) return { mode: 'unaligned', offerRecast: false };
-  if (atLeast(affinities.will ?? 0, 'ascendant')) return { mode: 'willed', offerRecast: false };
-  if (atLeast(affinities.fate ?? 0, 'ascendant')) return { mode: 'fated', offerRecast: false };
+  if (atLeast(affinities.will, 'ascendant')) return { mode: 'willed', offerRecast: false };
+  if (atLeast(affinities.fate, 'ascendant')) return { mode: 'fated', offerRecast: false };
   return { mode: 'unaligned', offerRecast: true };
 }
 

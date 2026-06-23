@@ -157,17 +157,20 @@ describe('planHexagramResolution', () => {
 });
 
 describe('deriveMandate', () => {
-  it('amplifies gains for a volatile hexagram (globalMult > 1)', () => {
-    // Hexagram #49 Revolution: volatility +2.0 → globalMult = 1 + (2/2)*0.6 = 1.6
+  it('amplifies gains for a volatile hexagram — exact endpoints', () => {
+    // Hexagram #49 Revolution: volatility +2.0
+    // globalMult = clamp(1 + (2/2)*0.6, 0.5, 1.6) = 1.6 (hits ceiling)
+    // chaos tilt: 1.6 × 1.25 = 2.0, clamped to 2.0 (hits inner ceiling [0.4, 2.0])
     const revolution = consolidateHexagram(fakeCast(49) as any, 'primary');
     const m = deriveMandate(revolution);
-    expect(m.globalMult).toBeGreaterThan(1.0);
-    expect(m.gainMult.chaos!).toBeGreaterThanOrEqual(m.globalMult);
+    expect(m.globalMult).toBeCloseTo(1.6, 5);
+    expect(m.gainMult.chaos!).toBeCloseTo(2.0, 5);
   });
-  it('dampens gains for a still hexagram (globalMult < 1)', () => {
-    // Hexagram #52 Keeping Still: volatility -2.0 → globalMult = 1 + (-2/2)*0.5 = 0.5
+  it('dampens gains for a still hexagram — exact endpoint', () => {
+    // Hexagram #52 Keeping Still: volatility -2.0
+    // globalMult = clamp(1 + (-2/2)*0.5, 0.5, 1.6) = 0.5 (hits floor)
     const stillness = consolidateHexagram(fakeCast(52) as any, 'primary');
-    expect(deriveMandate(stillness).globalMult).toBeLessThan(1.0);
+    expect(deriveMandate(stillness).globalMult).toBeCloseTo(0.5, 5);
   });
   it('source is formatted as iching:<number>', () => {
     const result = consolidateHexagram(fakeCast(1) as any, 'primary');

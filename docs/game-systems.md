@@ -792,4 +792,8 @@ Both compete in the `MUTATE` exclusive band (weighted by their affinity value); 
 fires per transform. The relating hexagram is always recomputed after any line change
 (`recomputeRelating`).
 
+Note: `chaos-line-cascade` can *create* a transformation from scratch — its condition is
+`< 6 changing lines` (not `≥ 1`), so Chaos can add the very first changing line to an
+otherwise stable cast, producing a relating hexagram where none would have existed.
+
 See §5 for the full responder catalog entry.

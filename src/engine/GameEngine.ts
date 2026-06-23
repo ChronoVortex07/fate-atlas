@@ -492,10 +492,17 @@ export class GameEngine {
 
   // Runs chaos/order line-mutation responders against a consolidated IChingResult
   // before it is committed. Chaos may add a changing line; Order may remove one.
-  // Returns the (possibly mutated) result for the minigame to hand to completeMinigame.
-  runHexagramTransform(result: IChingResult): IChingResult {
-    const { draft } = this.dispatchAt('iching:transform', { outcome: result });
-    return (draft.outcome as IChingResult) ?? result;
+  // Returns the (possibly mutated) result AND the EffectReports so the minigame
+  // can narrate them inline at the transform beat rather than at commit time.
+  // The reports are stripped from eventQueue here (they stay in turnEffects for
+  // the RunRecord); the caller is responsible for displaying them.
+  runHexagramTransform(result: IChingResult): { result: IChingResult; reports: EffectReport[] } {
+    const before = this.state.eventQueue.length;
+    const { draft, reports } = this.dispatchAt('iching:transform', { outcome: result });
+    // Narrated inline by the minigame's transform beat — keep them out of the
+    // commit-time queue (they stay in turnEffects for the run record).
+    if (reports.length > 0) this.state.eventQueue = this.state.eventQueue.slice(0, before);
+    return { result: (draft.outcome as IChingResult) ?? result, reports };
   }
 
   // Resolves every active roll modifier into one plan for the dice minigame.
