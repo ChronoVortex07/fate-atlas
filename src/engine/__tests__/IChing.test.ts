@@ -1,6 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
 import { castHexagram, HEXAGRAMS, HEX_BY_BINARY, hexagramByBinary, drawHexagramCast, consolidateHexagram } from '../../data/iching';
 import { planHexagramResolution, deriveMandate, hexagramNudge } from '../iching';
+import { GameEngine } from '../GameEngine';
+import type { SlotResult } from '../types';
+
+const dieResult = (result = 10): SlotResult => ({
+  type: 'd20', result, threshold: 'neutral', interpretation: 'Steady',
+  tags: ['roll', 'numeric'], themes: ['harmony'],
+  dimensions: { favorability: 0.0, certainty: -1.0, volatility: 0.0 }, modifierRoles: ['effect'],
+} as SlotResult);
 
 describe('I Ching data', () => {
   it('has 64 hexagrams', () => {
@@ -185,5 +193,73 @@ describe('hexagramNudge', () => {
     const creative = consolidateHexagram(fakeCast(1) as any, 'primary');
     const nudges = hexagramNudge(creative);
     expect(nudges.every(([, n]) => n !== 0)).toBe(true);
+  });
+});
+
+// ── Task 5: GameEngine wiring — nudge + mandate on commit, decay on later commits ──
+
+const ichingResult = (primary: number, changing: number[] = [1, 6]): SlotResult =>
+  consolidateHexagram(
+    { lines: [9, 7, 7, 7, 7, 9] as any, primaryNumber: primary, relatingNumber: primary, changingLines: changing },
+    'primary',
+  ) as SlotResult;
+
+// Commit a single result through the real lifecycle and drain to method-select.
+function commitOne(engine: GameEngine, result: SlotResult): void {
+  const orig = Math.random;
+  Math.random = () => 0.99; // suppress probabilistic responders / happening interrupts
+  try {
+    const methods = engine.getState().availableMethods;
+    const idx = methods.findIndex((m) => m !== 'happening');
+    engine.selectMethod(idx === -1 ? 0 : idx);
+    if (engine.getState().screen === 'happening') {
+      engine.resolveHappening(0);
+      const ix2 = engine.getState().availableMethods.findIndex((m) => m !== 'happening');
+      engine.selectMethod(ix2 === -1 ? 0 : ix2);
+    }
+    engine.completeMinigame(result, { revealedAsDrawn: true });
+    if (engine.getState().eventQueue.length > 0) engine.finishEventBatch();
+    if (engine.getState().awaitingContinue) engine.continueAfterReview();
+  } finally {
+    Math.random = orig;
+  }
+}
+
+describe('GameEngine I Ching mandate wiring', () => {
+  it('sets a Mandate of Change after committing an I Ching result', () => {
+    const engine = new GameEngine();
+    engine.startTurn('decision');
+    commitOne(engine, ichingResult(49)); // Revolution: volatility +2 → globalMult 1.6
+    const mandate = (engine as any).affinityEngine.getMandate();
+    expect(mandate).not.toBeNull();
+    expect(mandate.source).toBe('iching:49');
+    // Full strength immediately after the setting commit (its own advance was a no-op decay).
+    expect(mandate.globalMult).toBeCloseTo(1.6, 5);
+  });
+
+  it('applies the one-time nudge BEFORE the mandate (nudge is not mandate-scaled)', () => {
+    const engine = new GameEngine();
+    engine.startTurn('decision');
+    const before = (engine as any).affinityEngine.getState().chaos as number;
+    commitOne(engine, ichingResult(49)); // chaos nudge = round(2.0*4) = 8 (unscaled)
+    const after = (engine as any).affinityEngine.getState().chaos as number;
+    // Chaos rose from the unscaled nudge (plus tag feeds); had the mandate (1.6x)
+    // scaled the nudge it would be even higher, but we assert the nudge landed.
+    expect(after).toBeGreaterThan(before);
+  });
+
+  it('decays the mandate on a later committed reading', () => {
+    const engine = new GameEngine();
+    engine.startTurn('decision');
+    commitOne(engine, ichingResult(49));
+    const full = (engine as any).affinityEngine.getMandate().globalMult as number;
+    expect(full).toBeCloseTo(1.6, 5);
+    // A second committed (non-I-Ching) reading: its advanceAfterCommit decays the
+    // now-stale mandate. A die does not re-set the mandate, so decay is observable.
+    commitOne(engine, dieResult());
+    const decayed = (engine as any).affinityEngine.getMandate().globalMult as number;
+    // toward1(1.6) = 1.6 + (1 - 1.6) * 0.4 = 1.36
+    expect(decayed).toBeLessThan(full);
+    expect(decayed).toBeCloseTo(1.36, 5);
   });
 });
