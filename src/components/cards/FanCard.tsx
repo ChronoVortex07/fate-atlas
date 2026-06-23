@@ -255,20 +255,27 @@ export default function FanCard({
               maxWidth: isDesktop ? '26px' : '16px',
             };
             const sigilColor = isRerollTarget || isSource ? '#d4a854' : '#7b9ec7';
+            // Sigil centers form the equilateral triangle. Anchor each group by
+            // the sigil's intended center with translateX(-50%) so a name label
+            // wider than the sigil can't drag the sigil off its vertex.
+            const groupStyle: React.CSSProperties = {
+              position: 'absolute', display: 'flex', flexDirection: 'column',
+              alignItems: 'center', gap: '0px', transform: 'translateX(-50%)',
+            };
             return (
-              <div style={{ position: 'relative', width: cw, height: ch, lineHeight: 1 }}>
+              <div style={{ position: 'relative', width: cw, height: ch, lineHeight: 1, marginBottom: isDesktop ? 6 : 4 }}>
                 {/* Top — Past (apex) */}
-                <div style={{ position: 'absolute', left: (cw - sigil) / 2, top: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px' }}>
+                <div style={{ ...groupStyle, left: cw / 2, top: 0 }}>
                   <CardSigil card={display.subCards[0].face} size={sigil} color={sigilColor} />
                   <span title={display.subCards[0].name} style={nameStyle}>{display.subCards[0].name}</span>
                 </div>
                 {/* Bottom-left — Present */}
-                <div style={{ position: 'absolute', left: 0, top: h, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px' }}>
+                <div style={{ ...groupStyle, left: sigil / 2, top: h }}>
                   <CardSigil card={display.subCards[1].face} size={sigil} color={sigilColor} />
                   <span title={display.subCards[1].name} style={nameStyle}>{display.subCards[1].name}</span>
                 </div>
                 {/* Bottom-right — Future */}
-                <div style={{ position: 'absolute', right: 0, top: h, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px' }}>
+                <div style={{ ...groupStyle, left: cw - sigil / 2, top: h }}>
                   <CardSigil card={display.subCards[2].face} size={sigil} color={sigilColor} />
                   <span title={display.subCards[2].name} style={nameStyle}>{display.subCards[2].name}</span>
                 </div>
