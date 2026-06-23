@@ -32,6 +32,7 @@ export class GameEngine {
   private usedHappeningIds = new Set<string>();
   private minigamesPerTurn: number;
   private pendingTransition: (() => void) | null = null;
+  private pendingAdvance: (() => void) | null = null;
   private turnEffects: EffectReport[] = []; // per-turn accumulator of all reports (for RunRecord)
 
   constructor(minigamesPerTurn = 3) {
@@ -66,6 +67,7 @@ export class GameEngine {
       history: [],
       eventLog: [],
       debug: false,
+      awaitingContinue: false,
       affinityEffects: {
         spreadRedraws: 0, methodCount: 3, hintClarity: 0,
         readingDetail: 0, poolPreview: 'none', peekAvailable: false,
@@ -187,6 +189,7 @@ export class GameEngine {
     this.state.happening = null;
     this.state.selectedHappeningChoice = null;
     this.state.eventQueue = [];
+    this.state.awaitingContinue = false;
     this.turnEffects = [];
 
     this.narrativeAssembler.resetRotation();
@@ -295,9 +298,11 @@ export class GameEngine {
 
     this.bus.emit('minigame-complete', { result, completed });
 
-    // Resolve-first, narrate-second: if the commit queued any events, freeze on
-    // the current screen until the sequencer drains them, then transition.
-    this.runOrDefer(() => this.advanceAfterCommit(result, completed));
+    // Resolve-first, narrate-second, then hold a review beat: store the real
+    // advance and (once any event batch drains) show the Continue gate instead
+    // of advancing. continueAfterReview() runs the stored advance.
+    this.pendingAdvance = () => this.advanceAfterCommit(result, completed);
+    this.runOrDefer(() => this.showReviewBeat());
   }
 
   private advanceAfterCommit(result: SlotResult, completed: number): void {
@@ -331,6 +336,21 @@ export class GameEngine {
     this.state.screen = 'method-select';
     this.state.selectedMethod = null;
     this.notify();
+  }
+
+  // Hold on the committed/revealed minigame view until the player clicks Continue.
+  private showReviewBeat(): void {
+    this.state.awaitingContinue = true;
+    this.notify();
+  }
+
+  continueAfterReview(): void {
+    if (!this.state.awaitingContinue) return;
+    this.state.awaitingContinue = false;
+    const advance = this.pendingAdvance;
+    this.pendingAdvance = null;
+    if (advance) advance();
+    else this.notify();
   }
 
   private buildRunRecord(): void {
@@ -898,6 +918,7 @@ export class GameEngine {
     this.state.happening = null;
     this.state.selectedHappeningChoice = null;
     this.state.eventQueue = [];
+    this.state.awaitingContinue = false;
     this.turnEffects = [];
     this.notify();
   }

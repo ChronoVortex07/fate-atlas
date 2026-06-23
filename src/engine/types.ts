@@ -354,6 +354,7 @@ export interface GameState {
   history: RunRecord[];
   eventLog: GameEvent[];
   debug: boolean;
+  awaitingContinue: boolean;
   affinityEffects: AffinityEffects;
   eventQueue: EffectReport[];
   debugConfig: DebugConfig;
