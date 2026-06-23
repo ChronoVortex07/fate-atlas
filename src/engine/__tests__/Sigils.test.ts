@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { resolveSigil, MAJOR_SIGILS, rankLabel } from '../../data/sigils';
+import {
+  resolveSigil, rankLabel, MAJOR_ICON_KEYS, SUIT_ICON_KEYS,
+} from '../../data/sigils';
 import type { TarotCardFace, TarotResult } from '../types';
 import { MAJOR_ARCANA, generateMinorArcana } from '../../data/tarot';
 
@@ -9,34 +11,41 @@ const face = (o: Partial<TarotCardFace>): TarotCardFace => ({
   modifierRoles: [], meaningUpright: '', meaningReversed: '', tags: [], ...o,
 });
 
-describe('resolveSigil', () => {
-  it('every major id resolves to a bespoke multi-stroke major sigil (no generic fallback)', () => {
+describe('resolveSigil (icon keys)', () => {
+  it('every major id maps to a non-empty icon key', () => {
     for (const m of MAJOR_ARCANA) {
       const spec = resolveSigil(face({ id: m.id, arcana: 'major' }));
       expect(spec.kind).toBe('major');
       if (spec.kind === 'major') {
-        expect(MAJOR_SIGILS[m.id]).toBeDefined();
-        expect(spec.paths.length).toBeGreaterThan(0);
-        expect(spec.paths.every((p) => p.length > 0)).toBe(true);
+        const key = m.id as keyof typeof MAJOR_ICON_KEYS;
+        expect(MAJOR_ICON_KEYS[key]).toBeDefined();
+        expect(spec.icon.length).toBeGreaterThan(0);
+        expect(spec.icon).toBe(MAJOR_ICON_KEYS[key]);
       }
     }
   });
 
-  it('MAJOR_SIGILS has exactly the 22 canonical ids and nothing extra', () => {
+  it('MAJOR_ICON_KEYS has exactly the 22 canonical ids', () => {
     const ids = new Set(MAJOR_ARCANA.map((m) => m.id));
-    expect(Object.keys(MAJOR_SIGILS).sort()).toEqual([...ids].sort());
+    expect(Object.keys(MAJOR_ICON_KEYS).sort()).toEqual([...ids].sort());
   });
 
-  it('every minor composes: emblem present, correct rank label and court flag', () => {
+  it('every minor composes: suit icon present, correct rank label and court flag', () => {
     for (const m of generateMinorArcana()) {
       const spec = resolveSigil(face({ id: m.id, arcana: 'minor', suit: m.suit, rank: m.rank }));
       expect(spec.kind).toBe('minor');
       if (spec.kind === 'minor') {
-        expect(spec.emblem.length).toBeGreaterThan(0);
-        const court = typeof m.rank !== 'number';
-        expect(spec.rank.court).toBe(court);
+        expect(spec.icon).toBe(SUIT_ICON_KEYS[m.suit! as keyof typeof SUIT_ICON_KEYS]);
+        expect(spec.icon.length).toBeGreaterThan(0);
+        expect(spec.rank.court).toBe(typeof m.rank !== 'number');
         expect(spec.rank.label).toBe(rankLabel(m.rank!));
       }
+    }
+  });
+
+  it('all four suits have an icon key', () => {
+    for (const s of ['wands', 'cups', 'swords', 'pentacles'] as const) {
+      expect(SUIT_ICON_KEYS[s]).toBeTruthy();
     }
   });
 
@@ -51,7 +60,7 @@ describe('resolveSigil', () => {
     expect(rankLabel('king')).toBe('K');
   });
 
-  it('a multi-card spread resolves to the crest', () => {
+  it('a multi-card spread resolves to the spread crest key', () => {
     const spread = {
       type: 'tarot', id: 's', name: 'Spread', orientation: 'upright', spread: [
         { position: 'past', card: face({ id: 'the-fool' }) },
@@ -61,6 +70,7 @@ describe('resolveSigil', () => {
     } as unknown as TarotResult;
     const spec = resolveSigil(spread);
     expect(spec.kind).toBe('spread');
+    if (spec.kind === 'spread') expect(spec.icon).toBe('spread');
   });
 
   it('a single-card tarot result resolves by its underlying face', () => {

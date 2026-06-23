@@ -279,18 +279,18 @@ strongest).
 
 Sigil **resolution** lives in the pure, framework-free module `src/data/sigils.ts`
 (`resolveSigil`), which the engine test suite covers (`src/engine/__tests__/Sigils.test.ts`
-asserts completeness). `CardSigil` is a thin SVG renderer over `resolveSigil`. All sigils
-share one drawing contract: `viewBox 0 0 48 48`, `stroke=currentColor`, `fill=none`,
-`stroke-width ≈ 1.5`, rounded caps/joins.
+asserts completeness). `resolveSigil` returns an **icon key** (a stable string) rather than
+geometry; `CardSigil` is a thin renderer that maps each key to a **`react-icons` Game-Icons**
+(`react-icons/gi`) component via a `Record<IconKey, IconType>` (so TypeScript enforces that
+every key has a component). Icons render as `currentColor` SVGs sized by the `size` prop.
 
-- **Major Arcana** -- all 22 majors have a **bespoke geometric line-art** sigil
-  (`MAJOR_SIGILS`, an array of strokes per card). There is **no generic-circle fallback** for
-  a real card — the completeness test fails if any major is missing.
-- **Minor Arcana** -- composed as a refined **suit emblem** (`SUIT_EMBLEMS`) plus a small
-  corner **rank cartouche**: a roman numeral (`A` for aces, `II`–`X` for pips) or a court
-  letter (`P/N/Q/K`); courts also render a small **crown** above the emblem.
-- **Spread crest** -- a multi-card spread resolves to the refined three-overlapping-cards
-  `SPREAD_CREST`.
+- **Major Arcana** -- all 22 majors map to a **bespoke Game-Icon** (`MAJOR_ICON_KEYS`,
+  keyed by major id). Every id resolves to a real icon export — the completeness test fails
+  if any major is missing.
+- **Minor Arcana** -- composed as a **suit icon** (`SUIT_ICON_KEYS`) plus a small corner
+  **rank cartouche**: a roman numeral (`A` for aces, `II`–`X` for pips) or a court letter
+  (`P/N/Q/K`); courts also render a small **crown** above the icon.
+- **Spread crest** -- a multi-card spread resolves to a dedicated crest icon key (`'spread'`).
 - **Reversed** cards keep the 180° rotation convention.
 
 Tarot no longer renders the emoji `symbol` data field — the Result page sub-cards use
