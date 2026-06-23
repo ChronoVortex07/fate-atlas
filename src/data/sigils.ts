@@ -93,6 +93,12 @@ export function resolveSigil(card: AnyCard): SigilSpec {
   }
   const id = f?.id ?? card.id;
   const icon = MAJOR_ICON_KEYS[id as keyof typeof MAJOR_ICON_KEYS];
-  // Defensive: a non-mapped id would be a data bug; surface it loudly in dev.
-  return { kind: 'major', icon: icon ?? MAJOR_ICON_KEYS['the-fool'] };
+  if (!icon) {
+    // A non-mapped major id is a data bug; surface it (the completeness test
+    // guards against it for shipped data) and fall back to a real icon so the
+    // render never points at a missing component.
+    console.warn(`resolveSigil: no icon mapped for major id "${id}"; using the-fool`);
+    return { kind: 'major', icon: MAJOR_ICON_KEYS['the-fool'] };
+  }
+  return { kind: 'major', icon };
 }
