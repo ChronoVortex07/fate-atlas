@@ -17,8 +17,8 @@ const SUBJECT_NOUNS: Record<QuestionType, string> = {
 type Band = 'high' | 'neutral' | 'low';
 
 function getFavorabilityBand(value: number): Band {
-  if (value >= 1.0) return 'high';
-  if (value <= -0.9) return 'low';
+  if (value >= 0.5) return 'high';
+  if (value <= -0.5) return 'low';
   return 'neutral';
 }
 
@@ -56,7 +56,7 @@ export class NarrativeAssembler {
    */
   assemble(
     aggregated: AggregatedReading,
-    _results: SlotResult[],
+    results: SlotResult[],
     question: QuestionType,
     affinities: Record<string, number>,
     effects?: AffinityEffects,
@@ -103,18 +103,34 @@ export class NarrativeAssembler {
     }
 
     // Stage 3: Modifier weaving
-    const allRoles: ModifierRole[] = ['subject', 'action', 'effect'];
-    for (const role of allRoles) {
-      const assigned = aggregated.modifierAssignments[role];
+    // Assign each result to exactly one modifier role for narration: the role in
+    // which it ranks strongest (lowest index after the sumAbsDimensions sort).
+    const roleOrder: ModifierRole[] = ['subject', 'action', 'effect'];
+    const rankIn = (role: ModifierRole, r: SlotResult) => aggregated.modifierAssignments[role].indexOf(r);
+    const uniqueResults = new Set<SlotResult>();
+    for (const role of roleOrder) for (const r of aggregated.modifierAssignments[role]) uniqueResults.add(r);
+    const narrationByRole: Record<ModifierRole, SlotResult[]> = { subject: [], action: [], effect: [] };
+    for (const r of uniqueResults) {
+      const roles = roleOrder.filter((role) => rankIn(role, r) >= 0);
+      let best = roles[0];
+      for (const role of roles.slice(1)) if (rankIn(role, r) < rankIn(best, r)) best = role;
+      narrationByRole[best].push(r);
+    }
+    for (const role of roleOrder) {
+      narrationByRole[role].sort((a, b) => rankIn(role, a) - rankIn(role, b));
+    }
+
+    for (const role of roleOrder) {
+      const assigned = narrationByRole[role];
       const frameKey = `${role}_${question}`;
       const framePool = this.templates.modifierFrames[frameKey];
+      const trueGap = aggregated.modifierAssignments[role].length === 0;
 
       if (assigned && assigned.length > 0) {
         const resultsText = assigned.map((r) => this.describeSlotBrief(r)).join('; ');
         const frame = this.pick(`modifier_${frameKey}`, framePool ?? [frameKey]);
         paragraphs.push(frame.replace('{results}', resultsText));
-      } else {
-        // Missing modifier — acknowledge the gap
+      } else if (trueGap) {
         const fallbackPool = this.templates.fallbacks.missingModifier[role];
         if (fallbackPool && fallbackPool.length > 0) {
           paragraphs.push(this.pick(`missing_${role}`, fallbackPool));
@@ -122,19 +138,52 @@ export class NarrativeAssembler {
       }
     }
 
+    // Per-position insight: one compact line per multi-card tarot spread.
+    for (const r of results) {
+      if (r.type !== 'tarot' || !r.spread || r.spread.length <= 1) continue;
+      const parts = r.spread.map((sp) => {
+        const pos = sp.position.charAt(0).toUpperCase() + sp.position.slice(1);
+        const fav = sp.card.dimensions.favorability;
+        if (fav >= 0.5) return `${pos} leans ${sp.card.themes[0] ?? 'mystery'}`;
+        if (fav <= -0.5) return `${pos} turns adverse`;
+        return `${pos} holds steady`;
+      });
+      paragraphs.push(parts.join(' · '));
+    }
+
     // Stage 4: Tension (conditional)
+    // Named opposition: when strong poles oppose, name them explicitly.
+    const netBand = getFavorabilityBand(aggregated.dimensionProfile.favorability);
+    const favPole = aggregated.strongestFavor;
+    const advPole = aggregated.strongestAdverse;
+    const polesOppose = !!favPole && !!advPole && favPole.value >= 1 && advPole.value <= -1;
+    let namedOpposition: string | null = null;
+    if (polesOppose) {
+      const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+      namedOpposition = `${cap(favPole!.label)} pulls toward fortune while ${advPole!.label} drags against it — the balance you feel is a contest, not a calm.`;
+    }
+    if (netBand === 'neutral' && namedOpposition) {
+      paragraphs.push(namedOpposition);
+    }
+
     if (aggregated.hasTension) {
-      let tensionKey: string;
-      if (aggregated.tensionPair) {
-        const [a, b] = aggregated.tensionPair;
-        // Normalize key: sort alphabetically
-        tensionKey = [a, b].sort().join('_');
+      if (!aggregated.tensionPair && namedOpposition) {
+        // Variance-based tension names its actual poles (avoid double-print when
+        // the neutral branch above already pushed it).
+        if (netBand !== 'neutral') paragraphs.push(namedOpposition);
       } else {
-        tensionKey = 'high_variance';
-      }
-      const tensionPool = this.templates.tensionPatterns[tensionKey];
-      if (tensionPool && tensionPool.length > 0) {
-        paragraphs.push(this.pick(`tension_${tensionKey}`, tensionPool));
+        let tensionKey: string;
+        if (aggregated.tensionPair) {
+          const [a, b] = aggregated.tensionPair;
+          // Normalize key: sort alphabetically
+          tensionKey = [a, b].sort().join('_');
+        } else {
+          tensionKey = 'high_variance';
+        }
+        const tensionPool = this.templates.tensionPatterns[tensionKey];
+        if (tensionPool && tensionPool.length > 0) {
+          paragraphs.push(this.pick(`tension_${tensionKey}`, tensionPool));
+        }
       }
     }
 
@@ -201,10 +250,8 @@ export class NarrativeAssembler {
     switch (slot.type) {
       case 'tarot':
         if (slot.spread && slot.spread.length > 1) {
-          return slot.spread.map((sp) => {
-            const pos = sp.position.charAt(0).toUpperCase() + sp.position.slice(1);
-            return `${pos}: ${sp.card.name} (${sp.card.orientation})`;
-          }).join('; ');
+          // Name the cards; positions are narrated by the dedicated per-position line.
+          return slot.spread.map((sp) => `${sp.card.name} (${sp.card.orientation})`).join(', ');
         }
         return `The ${slot.name} (${slot.orientation})`;
       case 'd20':
