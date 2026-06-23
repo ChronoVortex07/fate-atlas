@@ -208,42 +208,45 @@ export default function TarotMinigame() {
         </motion.h1>
         <OrnamentalBorder width="120px" />
 
-        {/* Deck visual */}
-        <motion.div style={deckStyle} layout>
-          <div style={deckStackStyle}>
-            {draft.deck.length > 1 && <div style={deckCardBack(1)} />}
-            {draft.deck.length > 2 && <div style={deckCardBack(2)} />}
-            {draft.deck.length > 0 && (
-              <div style={{ ...deckCardBack(0), display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none' }}>
-                <CardBack size={46} />
-              </div>
-            )}
+        {/* Deck rail + table spread in a horizontal row */}
+        <div style={tableRowStyle}>
+          {/* Deck rail */}
+          <div style={deckRailStyle}>
+            <div style={deckStackStyle}>
+              {draft.deck.length > 2 && <div style={deckCardBack(2)} />}
+              {draft.deck.length > 1 && <div style={deckCardBack(1)} />}
+              {draft.deck.length > 0 && (
+                <div style={{ ...deckCardBack(0), display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none' }}>
+                  <CardBack size={46} />
+                </div>
+              )}
+            </div>
+            <motion.span
+              key={`count-${draft.deck.length}`}
+              style={deckCountStyle}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              {draft.deck.length} cards
+            </motion.span>
           </div>
-          <motion.span
-            key={`count-${draft.deck.length}`}
-            style={deckCountStyle}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            {draft.deck.length} cards
-          </motion.span>
-        </motion.div>
 
-        {/* Table spread */}
-        <RunicBand color="#d4a854" opacity={0.22} fontSize="0.7rem" />
-        <div
-          ref={tableRef}
-          style={{
-            ...tableAreaStyle,
-            borderColor: dragOverTable ? '#d4a854' : '#1a2440',
-          }}
-          onMouseMove={handleTableMouseMove}
-          onMouseLeave={handleTableMouseLeave}
-          onTouchStart={handleTableTouch}
-          onDragOver={handleTableDragOver}
-          onDragLeave={handleTableDragLeave}
-          onDrop={handleTableDrop}
-        >
+          {/* Spread column */}
+          <div style={spreadColStyle}>
+            <RunicBand color="#d4a854" opacity={0.22} fontSize="0.7rem" />
+            <div
+              ref={tableRef}
+              style={{
+                ...tableAreaStyle,
+                borderColor: dragOverTable ? '#d4a854' : '#1a2440',
+              }}
+              onMouseMove={handleTableMouseMove}
+              onMouseLeave={handleTableMouseLeave}
+              onTouchStart={handleTableTouch}
+              onDragOver={handleTableDragOver}
+              onDragLeave={handleTableDragLeave}
+              onDrop={handleTableDrop}
+            >
           {/* Celestial backdrop + arcane corner flourishes */}
           <svg
             viewBox="0 0 200 100" preserveAspectRatio="none" aria-hidden
@@ -318,8 +321,10 @@ export default function TarotMinigame() {
               })}
             </motion.div>
           </AnimatePresence>
+            </div>
+            <RunicBand color="#d4a854" opacity={0.22} fontSize="0.7rem" />
+          </div>
         </div>
-        <RunicBand color="#d4a854" opacity={0.22} fontSize="0.7rem" />
 
         {/* Shuffle button */}
         <motion.button
@@ -517,19 +522,35 @@ const headingStyle: React.CSSProperties = {
   letterSpacing: '0.12em', margin: 0, textAlign: 'center',
 };
 
-const deckStyle: React.CSSProperties = {
-  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem',
+const tableRowStyle: React.CSSProperties = {
+  display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.85rem',
+  width: '100%', flexWrap: 'wrap', justifyContent: 'center',
+};
+
+const deckRailStyle: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem',
+  padding: '0.75rem 0.6rem', flex: '0 0 auto',
+  background: 'radial-gradient(80% 80% at 50% 30%, rgba(42,21,69,0.35), rgba(7,11,20,0.6))',
+  border: '1px solid #2a2150', borderRadius: '10px',
+  boxShadow: '0 0 16px rgba(212,168,84,0.18), inset 0 0 18px rgba(8,13,24,0.8)',
+};
+
+const spreadColStyle: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '0.4rem',
+  flex: '1 1 360px', minWidth: '260px',
 };
 
 const deckStackStyle: React.CSSProperties = {
-  position: 'relative', width: '50px', height: '60px',
+  position: 'relative', width: '54px', height: '66px',
   filter: 'drop-shadow(0 0 8px rgba(212,168,84,0.35))',
 };
 
+// Symmetric stack: back cards inset on both sides so the front face (i=0)
+// sits centred on the stack's center line.
 const deckCardBack = (i: number): React.CSSProperties => ({
   position: 'absolute',
-  top: `${i * 2}px`,
-  left: `${i * 2}px`,
+  top: `${4 - i * 2}px`,
+  left: `${4 - i * 2}px`,
   width: '46px', height: '62px',
   background: '#080d18', border: '1px solid #1a2440', borderRadius: '4px',
 });
