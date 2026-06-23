@@ -28,6 +28,8 @@ const baseAggregated: AggregatedReading = {
   modifierAssignments: { subject: [], action: [], effect: [] },
   hasTension: false,
   tensionPair: null,
+  strongestFavor: null,
+  strongestAdverse: null,
 };
 
 describe('NarrativeAssembler', () => {
@@ -134,6 +136,54 @@ describe('NarrativeAssembler', () => {
     const agg = { ...baseAggregated, hasTension: false };
     const result = assembler.assemble(agg, [], 'decision', { chaos: 40, order: 50 });
     expect(result.tensionNote).toBeUndefined();
+  });
+
+  it('narrower band: favorability 0.5 reaches a real verdict (not neutral)', () => {
+    const agg = { ...baseAggregated, dimensionProfile: { favorability: 0.5, certainty: 0, volatility: 0 } };
+    const r1 = assembler.assemble(agg, [], 'decision', { chaos: 40, order: 50 });
+    const aggLow = { ...baseAggregated, dimensionProfile: { favorability: -0.5, certainty: 0, volatility: 0 } };
+    assembler.resetRotation();
+    const r2 = assembler.assemble(aggLow, [], 'decision', { chaos: 40, order: 50 });
+    // The two verdicts must differ (one high band, one low band) — not both neutral.
+    expect(r1.headline).not.toBe(r2.headline);
+  });
+
+  it('balanced-but-opposed emits a named tension paragraph', () => {
+    const agg = {
+      ...baseAggregated,
+      dimensionProfile: { favorability: 0.0, certainty: 0, volatility: 0 },
+      strongestFavor: { label: 'the Ace of Cups (upright)', value: 1.5 },
+      strongestAdverse: { label: 'the reversed Nine of Wands', value: -1.5 },
+    };
+    const result = assembler.assemble(agg, [], 'self', { chaos: 40, order: 50 });
+    const para = result.paragraphs.find((p) => p.includes('Ace of Cups') && p.includes('Nine of Wands'));
+    expect(para).toBeTruthy();
+    expect(para).toMatch(/contest|balance/);
+  });
+
+  it('emits a per-position line for a tarot spread', () => {
+    const spread = makeSlot('tarot', {
+      spread: [
+        { position: 'past', card: { name: 'A', orientation: 'upright', themes: ['renewal'], dimensions: { favorability: 1.0, certainty: 0, volatility: 0 }, modifierRoles: ['subject'], id: 'a', arcana: 'minor', symbol: '✦', meaningUpright: '', meaningReversed: '', tags: [] } },
+        { position: 'present', card: { name: 'B', orientation: 'upright', themes: ['harmony'], dimensions: { favorability: 0.0, certainty: 0, volatility: 0 }, modifierRoles: ['subject'], id: 'b', arcana: 'minor', symbol: '✦', meaningUpright: '', meaningReversed: '', tags: [] } },
+        { position: 'future', card: { name: 'C', orientation: 'reversed', themes: ['conflict'], dimensions: { favorability: -1.0, certainty: 0, volatility: 0 }, modifierRoles: ['subject'], id: 'c', arcana: 'minor', symbol: '✦', meaningUpright: '', meaningReversed: '', tags: [] } },
+      ],
+    });
+    const agg = { ...baseAggregated, modifierAssignments: { subject: [spread], action: [], effect: [] } };
+    const result = assembler.assemble(agg, [spread], 'self', { chaos: 40, order: 50 });
+    const line = result.paragraphs.find((p) => p.includes('Past') && p.includes('Future'));
+    expect(line).toBeTruthy();
+    expect(line).toMatch(/Past leans/);
+    expect(line).toMatch(/Future turns adverse/);
+  });
+
+  it('de-dupes a result shared across modifier roles to a single frame', () => {
+    const shared = makeSlot('tarot', { name: 'The Tower', modifierRoles: ['subject', 'action', 'effect'],
+      dimensions: { favorability: -1.0, certainty: 1.0, volatility: 1.0 } });
+    const agg = { ...baseAggregated, modifierAssignments: { subject: [shared], action: [shared], effect: [shared] } };
+    const result = assembler.assemble(agg, [], 'decision', { chaos: 40, order: 50 });
+    const mentions = result.paragraphs.filter((p) => p.includes('The Tower')).length;
+    expect(mentions).toBe(1);
   });
 
   it('closing uses correct question type template', () => {
@@ -309,7 +359,7 @@ describe('NarrativeAssembler', () => {
       expect(desc).toBe('The The Fool (upright)');
     });
 
-    it('describes a multi-card tarot spread by position', () => {
+    it('describes a multi-card tarot spread by card name (positions handled by the per-position line)', () => {
       const spreadSlot = {
         type: 'tarot',
         id: 'spread:test',
@@ -330,9 +380,9 @@ describe('NarrativeAssembler', () => {
         ],
       } as unknown as SlotResult;
       const desc = (assembler as any).describeSlotBrief(spreadSlot);
-      expect(desc).toContain('Past: The Fool (upright)');
-      expect(desc).toContain('Present: The Magician (upright)');
-      expect(desc).toContain('Future: The High Priestess (upright)');
+      expect(desc).toBe('The Fool (upright), The Magician (upright), The High Priestess (upright)');
+      // Position labels are no longer re-listed in the brief.
+      expect(desc).not.toContain('Past:');
     });
 
     it('single card tarot result with reversed uses original format', () => {

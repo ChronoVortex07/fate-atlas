@@ -26,6 +26,8 @@ function completeTurn(engine: GameEngine): void {
         engine.selectMethod(ix2);
       }
       engine.completeMinigame(dieResult());
+      if (engine.getState().eventQueue.length > 0) engine.finishEventBatch();
+      if (engine.getState().awaitingContinue) engine.continueAfterReview();
     }
   } finally {
     Math.random = orig;
@@ -94,6 +96,32 @@ describe('GameEngine — new lifecycle', () => {
     const orig = Math.random; Math.random = () => 0.99;
     engine.completeMinigame(dieResult());
     Math.random = orig;
+    engine.continueAfterReview();
+    expect(engine.getState().screen).toBe('method-select');
+  });
+
+  it('completeMinigame holds a review beat; continueAfterReview advances to method-select', () => {
+    engine.startTurn('self');
+    const idx = engine.getState().availableMethods.findIndex((m) => m !== 'happening');
+    if (idx === -1) return;
+    engine.selectMethod(idx);
+    if (engine.getState().screen !== 'minigame') return;
+    const orig = Math.random; Math.random = () => 0.99;
+    engine.completeMinigame(dieResult());
+    Math.random = orig;
+    // Review beat: result committed, but the screen has NOT advanced.
+    expect(engine.getState().awaitingContinue).toBe(true);
+    expect(engine.getState().screen).toBe('minigame');
+    expect(engine.getState().turnResults.length).toBe(1);
+    // Continue advances.
+    engine.continueAfterReview();
+    expect(engine.getState().awaitingContinue).toBe(false);
+    expect(engine.getState().screen).toBe('method-select');
+  });
+
+  it('continueAfterReview is a no-op when not awaiting', () => {
+    engine.startTurn('self');
+    expect(() => engine.continueAfterReview()).not.toThrow();
     expect(engine.getState().screen).toBe('method-select');
   });
 
@@ -198,9 +226,12 @@ describe('GameEngine — dispatch effects', () => {
     expect(engine.getState().eventQueue.length).toBeGreaterThan(0);
     expect(engine.getState().screen).toBe('minigame');
 
-    // Draining the batch runs the deferred transition.
+    // Draining the batch runs the deferred transition — which is now the review beat.
     engine.finishEventBatch();
     expect(engine.getState().eventQueue.length).toBe(0);
+    expect(engine.getState().awaitingContinue).toBe(true);
+    expect(engine.getState().screen).toBe('minigame');
+    engine.continueAfterReview();
     expect(engine.getState().screen).toBe('method-select');
     expect(die).toBeDefined();
   });
@@ -212,15 +243,16 @@ describe('GameEngine — dispatch effects', () => {
     engine.forceEffects(['chaos-second-result'], true);
     engine.completeMinigame({ type: 'd20', result: 5, threshold: 'low', interpretation: '',
       tags: [], themes: [], dimensions: { favorability: 0, certainty: 0, volatility: 0 }, modifierRoles: [] } as any);
-    engine.finishEventBatch(); // drain the deferred reading-1 transition
+    engine.finishEventBatch(); // drain the deferred reading-1 batch → review beat
     // Complete the remaining readings to reach the final synthesis + RunRecord.
     while (engine.getState().screen !== 'result') {
+      if (engine.getState().awaitingContinue) { engine.continueAfterReview(); continue; }
       const methods = engine.getState().availableMethods;
       const idx = methods.findIndex((m) => m !== 'happening');
       engine.selectMethod(idx);
       engine.completeMinigame({ type: 'd20', result: 5, threshold: 'low', interpretation: '',
         tags: [], themes: [], dimensions: { favorability: 0, certainty: 0, volatility: 0 }, modifierRoles: [] } as any);
-      engine.finishEventBatch();
+      if (engine.getState().eventQueue.length > 0) engine.finishEventBatch();
     }
     const hist = engine.getState().history;
     const last = hist[hist.length - 1];

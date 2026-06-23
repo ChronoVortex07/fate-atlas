@@ -7,8 +7,8 @@ import CardSigil from '../cards/CardSigil';
 
 const TABLE_CARD_WIDTH = 58; // px per card face
 const TABLE_OVERLAP = 16;   // px overlap between adjacent cards
-const FAN_RADIUS = 200;     // px — hover fan-out detection radius
-const MAX_FAN_OFFSET = 32;  // px — max fan-out displacement
+const FAN_RADIUS = 140;        // px — proximity gate for gap expansion
+const MAX_GAP_EXPANSION = 26;  // px — max extra width added to a single gap
 
 type FanState = { centerX: number; active: boolean };
 
@@ -162,25 +162,26 @@ export default function TarotMinigame() {
     // first card's left edge offset from container center
     const startOffset = -totalSpan / 2;
 
-    return activeTableCards.map((card) => {
-      // default position of this card's left edge from container center
+    // Each card's default center in absolute container coordinates (ascending).
+    const centers = activeTableCards.map((card) => {
       const defaultLeftOffset = startOffset + card.originIndex * cardStep;
-      // card center in absolute container coordinates:
-      const cardCenterAbs = containerWidth / 2 + defaultLeftOffset + TABLE_CARD_WIDTH / 2;
+      return containerWidth / 2 + defaultLeftOffset + TABLE_CARD_WIDTH / 2;
+    });
 
-      let offsetX = 0;
+    const offsets = fan.active
+      ? computeFanOffsets(centers, fan.centerX, { radius: FAN_RADIUS, maxGapExpansion: MAX_GAP_EXPANSION })
+      : centers.map(() => 0);
+
+    return activeTableCards.map((card, i) => {
+      const defaultLeftOffset = startOffset + card.originIndex * cardStep;
+      const cardCenterAbs = centers[i];
+      const offsetX = offsets[i];
       let scale = 1;
       if (fan.active) {
-        const dx = cardCenterAbs - fan.centerX;
-        const dist = Math.abs(dx);
-        if (dist < FAN_RADIUS) {
-          const t = 1 - dist / FAN_RADIUS;
-          // push cards AWAY from cursor — sign of dx determines direction
-          offsetX = (dx > 0 ? 1 : dx < 0 ? -1 : 0) * MAX_FAN_OFFSET * t;
-          scale = 1 + 0.06 * t;
-        }
+        const dist = Math.abs(cardCenterAbs - fan.centerX);
+        if (dist < FAN_RADIUS) scale = 1 + 0.06 * (1 - dist / FAN_RADIUS);
       }
-      return { cardId: card.cardId, originIndex: card.originIndex, defaultLeftOffset, offsetX, scale };
+      return { cardId: card.cardId, originIndex: card.originIndex, defaultLeftOffset, offsetX, scale, cardCenterAbs };
     });
   }, [draft.table, fan, containerWidth]);
 
@@ -192,6 +193,15 @@ export default function TarotMinigame() {
 
   // ── Render ──
   const activeTableCards = draft.table.filter((t): t is TableCard => t !== null);
+
+  // During the review beat the screen stays mounted in the committing phase.
+  // Surface the committed Past/Present/Future faces face-up in the hand row.
+  const committedSlot =
+    state.activeSlotIndex !== null ? state.turnResults[state.activeSlotIndex] : undefined;
+  const committedSpread =
+    draft.phase === 'committing' && committedSlot && committedSlot.type === 'tarot'
+      ? committedSlot.spread ?? null
+      : null;
 
   return (
     <motion.div style={containerStyle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -265,7 +275,7 @@ export default function TarotMinigame() {
                       marginLeft: `${-TABLE_CARD_WIDTH / 2}px`,
                       width: `${TABLE_CARD_WIDTH}px`,
                       transform: `scale(${scale})`,
-                      zIndex: cardIndexZ(card.originIndex, fan),
+                      zIndex: cardIndexZ(d?.cardCenterAbs ?? 0, fan),
                       background: card.faceUp ? '#0d1220' : '#080d18',
                       borderColor: card.faceUp ? '#7b9ec7' : '#1a2440',
                       cursor: handFull ? 'default' : 'pointer',
@@ -333,6 +343,7 @@ export default function TarotMinigame() {
             {(['Past', 'Present', 'Future'] as const).map((label, i) => {
               const card = draft.hand[i];
               const isReturning = animatingReturn === i;
+              const revealed = committedSpread?.[i]?.card;
               return (
                 <div
                   key={label}
@@ -342,7 +353,21 @@ export default function TarotMinigame() {
                 >
                   <div style={handLabelStyle}>{label}</div>
                   <AnimatePresence mode="wait">
-                    {card ? (
+                    {revealed ? (
+                      <motion.div
+                        key={`revealed-${revealed.id}-${i}`}
+                        style={{ ...handCardStyle, cursor: 'default', borderColor: '#7b9ec7' }}
+                        initial={{ opacity: 0, rotateY: 90 }}
+                        animate={{ opacity: 1, rotateY: 0 }}
+                        transition={{ type: 'spring', stiffness: 260, damping: 22, delay: i * 0.12 }}
+                      >
+                        <CardSigil card={revealed} size={22} color="#7b9ec7" />
+                        <div style={handCardNameStyle}>{revealed.name}</div>
+                        <div style={handCardOrientStyle}>
+                          {revealed.orientation === 'upright' ? '▲ Upright' : '▼ Reversed'}
+                        </div>
+                      </motion.div>
+                    ) : card ? (
                       <div
                         key={`hand-wrap-${card.cardId}-${card.tableOriginIndex}`}
                         draggable
@@ -462,13 +487,62 @@ export default function TarotMinigame() {
 
 // ── Helpers ──
 
-/** Cards closer to cursor get higher z-index, so they layer above their neighbors during fan-out. */
-function cardIndexZ(originIndex: number, fan: FanState): number {
-  // When fan is inactive, tiebreak by natural order.
-  if (!fan.active) return originIndex;
-  // We don't have per-card distance here; return natural order.
-  // The absolute positioning + origin-based z-index gives a stable stack.
-  return originIndex;
+interface FanParams {
+  radius: number;          // falloff width in px (proximity gate)
+  maxGapExpansion: number; // max extra px added to a single gap
+}
+
+/**
+ * Gap-expansion fan-out. The cluster of cards near the cursor breathes open:
+ * gaps widen most where they are nearest the cursor, so the card under the
+ * pointer barely moves and becomes easy to click. Order is always preserved.
+ * cardCenters must be ascending. Returns the signed x-delta for each card.
+ */
+export function computeFanOffsets(
+  cardCenters: number[],
+  cursorX: number,
+  { radius, maxGapExpansion }: FanParams,
+): number[] {
+  const n = cardCenters.length;
+  if (n === 0) return [];
+  if (n === 1) return [0];
+
+  // Smooth Gaussian falloff, zero beyond the radius (enforces max repel distance).
+  const falloff = (u: number) => (u <= 1 ? Math.exp(-3 * u * u) : 0);
+
+  // Expansion of each adjacent gap (length n-1), gated by its midpoint's distance.
+  const gapExpansion: number[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    const midpoint = (cardCenters[i] + cardCenters[i + 1]) / 2;
+    const u = Math.abs(midpoint - cursorX) / radius;
+    gapExpansion.push(maxGapExpansion * falloff(u));
+  }
+
+  // Each card's offset is the signed sum of the expansions of gaps that lie
+  // between it and the cursor (cursor-anchored integration).
+  const offsets: number[] = new Array(n).fill(0);
+  for (let k = 0; k < n; k++) {
+    let offset = 0;
+    for (let i = 0; i < n - 1; i++) {
+      const midpoint = (cardCenters[i] + cardCenters[i + 1]) / 2;
+      // Card k right of gap i, cursor left of gap i → push card right.
+      if (k >= i + 1 && cursorX < midpoint) offset += gapExpansion[i];
+      // Card k left of gap i, cursor right of gap i → push card left.
+      else if (k <= i && cursorX > midpoint) offset -= gapExpansion[i];
+    }
+    offsets[k] = offset;
+  }
+
+  // Re-center: subtract the mean so the cluster's center of mass stays put.
+  const mean = offsets.reduce((s, v) => s + v, 0) / n;
+  return offsets.map((o) => o - mean);
+}
+
+/** Cards closer to the cursor get a higher z-index so the opened-up card layers above its neighbors. */
+function cardIndexZ(cardCenterAbs: number, fan: FanState): number {
+  if (!fan.active) return 1;
+  const dist = Math.abs(cardCenterAbs - fan.centerX);
+  return Math.max(1, Math.round(1000 - dist));
 }
 
 // ── Styles ──
