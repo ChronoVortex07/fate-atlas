@@ -17,9 +17,10 @@ describe('resolveSigil (icon keys)', () => {
       const spec = resolveSigil(face({ id: m.id, arcana: 'major' }));
       expect(spec.kind).toBe('major');
       if (spec.kind === 'major') {
-        expect(MAJOR_ICON_KEYS[m.id]).toBeDefined();
+        const key = m.id as keyof typeof MAJOR_ICON_KEYS;
+        expect(MAJOR_ICON_KEYS[key]).toBeDefined();
         expect(spec.icon.length).toBeGreaterThan(0);
-        expect(spec.icon).toBe(MAJOR_ICON_KEYS[m.id]);
+        expect(spec.icon).toBe(MAJOR_ICON_KEYS[key]);
       }
     }
   });
@@ -34,7 +35,7 @@ describe('resolveSigil (icon keys)', () => {
       const spec = resolveSigil(face({ id: m.id, arcana: 'minor', suit: m.suit, rank: m.rank }));
       expect(spec.kind).toBe('minor');
       if (spec.kind === 'minor') {
-        expect(spec.icon).toBe(SUIT_ICON_KEYS[m.suit!]);
+        expect(spec.icon).toBe(SUIT_ICON_KEYS[m.suit! as keyof typeof SUIT_ICON_KEYS]);
         expect(spec.icon.length).toBeGreaterThan(0);
         expect(spec.rank.court).toBe(typeof m.rank !== 'number');
         expect(spec.rank.label).toBe(rankLabel(m.rank!));

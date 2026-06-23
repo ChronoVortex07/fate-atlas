@@ -1,7 +1,6 @@
 import type { TarotResult, TarotCardFace } from '../engine/types';
 
 type AnyCard = TarotResult | TarotCardFace;
-type Suit = 'wands' | 'cups' | 'swords' | 'pentacles';
 type Rank = number | 'page' | 'knight' | 'queen' | 'king';
 
 // Icon keys are the chosen react-icons/gi export names. CardSigil maps each to a
