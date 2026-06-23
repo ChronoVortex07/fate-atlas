@@ -194,6 +194,15 @@ export default function TarotMinigame() {
   // ── Render ──
   const activeTableCards = draft.table.filter((t): t is TableCard => t !== null);
 
+  // During the review beat the screen stays mounted in the committing phase.
+  // Surface the committed Past/Present/Future faces face-up in the hand row.
+  const committedSlot =
+    state.activeSlotIndex !== null ? state.turnResults[state.activeSlotIndex] : undefined;
+  const committedSpread =
+    draft.phase === 'committing' && committedSlot && committedSlot.type === 'tarot'
+      ? committedSlot.spread ?? null
+      : null;
+
   return (
     <motion.div style={containerStyle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <style>{`.snap-scroll-row::-webkit-scrollbar{display:none}`}</style>
@@ -334,6 +343,7 @@ export default function TarotMinigame() {
             {(['Past', 'Present', 'Future'] as const).map((label, i) => {
               const card = draft.hand[i];
               const isReturning = animatingReturn === i;
+              const revealed = committedSpread?.[i]?.card;
               return (
                 <div
                   key={label}
@@ -343,7 +353,21 @@ export default function TarotMinigame() {
                 >
                   <div style={handLabelStyle}>{label}</div>
                   <AnimatePresence mode="wait">
-                    {card ? (
+                    {revealed ? (
+                      <motion.div
+                        key={`revealed-${revealed.id}-${i}`}
+                        style={{ ...handCardStyle, cursor: 'default', borderColor: '#7b9ec7' }}
+                        initial={{ opacity: 0, rotateY: 90 }}
+                        animate={{ opacity: 1, rotateY: 0 }}
+                        transition={{ type: 'spring', stiffness: 260, damping: 22, delay: i * 0.12 }}
+                      >
+                        <CardSigil card={revealed} size={22} color="#7b9ec7" />
+                        <div style={handCardNameStyle}>{revealed.name}</div>
+                        <div style={handCardOrientStyle}>
+                          {revealed.orientation === 'upright' ? '▲ Upright' : '▼ Reversed'}
+                        </div>
+                      </motion.div>
+                    ) : card ? (
                       <div
                         key={`hand-wrap-${card.cardId}-${card.tableOriginIndex}`}
                         draggable

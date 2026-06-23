@@ -97,6 +97,24 @@ export default function GameTable() {
       {state.eventQueue.length > 0 && (
         <InteractionSequencer />
       )}
+      {state.screen === 'minigame' && state.awaitingContinue && state.eventQueue.length === 0 && (
+        <ContinueBar />
+      )}
+    </div>
+  );
+}
+
+function ContinueBar() {
+  const { engine } = useGameEngine();
+  return (
+    <div style={continueBarStyle}>
+      <button
+        type="button"
+        style={continueBtnStyle}
+        onClick={() => engine.continueAfterReview()}
+      >
+        Continue →
+      </button>
     </div>
   );
 }
@@ -135,4 +153,29 @@ const centerStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   overflow: 'hidden',
+};
+
+const continueBarStyle: React.CSSProperties = {
+  position: 'absolute',
+  bottom: '24px',
+  left: '50%',
+  transform: 'translateX(-50%)',
+  zIndex: 15,
+  display: 'flex',
+  justifyContent: 'center',
+  pointerEvents: 'auto',
+};
+
+const continueBtnStyle: React.CSSProperties = {
+  fontFamily: "'Cormorant Garamond', serif",
+  fontWeight: 600,
+  fontSize: '0.95rem',
+  letterSpacing: '0.1em',
+  color: '#c8d8f0',
+  background: '#0d1220',
+  border: '1px solid #d4a854',
+  borderRadius: '24px',
+  padding: '0.6rem 2rem',
+  cursor: 'pointer',
+  outline: 'none',
 };
