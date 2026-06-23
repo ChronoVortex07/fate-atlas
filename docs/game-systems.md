@@ -213,6 +213,12 @@ When the player chooses Tarot, a **card-drafting minigame** begins:
 The draft engine state (`TarotDraftState`) is managed entirely on `GameState.minigameState`.
 All mutations route through `GameEngine` methods that call `notify()`.
 
+9. **Review beat** — after a spread commits and any meta-interactions finish narrating, the
+   screen holds a **review beat** showing the face-up Past/Present/Future faces; play advances
+   only on an explicit **Continue** click. This gate (`GameState.awaitingContinue`, cleared by
+   `GameEngine.continueAfterReview()`) applies to all three minigames and to the final commit
+   before the Result page.
+
 ### 4c. New event triggers
 
 The draft minigame introduces seven new event dispatch points for meta-interactions:
@@ -255,6 +261,19 @@ method) and integrates with existing responders without structural changes. Dime
 averaging and theme capping prevent the spread from overwhelming the reading with noise;
 the preserved spread array enables the spread-internal interaction channel without
 breaking cross-slot interactions that match on the consolidated result.
+
+**Synthesis profiles over atomic signals, not the consolidated averages.** To avoid the
+double-average that washed a balanced spread out to a flat "balanced" verdict, the
+`ReadingPlanner.aggregate` step expands results into **atomic signals** — each individual
+card in a multi-card spread, each die, each hexagram, each astral cast — and profiles the
+reading over those. Favorability is **magnitude-weighted** (`Σ v·|v| / Σ|v|`) so strong
+pulls dominate rather than cancelling, and the planner surfaces the **strongest favorable
+and adverse poles** (`strongestFavor` / `strongestAdverse`). `NarrativeAssembler` then uses
+a **narrower symmetric favorability band** (`high ≥ +0.5`, `low ≤ −0.5`), **names the
+opposing poles** when a neutral net hides opposed forces, emits one **per-position line**
+per spread (instead of re-listing the spread inside the modifier frames), and narrates each
+result under **exactly one** modifier role (disjoint frames — the role where it ranks
+strongest).
 
 ### 4f. SVG sigils
 
