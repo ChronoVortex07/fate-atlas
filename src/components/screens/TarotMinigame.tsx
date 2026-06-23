@@ -4,6 +4,7 @@ import { useGameEngine } from '../../hooks/useGameEngine';
 import type { TarotDraftState, TableCard } from '../../engine/types';
 import { DECK_BY_ID } from '../../data/tarot';
 import CardSigil from '../cards/CardSigil';
+import CardBack from '../cards/CardBack';
 
 const TABLE_CARD_WIDTH = 58; // px per card face
 const TABLE_OVERLAP = 16;   // px overlap between adjacent cards
@@ -223,9 +224,13 @@ export default function TarotMinigame() {
         {/* Deck visual */}
         <motion.div style={deckStyle} layout>
           <div style={deckStackStyle}>
-            {draft.deck.length > 0 && <div style={deckCardBack(0)} />}
             {draft.deck.length > 1 && <div style={deckCardBack(1)} />}
             {draft.deck.length > 2 && <div style={deckCardBack(2)} />}
+            {draft.deck.length > 0 && (
+              <div style={{ ...deckCardBack(0), display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none' }}>
+                <CardBack size={46} />
+              </div>
+            )}
           </div>
           <motion.span
             key={`count-${draft.deck.length}`}
@@ -311,10 +316,7 @@ export default function TarotMinigame() {
                         </div>
                       </>
                     ) : (
-                      <>
-                        <span style={tableRuneStyle}>ᚠᚢᚦ</span>
-                        <span style={tableStarStyle}>✧</span>
-                      </>
+                      <CardBack size={44} />
                     )}
                   </motion.div>
                 );
@@ -398,10 +400,7 @@ export default function TarotMinigame() {
                             </div>
                           </>
                         ) : (
-                          <>
-                            <span style={handRuneStyle}>ᚠᚢᚦᚨ</span>
-                            <span style={handStarStyle}>✧</span>
-                          </>
+                          <CardBack size={64} />
                         )}
 
                         {/* Affordances: peek + return-to-deck */}
@@ -599,14 +598,6 @@ const tableCardStyle: React.CSSProperties = {
   gap: '0.2rem', cursor: 'pointer', userSelect: 'none',
 };
 
-const tableRuneStyle: React.CSSProperties = {
-  fontFamily: "'Noto Sans', sans-serif", fontSize: '0.4rem', color: '#5b7290',
-  letterSpacing: '0.2em',
-};
-
-const tableStarStyle: React.CSSProperties = {
-  fontSize: '0.9rem', color: '#9b6bb0', opacity: 0.5,
-};
 
 const tableCardNameStyle: React.CSSProperties = {
   fontFamily: "'Cormorant Garamond', serif", fontWeight: 600,
@@ -659,13 +650,6 @@ const handCardOrientStyle: React.CSSProperties = {
   fontSize: '0.5rem', color: '#7b9ec7', letterSpacing: '0.05em',
 };
 
-const handRuneStyle: React.CSSProperties = {
-  fontFamily: "'Noto Sans', sans-serif", fontSize: '0.5rem', color: '#5b7290', letterSpacing: '0.25em',
-};
-
-const handStarStyle: React.CSSProperties = {
-  fontSize: '1.2rem', color: '#9b6bb0', opacity: 0.5,
-};
 
 const handAffordanceStyle: React.CSSProperties = {
   position: 'absolute', bottom: '4px', display: 'flex', gap: '0.25rem',
