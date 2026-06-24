@@ -158,15 +158,17 @@ export function createCelestialScene(opts: {
     )) omens.push('crowned-conjunction');
     if (ticks >= SETTLE_TICK_CAP) omens.push('veiled-oracle');
 
-    const cast: AstralCast = target ?? {
-      planet: pFace as PlanetId,
-      sign: sFace as SignId,
-      planetHouse: sectorOf(pPos.x, pPos.z),
-      signHouse: sectorOf(sPos.x, sPos.z),
-      omens,
-    };
-    // When target-driven, still attach physically-derived omens.
-    if (target) cast.omens = omens;
+    // Target-driven (debug): preserve the staged omens and add any
+    // physically-derived ones (deduped). Real casts build from the dice.
+    const cast: AstralCast = target
+      ? { ...target, omens: Array.from(new Set([...target.omens, ...omens])) }
+      : {
+          planet: pFace as PlanetId,
+          sign: sFace as SignId,
+          planetHouse: sectorOf(pPos.x, pPos.z),
+          signHouse: sectorOf(sPos.x, sPos.z),
+          omens,
+        };
 
     onSettled(cast);
   };
