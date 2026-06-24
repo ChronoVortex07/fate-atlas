@@ -10,6 +10,28 @@ interface Props {
   results: SlotResult[];
 }
 
+// Movement (px) past which a pointer gesture counts as a drag rather than a tap.
+// Generous enough for a finger tap's natural drift on touch screens.
+const TAP_SLOP = 10;
+
+// Mouse fires no stray click after a gesture, but touch/pen synthesize a
+// compatibility `click` ~after `pointerup`. When a tap opens the detail modal,
+// that ghost click would otherwise land on the freshly-mounted backdrop and
+// close it instantly. Swallow exactly one upcoming click in the capture phase
+// (before it reaches the backdrop), with a timeout in case none arrives.
+function swallowNextClick(): void {
+  if (typeof window === 'undefined') return;
+  let timer: ReturnType<typeof setTimeout>;
+  const swallow = (ev: Event) => {
+    ev.stopPropagation();
+    ev.preventDefault();
+    window.removeEventListener('click', swallow, true);
+    clearTimeout(timer);
+  };
+  window.addEventListener('click', swallow, true);
+  timer = setTimeout(() => window.removeEventListener('click', swallow, true), 500);
+}
+
 export default function ConstellationFan({ results }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [rotation, setRotation] = useState(0);
@@ -75,7 +97,7 @@ export default function ConstellationFan({ results }: Props) {
     const d = dragRef.current;
     if (!d) return;
     const dx = e.clientX - d.startX;
-    if (Math.abs(dx) > 6) movedRef.current = true;
+    if (Math.abs(dx) > TAP_SLOP) movedRef.current = true;
     setRotation(d.startRot - dx / PX_PER_CARD);
   }, []);
 
@@ -87,7 +109,15 @@ export default function ConstellationFan({ results }: Props) {
     dragRef.current = null;
     setDragging(false);
     setRotation((r) => Math.round(r)); // snap-to-front
-    if (wasTap && e.type !== 'pointercancel') setDetailIndex(i);
+    if (wasTap && e.type !== 'pointercancel') {
+      // Touch/pen synthesize a compatibility `click` shortly after `pointerup`.
+      // The detail modal mounts synchronously below, so that ghost click would
+      // land on the freshly-mounted backdrop and close the modal instantly
+      // (a real mouse fires no such stray click). Swallow the one stray click
+      // before it reaches the backdrop. See ghost-click handling in repo notes.
+      if (e.pointerType !== 'mouse') swallowNextClick();
+      setDetailIndex(i);
+    }
   }, []);
 
   const onWheelSpin = useCallback((e: React.WheelEvent) => {

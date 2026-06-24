@@ -72,12 +72,17 @@ export default function GameTable() {
       {historyOpen && <HistoryModal onClose={() => setHistoryOpen(false)} />}
       <div style={{
         ...centerStyle,
-        ...(showTableau ? { paddingBottom: '100px' } : {}),
         ...(state.eventQueue.length > 0 ? { pointerEvents: 'none' as const } : {}),
       }}>
-        <AnimatePresence mode="wait">
-          {renderCenter()}
-        </AnimatePresence>
+        <div style={{
+          ...centerInnerStyle,
+          // Reserve room for the constellation fan that floats at the bottom.
+          ...(showTableau ? { paddingBottom: '100px' } : {}),
+        }}>
+          <AnimatePresence mode="wait">
+            {renderCenter()}
+          </AnimatePresence>
+        </div>
       </div>
       <InteractionFocusProvider>
         {showTableau && (
@@ -137,12 +142,27 @@ const historyBtnStyle: React.CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
+// Scroll container. The inner wrapper's `min-height: 100%` makes it exactly fill
+// the viewport when the screen is short (so `justify-content: center` vertically
+// centers it), but grow to its content's height when the screen is tall — at
+// which point there is no free space to center and the content simply starts at
+// the top and scrolls. This keeps the bottom (e.g. the tarot commit buttons)
+// reachable on short mobile screens instead of being clipped. min-height:0 lets
+// this flex child actually shrink so its own overflow can scroll.
 const centerStyle: React.CSSProperties = {
   flex: 1,
+  minHeight: 0,
+  overflowY: 'auto',
+  overflowX: 'hidden',
+};
+
+const centerInnerStyle: React.CSSProperties = {
+  minHeight: '100%',
+  boxSizing: 'border-box',
   display: 'flex',
+  flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  overflow: 'hidden',
 };
 
 const continueBarStyle: React.CSSProperties = {

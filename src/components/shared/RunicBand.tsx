@@ -25,7 +25,12 @@ export default function RunicBand({
         letterSpacing: '0.5em',
         opacity,
         fontFamily: "'Cormorant Garamond', serif",
-        wordBreak: 'break-all',
+        // A single decorative rule: keep it to one line and clip the overflow so
+        // it fills whatever width is available instead of wrapping into a tall
+        // block of runes on narrow (mobile) screens.
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        maxWidth: '100%',
         lineHeight: 1.4,
         userSelect: 'none',
         textAlign: 'center',

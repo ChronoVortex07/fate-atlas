@@ -90,13 +90,17 @@ const titleSectionStyle: React.CSSProperties = {
 };
 
 const titleStyle: React.CSSProperties = {
-  fontSize: 'clamp(2.5rem, 8vw, 5rem)',
+  // Min kept small enough that the full title fits on narrow phones without
+  // clipping; letter-spacing scales with width so it stays generous on desktop
+  // (max 5rem / 0.3em) but tightens on mobile.
+  fontSize: 'clamp(1.9rem, 8vw, 5rem)',
   color: '#c8d8f0',
   fontFamily: "'Cormorant Garamond', serif",
   fontWeight: 700,
-  letterSpacing: '0.3em',
+  letterSpacing: 'clamp(0.12em, 1.2vw, 0.3em)',
   margin: 0,
   lineHeight: 1.1,
+  maxWidth: '100%',
   textShadow: '0 0 40px rgba(200, 216, 240, 0.15)',
 };
 
