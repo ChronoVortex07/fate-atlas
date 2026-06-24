@@ -23,8 +23,9 @@ interface FanCardProps {
   wheelZ?: number;
   glowing?: boolean;      // meta-interaction spotlight
   instant?: boolean;      // disable the spring while actively dragging (1:1 follow)
-  // Interaction — wired by the wheel container.
-  onSelect?: () => void;
+  // Interaction — wired by the wheel container. Tap-to-inspect is resolved in
+  // pointerup (drag-movement aware) rather than a separate click for reliability
+  // under pointer capture.
   onPointerDown?: (e: React.PointerEvent) => void;
   onPointerMove?: (e: React.PointerEvent) => void;
   onPointerUp?: (e: React.PointerEvent) => void;
@@ -118,7 +119,6 @@ export default function FanCard({
   wheelZ,
   glowing,
   instant,
-  onSelect,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -202,7 +202,6 @@ export default function FanCard({
       onPointerUp={wheel ? onPointerUp : undefined}
       onPointerCancel={wheel ? onPointerUp : undefined}
       onWheel={wheel ? onWheelSpin : undefined}
-      onClick={wheel ? onSelect : undefined}
       style={{
         position: 'absolute',
         bottom: 0,

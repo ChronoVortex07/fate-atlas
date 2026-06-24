@@ -79,21 +79,20 @@ export default function ConstellationFan({ results }: Props) {
     setRotation(d.startRot - dx / PX_PER_CARD);
   }, []);
 
-  const onCardPointerUp = useCallback(() => {
+  // Resolve tap vs drag here (not via onClick) so it stays reliable under
+  // pointer capture: a release with no meaningful movement opens that card.
+  const onCardPointerUp = useCallback((e: React.PointerEvent, i: number) => {
     if (!dragRef.current) return;
+    const wasTap = !movedRef.current;
     dragRef.current = null;
     setDragging(false);
     setRotation((r) => Math.round(r)); // snap-to-front
+    if (wasTap && e.type !== 'pointercancel') setDetailIndex(i);
   }, []);
 
   const onWheelSpin = useCallback((e: React.WheelEvent) => {
     const delta = e.deltaX !== 0 ? e.deltaX : e.deltaY;
     setRotation((r) => r + delta / 400);
-  }, []);
-
-  const onCardSelect = useCallback((i: number) => {
-    if (movedRef.current) return; // it was a drag, not a tap
-    setDetailIndex(i);
   }, []);
 
   const handleToggle = useCallback(() => {
@@ -263,10 +262,9 @@ export default function ConstellationFan({ results }: Props) {
               wheelZ={expanded ? slot.zIndex : undefined}
               glowing={expanded && isGlowing(i)}
               instant={dragging}
-              onSelect={() => onCardSelect(i)}
               onPointerDown={onCardPointerDown}
               onPointerMove={onCardPointerMove}
-              onPointerUp={onCardPointerUp}
+              onPointerUp={(e) => onCardPointerUp(e, i)}
               onWheelSpin={onWheelSpin}
             />
           );
