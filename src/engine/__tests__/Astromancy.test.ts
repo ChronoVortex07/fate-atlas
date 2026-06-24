@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { AstralResult, AstralCast } from '../types';
-import { PLANETS, SIGNS, HOUSES, DIGNITY, aspectBetween, consolidateCast, dignityOf, drawAstralCast } from '../../data/astromancy';
+import { PLANETS, SIGNS, HOUSES, DIGNITY, NATURAL_ZODIAC_BY_HOUSE, aspectBetween, consolidateCast, dignityOf, drawAstralCast } from '../../data/astromancy';
 import { DIVINATION_PROFILES } from '../../data/divination-profiles';
 import { TurnOrchestrator } from '../TurnOrchestrator';
 import { EventBus } from '../EventBus';
@@ -229,5 +229,13 @@ describe('astral registration', () => {
     const o = new TurnOrchestrator(new EventBus());
     const r = o.drawSingleResult('astral', { chaos: 0, order: 0 });
     expect(r.type).toBe('astral');
+  });
+});
+
+describe('NATURAL_ZODIAC_BY_HOUSE', () => {
+  it('maps the 12 houses to the zodiac in order', () => {
+    expect(NATURAL_ZODIAC_BY_HOUSE).toHaveLength(12);
+    expect(NATURAL_ZODIAC_BY_HOUSE[0]).toBe('aries');   // House 1
+    expect(NATURAL_ZODIAC_BY_HOUSE[11]).toBe('pisces'); // House 12
   });
 });
