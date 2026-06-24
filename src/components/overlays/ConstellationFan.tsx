@@ -118,6 +118,15 @@ export default function ConstellationFan({ results, activeSlots }: Props) {
 
   if (results.length === 0) return null;
 
+  // Collapsed footprint — sized to the FULL visible stack so the whole pile is
+  // tappable (the cards translate upward out of a bottom-anchored box, so a
+  // short wrapper would leave the top cards outside the hit target).
+  const collapsedCardH = isDesktop ? 116 : 72;
+  const collapsedStep = isDesktop ? 14 : 6;
+  const collapsedBase = isDesktop ? 60 : 36;
+  const collapsedStackH = collapsedBase + Math.max(0, results.length - 1) * collapsedStep + collapsedCardH + 12;
+  const collapsedStackW = (isDesktop ? 80 : 50) + 24;
+
   return (
     <>
       {/* Dimming overlay when expanded */}
@@ -207,13 +216,13 @@ export default function ConstellationFan({ results, activeSlots }: Props) {
         style={{
           position: 'absolute',
           bottom: isDesktop ? '14px' : '56px',
-          right: isDesktop ? undefined : '14px',
-          left: isDesktop ? '50%' : undefined,
-          transform: isDesktop ? 'translateX(-50%)' : undefined,
-          // Collapsed: footprint hugs the real card stack so it can't cover the method grid.
-          // Expanded: span the area so polar-positioned cards have room.
-          width: expanded ? (isDesktop ? '100%' : '220px') : (isDesktop ? '120px' : '70px'),
-          height: expanded ? (isDesktop ? '320px' : '220px') : (isDesktop ? '130px' : '90px'),
+          // Collapsed: bottom-right on both breakpoints (clears centred minigame UI).
+          // Expanded: centred on desktop so the wheel has symmetric room.
+          right: expanded ? (isDesktop ? undefined : '14px') : (isDesktop ? '20px' : '14px'),
+          left: expanded && isDesktop ? '50%' : undefined,
+          transform: expanded && isDesktop ? 'translateX(-50%)' : undefined,
+          width: expanded ? (isDesktop ? '100%' : '220px') : `${collapsedStackW}px`,
+          height: expanded ? (isDesktop ? '320px' : '220px') : `${collapsedStackH}px`,
           zIndex: expanded ? 16 : 8,
           cursor: !expanded ? 'pointer' : undefined,
           WebkitTapHighlightColor: 'transparent',
@@ -251,9 +260,7 @@ export default function ConstellationFan({ results, activeSlots }: Props) {
           style={{
             position: 'absolute',
             bottom: '4px',
-            left: isDesktop ? '50%' : undefined,
-            right: isDesktop ? undefined : '14px',
-            transform: isDesktop ? 'translateX(-50%)' : undefined,
+            right: isDesktop ? '20px' : '14px',
             zIndex: 9,
             pointerEvents: 'none',
             opacity: 0.4,
