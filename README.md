@@ -39,17 +39,19 @@ npm run dev        # → http://localhost:5173
 | **Tarot** | 78 cards (22 Major Arcana + 56 Minor Arcana by suit×rank), three-card Past/Present/Future spread consolidated into one result, upright or reversed per face. Complete standardized geometric **sigil system** — 22 bespoke major line-art sigils + composed minors (suit emblem + rank cartouche, court crowns) — with a constellation-crest card back, replacing the old emoji/rune placeholders | `major-arcana` `minor-arcana` `reversible` `fool-archetype` `suit-*` `element-*` ... |
 | **d20 Dice** | 1d20 roll, 5-tier thresholds (critical-low → critical-high) | `roll` `numeric` `threshold` |
 | **I Ching** | 64 hexagrams (King Wen), authentic 3-coin casting per line. Changing lines (old yang/yin) transform the **primary hexagram** into a **relating hexagram**. Affinities gate whether the player chooses which to commit (Will ascendant), fate chooses (Fate ascendant), or a re-cast is offered (unaligned). The committed hexagram sets a lingering **Mandate of Change** (per-affinity multiplier on all future shift magnitude) that decays 40%/commit toward ×1.0. | `draw` `random` `binary` `governing-primary\|relating` · `changing-lines` `reversible` *(only when changing lines exist)* |
-| **Astromancy** | Planet die + Sign die thrown onto a 12-house zodiac board | `draw` `random` `astral` `planet-<id>` `sign-<id>` `house-<N>` ... |
+| **Astromancy** | Two 3D d12 dice (planet + sign) thrown onto a 12-house zodiac board (board visible before cast) | `draw` `random` `astral` `planet-<id>` `sign-<id>` `house-<N>` ... |
 | **Happenings** | 8 authored cryptic scenes with 2-3 choices each | `event` `choice` `affinity-shift` |
 
 ### Astromancy: Planet-in-Sign-in-House
 
-Two physical dice are thrown onto a 12-house zodiac board. The **Planet die** (12 faces: Sun
-through South Node) lands in a house and contributes the planet's theme and dimension values.
-The **Sign die** (12 faces: Aries through Pisces) lands in a different house; its element and
-modality add dimension leans. The angle between the two landing houses produces an **aspect**
-(conjunction, sextile, square, trine, opposition, or minor), which adds its own dimension
-modifier and theme.
+Two **3D d12 dice** are thrown onto a 12-house zodiac board — the board is **visible before
+casting**, with each slice decorated in natural-zodiac art (CC0 OpenClipart). The **Planet
+die** (12 faces: Sun through South Node) lands in a house and contributes the planet's theme
+and dimension values. The **Sign die** (12 faces: Aries through Pisces) lands in a house; its
+element and modality add dimension leans. The up-most face of each die decides the
+planet/sign; the slice it rests in decides the house. The angle between the two landing houses
+produces an **aspect** (conjunction, sextile, square, trine, opposition, or minor), which adds
+its own dimension modifier and theme.
 
 The reading is expressed as **Planet in Sign, House of \<Arena\>** plus the aspect name.
 
@@ -81,17 +83,19 @@ Eight special conditions are checked when the cast is committed:
 | **The Great Trine** | Jupiter or Venus in a trine aspect | Favor +1.0, harmony theme forced |
 | **The Duel** | Mars in square or opposition | Volatility +1.0, favor −0.5, conflict theme forced |
 | **Saturn's Gate** | Saturn in House 1 or 10 | Certainty +1.0, favor −0.5, authority theme forced |
-| **Conjunction Crowned** | Both dice land in the same house *(omen)* | Dominant dimension amplified +1.0 |
-| **The Veiled Oracle** | A die lands askew on an edge *(omen)* | Certainty −1.0, mystery theme forced |
+| **Conjunction Crowned** | Planet and sign dice settle close together *(omen)* | Dominant dimension amplified +1.0 |
+| **The Veiled Oracle** | Cast fails to settle before the time cap *(omen, timeout-based)* | Certainty −1.0, mystery theme forced |
 | **The Errant Star** | A die flies off the board *(omen)* | A second astral result is spawned |
 
 #### Affinity and the cast
 
 Affinities shape the throw in two ways — as physical forces and as cast modes:
 
-- **Chaos** adds turbulence to the physics (dice scatter wider, more extreme aspects). **Order**
-  centers the dice (smaller separation between landing houses). This is cosmetic; the same
-  influence is baked into the engine-side fallback generator.
+- **Chaos** makes dice bouncier with wider scatter and turbulence (more extreme aspects).
+  **Order** applies gentle centering and a calmer settle — the center vortex is deliberately
+  soft so dice spread across slices rather than clumping at center. **Light/Shadow** introduce
+  lateral drift. This is cosmetic; the same influence is baked into the engine-side fallback
+  generator.
 - **Will dominant** → `choice` mode: two casts are drawn and the player picks one.
 - **Light ascendant** → `favored` mode: two casts drawn; the higher-favorability result is kept automatically.
 - **Shadow ascendant** → `clouded` mode: two casts drawn; the lower-favorability result is kept automatically.
