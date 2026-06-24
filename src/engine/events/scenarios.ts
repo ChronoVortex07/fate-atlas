@@ -2,6 +2,8 @@ import type { AffinityId, SlotResult } from '../types';
 import { defaultAffinityState } from '../../data/affinities';
 import { consolidateSpread, buildFace, DECK_BY_ID } from '../../data/tarot';
 import { consolidateCast } from '../../data/astromancy';
+import { consolidateScatter } from '../../data/runes';
+import type { RuneId, RuneOmenTag, LandedRune } from '../types';
 
 export interface ScenarioStage {
   affinities: Record<AffinityId, number>;
@@ -23,7 +25,19 @@ const atMethodSelect = (s: ScenarioStage) => { s.screen = 'method-select'; };
 const atDice = (s: ScenarioStage) => { s.screen = 'minigame'; s.selectedMethod = 'd20'; };
 const atTarot = (s: ScenarioStage) => { s.screen = 'minigame'; s.selectedMethod = 'tarot'; };
 const atAstral = (s: ScenarioStage) => { s.screen = 'minigame'; s.selectedMethod = 'astral'; };
+const atRune = (s: ScenarioStage) => { s.screen = 'minigame'; s.selectedMethod = 'rune'; };
 const set = (s: ScenarioStage, a: Partial<Record<AffinityId, number>>) => Object.assign(s.affinities, a);
+
+const runeStone = (rune: RuneId, faceUp = true, orientation: LandedRune['orientation'] = 'upright', ring: LandedRune['ring'] = 'heart'): LandedRune =>
+  ({ rune, faceUp, orientation, ring, x: 0, y: 0 });
+const runeSlot = (governing: RuneId, omens: RuneOmenTag[] = [], extra: LandedRune[] = []): SlotResult =>
+  consolidateScatter({ stones: [runeStone(governing), ...extra], governingIndex: 0, omens }) as SlotResult;
+
+const criticalHighDie: SlotResult = {
+  type: 'd20', result: 20, threshold: 'critical-high', interpretation: '',
+  tags: ['critical-high'],
+  themes: [], dimensions: { favorability: 0, certainty: 0, volatility: 0 }, modifierRoles: [],
+} as SlotResult;
 
 const FOOL: SlotResult = {
   type: 'tarot', id: 'fool', name: 'The Fool', number: 0, orientation: 'upright',
@@ -140,6 +154,25 @@ export const DEBUG_SCENARIOS: DebugScenario[] = [
     setup: (s) => { s.screen = 'minigame'; s.selectedMethod = 'iching'; set(s, { order: 90 }); } },
   { id: 'iching-resonant-change', label: 'I Ching: resonant change', group: 'Interaction', forced: ['iching-resonant-change'], isolate: true,
     setup: (s) => { s.screen = 'minigame'; s.selectedMethod = 'iching'; s.slots = [reversibleCardA]; } },
+  // ── Rune scatter ──
+  { id: 'rune-bindrune', label: 'Rune: bindrune', group: 'Rune', forced: ['rune-bindrune'], isolate: true,
+    setup: (s) => { atRune(s); s.slots = [runeSlot('sowilo', ['bindrune'])]; } },
+  { id: 'rune-merkstave-cascade', label: 'Rune: merkstave cascade', group: 'Rune', forced: ['rune-merkstave-cascade'], isolate: true,
+    setup: (s) => { atRune(s); s.slots = [runeSlot('fehu', ['merkstave-cascade'])]; } },
+  { id: 'rune-true-cast', label: 'Rune: true cast', group: 'Rune', forced: ['rune-true-cast'], isolate: true,
+    setup: (s) => { atRune(s); s.slots = [runeSlot('tiwaz', ['true-cast'])]; } },
+  { id: 'rune-silent-field', label: 'Rune: the silent field', group: 'Rune', forced: ['rune-silent-field'], isolate: true,
+    setup: (s) => { atRune(s); s.slots = [runeSlot('mannaz', ['silent-field'])]; } },
+  { id: 'rune-errant', label: 'Rune: the errant rune', group: 'Rune', forced: ['rune-errant'], isolate: true,
+    setup: (s) => { atRune(s); s.slots = [runeSlot('fehu', ['errant-rune'])]; } },
+  { id: 'rune-perthro', label: 'Rune: Perthro spills the cup', group: 'Rune', forced: ['rune-perthro'], isolate: true,
+    setup: (s) => { atRune(s); s.slots = [runeSlot('perthro')]; } },
+  { id: 'rune-hagalaz', label: 'Rune: Hagalaz the hailstone', group: 'Rune', forced: ['rune-hagalaz'], isolate: true,
+    setup: (s) => { atRune(s); s.slots = [runeSlot('hagalaz', [], [runeStone('isa', true, 'upright', 'field')])]; } },
+  { id: 'rune-isa', label: 'Rune: Isa the standstill', group: 'Rune', forced: ['rune-isa'], isolate: true,
+    setup: (s) => { atRune(s); s.slots = [runeSlot('isa')]; } },
+  { id: 'rune-tiwaz-victory', label: "Rune: Tiwaz's Victory", group: 'Rune', forced: ['rune-tiwaz-victory'], isolate: true,
+    setup: (s) => { atRune(s); s.slots = [runeSlot('tiwaz'), criticalHighDie]; } },
 ];
 
 export function findScenario(id: string): DebugScenario | undefined {

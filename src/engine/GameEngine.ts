@@ -12,6 +12,7 @@ import { buildAffinityResponders } from './responders/affinity';
 import { buildInteractionResponders } from './responders/interactions';
 import { buildAstralResponders } from './responders/astral';
 import { buildIChingResponders } from './responders/iching';
+import { buildRuneResponders } from './responders/runes';
 import { findScenario, freshStage, DEBUG_SCENARIOS } from './events/scenarios';
 import type { Responder, PhaseContext, PhaseDraft, EffectReport } from './events/types';
 import { planAstralCast as planAstralCastPure, resolveCastSelection as resolveCastSelectionPure, shouldOfferRecast } from './astral';
@@ -45,7 +46,7 @@ export class GameEngine {
     this.orchestrator = new TurnOrchestrator(this.bus);
     this.readingPlanner = new ReadingPlanner();
     this.narrativeAssembler = new NarrativeAssembler();
-    this.responders = [...buildAffinityResponders(), ...buildInteractionResponders(), ...buildAstralResponders(), ...buildIChingResponders()];
+    this.responders = [...buildAffinityResponders(), ...buildInteractionResponders(), ...buildAstralResponders(), ...buildIChingResponders(), ...buildRuneResponders()];
     this.state = this.defaultState();
     this.cachedSnapshot = JSON.parse(JSON.stringify(this.state)) as GameState;
   }
