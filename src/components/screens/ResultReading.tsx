@@ -6,10 +6,7 @@ import RunicBand from '../shared/RunicBand';
 import OrnamentalBorder from '../shared/OrnamentalBorder';
 import MysticButton from '../shared/MysticButton';
 import HistoryModal from '../overlays/HistoryModal';
-import CardSigil from '../cards/CardSigil';
-import type { SlotResult } from '../../engine/types';
-import AstralSigil from '../cards/AstralSigil';
-import { HOUSES } from '../../data/astromancy';
+import CardReadingDetail from '../cards/CardReadingDetail';
 
 function formatQuestionType(qt: string): string {
   switch (qt) {
@@ -18,67 +15,6 @@ function formatQuestionType(qt: string): string {
     case 'future': return 'Future / Forecast';
     case 'self': return 'Self-Analysis';
     default: return qt;
-  }
-}
-
-function getResultDisplay(result: SlotResult): {
-  symbol: string;
-  name: string;
-  subtitle: string;
-  subCards?: { position: string; name: string; orientation: string; symbol: string; meaning: string; face: import('../../engine/types').TarotCardFace }[];
-} {
-  switch (result.type) {
-    case 'tarot': {
-      const spread = (result as import('../../engine/types').TarotResult).spread;
-      if (spread && spread.length > 1) {
-        return {
-          symbol: result.symbol,
-          name: result.name,
-          subtitle: `${result.orientation === 'upright' ? '▲ Upright' : '▼ Reversed'} — Three-card spread`,
-          subCards: spread.map((sp) => ({
-            position: sp.position.charAt(0).toUpperCase() + sp.position.slice(1),
-            name: sp.card.name,
-            orientation: sp.card.orientation === 'upright' ? '▲ Upright' : '▼ Reversed',
-            symbol: sp.card.symbol,
-            meaning: (sp.card.orientation === 'upright' ? sp.card.meaningUpright : sp.card.meaningReversed).slice(0, 80),
-            face: sp.card,
-          })),
-        };
-      }
-      return {
-        symbol: result.symbol,
-        name: result.name,
-        subtitle: result.orientation === 'upright'
-          ? `Upright — ${result.meaningUpright.slice(0, 100)}`
-          : `Reversed — ${result.meaningReversed.slice(0, 100)}`,
-      };
-    }
-    case 'd20':
-      return {
-        symbol: String.fromCodePoint(0x2685),
-        name: `D20 — ${result.result}`,
-        subtitle: result.interpretation.slice(0, 100),
-      };
-    case 'iching':
-      return {
-        symbol: result.symbol,
-        name: `Hexagram #${result.hexagramNumber} — ${result.name}`,
-        subtitle: result.judgment.slice(0, 100),
-      };
-    case 'astral':
-      return {
-        symbol: result.symbol,
-        name: result.name,
-        subtitle: `in the House of ${HOUSES[result.house - 1]?.arena ?? result.house} — ${result.aspect}`,
-      };
-    case 'happening':
-      return {
-        symbol: String.fromCodePoint(0x2726),
-        name: 'Happening',
-        subtitle: result.scene.slice(0, 100),
-      };
-    default:
-      return { symbol: '?', name: 'Unknown', subtitle: '' };
   }
 }
 
@@ -123,100 +59,9 @@ export default function ResultReading() {
         {/* Divination Results */}
         {turnResults.length > 0 && (
           <div style={resultsGridStyle}>
-            {turnResults.map((r, i) => {
-              const d = getResultDisplay(r);
-              return (
-                <div key={i} style={resultCardStyle}>
-                  <div style={resultIndexStyle}>{i + 1}</div>
-                  <div style={resultSymbolStyle}>
-                    {r.type === 'astral'
-                      ? <AstralSigil kind="planet" id={r.planet} size={32} />
-                      : r.type === 'tarot'
-                        ? <CardSigil card={r} size={28} color="#d4a854" />
-                        : d.symbol}
-                  </div>
-                  <div style={resultNameStyle}>{d.name}</div>
-                  {r.type === 'astral' ? (
-                    <>
-                      <div style={resultSubtitleStyle}>
-                        in the House of {HOUSES[r.house - 1]?.arena ?? r.house}
-                      </div>
-                      <div style={resultSubtitleStyle}>{r.aspect} — {r.interpretation}</div>
-                    </>
-                  ) : (
-                    <div style={resultSubtitleStyle}>{d.subtitle}</div>
-                  )}
-                  {/* Sub-card spread layout for multi-card tarot */}
-                  {d.subCards && d.subCards.length > 1 && (
-                    <div style={{
-                      display: 'flex',
-                      gap: '0.5rem',
-                      width: '100%',
-                      marginTop: '0.25rem',
-                    }}>
-                      {d.subCards.map((sc) => (
-                        <div key={sc.position} style={{
-                          flex: 1,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          gap: '0.2rem',
-                          background: '#080d18',
-                          border: '1px solid #1a2440',
-                          borderRadius: '4px',
-                          padding: '0.4rem 0.25rem',
-                        }}>
-                          <span style={{
-                            fontFamily: "'Cormorant Garamond', serif",
-                            fontWeight: 600,
-                            fontSize: '0.6rem',
-                            color: '#d4a854',
-                            letterSpacing: '0.1em',
-                            textTransform: 'uppercase',
-                          }}>
-                            {sc.position}
-                          </span>
-                          <CardSigil
-                            card={sc.face}
-                            size={26}
-                            color={sc.orientation === '▲ Upright' ? '#7b9ec7' : '#d4a854'}
-                          />
-                          <span style={{
-                            fontFamily: "'Cormorant Garamond', serif",
-                            fontWeight: 600,
-                            fontSize: '0.65rem',
-                            color: '#c8d8f0',
-                            textAlign: 'center',
-                            lineHeight: 1.15,
-                          }}>
-                            {sc.name}
-                          </span>
-                          <span style={{
-                            fontFamily: "'Inter', sans-serif",
-                            fontWeight: 300,
-                            fontSize: '0.5rem',
-                            color: sc.orientation === '▲ Upright' ? '#7b9ec7' : '#d4a854',
-                          }}>
-                            {sc.orientation}
-                          </span>
-                          <span style={{
-                            fontFamily: "'Inter', sans-serif",
-                            fontWeight: 300,
-                            fontSize: '0.55rem',
-                            color: '#5b7290',
-                            textAlign: 'center',
-                            lineHeight: 1.3,
-                            marginTop: '0.15rem',
-                          }}>
-                            {sc.meaning}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {turnResults.map((r, i) => (
+              <CardReadingDetail key={i} result={r} index={i} />
+            ))}
           </div>
         )}
 
@@ -302,30 +147,6 @@ const questionStyle: React.CSSProperties = {
 
 const resultsGridStyle: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%',
-};
-
-const resultIndexStyle: React.CSSProperties = {
-  fontFamily: "'Inter', sans-serif", fontWeight: 600,
-  fontSize: '0.6rem', color: '#5b7290', letterSpacing: '0.1em',
-  position: 'absolute', top: '0.5rem', left: '0.5rem',
-};
-
-const resultCardStyle: React.CSSProperties = {
-  position: 'relative',
-  display: 'flex', flexDirection: 'column', alignItems: 'center',
-  gap: '0.3rem', padding: '1rem', background: '#0d1220',
-  border: '1px solid #1a2440', borderRadius: '6px', width: '100%',
-  boxSizing: 'border-box',
-};
-
-const resultSymbolStyle: React.CSSProperties = { fontSize: '2rem', color: '#d4a854' };
-const resultNameStyle: React.CSSProperties = {
-  fontFamily: "'Cormorant Garamond', serif", fontWeight: 600,
-  fontSize: '1rem', color: '#c8d8f0', letterSpacing: '0.05em',
-};
-const resultSubtitleStyle: React.CSSProperties = {
-  fontFamily: "'Inter', sans-serif", fontWeight: 300,
-  fontSize: '0.75rem', color: '#7b9ec7', textAlign: 'center', lineHeight: 1.4,
 };
 
 const synthesisSectionStyle: React.CSSProperties = {
