@@ -30,13 +30,15 @@ const CelestialCast = forwardRef<CelestialCastHandle, Props>(function CelestialC
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sceneRef = useRef<CelestialSceneController | null>(null);
   const settledRef = useRef(false);
+  const onSettledRef = useRef(onSettled);
+  onSettledRef.current = onSettled;
   const use3DRef = useRef(false);
 
   // Wrap onSettled so it can only fire once per roll.
   const fireSettled = (cast: AstralCast) => {
     if (settledRef.current) return;
     settledRef.current = true;
-    onSettled(cast);
+    onSettledRef.current(cast);
   };
 
   useEffect(() => {
