@@ -110,8 +110,6 @@ export function createDie(
   });
   world.addBody(body);
 
-  if (faceData.length !== 12) console.warn('dodeca faces', faceData.length);
-
   return {
     object,
     body,

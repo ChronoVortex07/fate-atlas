@@ -33,6 +33,7 @@ const CelestialCast = forwardRef<CelestialCastHandle, Props>(function CelestialC
   const onSettledRef = useRef(onSettled);
   onSettledRef.current = onSettled;
   const use3DRef = useRef(false);
+  const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Wrap onSettled so it can only fire once per roll.
   const fireSettled = (cast: AstralCast) => {
@@ -51,6 +52,7 @@ const CelestialCast = forwardRef<CelestialCastHandle, Props>(function CelestialC
       });
     }
     return () => {
+      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
       sceneRef.current?.dispose();
       sceneRef.current = null;
     };
@@ -65,7 +67,7 @@ const CelestialCast = forwardRef<CelestialCastHandle, Props>(function CelestialC
       } else {
         // Fallback: resolve instantly with a valid affinity-biased cast.
         const cast = target ?? drawAstralCast(affinities);
-        setTimeout(() => fireSettled(cast), 600);
+        fallbackTimerRef.current = setTimeout(() => fireSettled(cast), 600);
       }
     },
   }));

@@ -221,6 +221,19 @@ export function createCelestialScene(opts: {
     dispose() {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', onResize);
+      scene.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
+        if (mesh.geometry) mesh.geometry.dispose();
+        const material = mesh.material;
+        if (material) {
+          const mats = Array.isArray(material) ? material : [material];
+          for (const m of mats) {
+            const map = (m as THREE.MeshStandardMaterial).map;
+            if (map) map.dispose();
+            m.dispose();
+          }
+        }
+      });
       renderer.dispose();
     },
   };
