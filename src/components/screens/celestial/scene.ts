@@ -129,6 +129,11 @@ export function createCelestialScene(opts: {
     phase = 'done';
 
     // Snap each die flat (to target face if provided, else to up-most face).
+    // Capture face ids BEFORE snapping so the cast is built from the pre-snap
+    // read; faceIndexOfId clamps -1 → 0, preventing a NaN quaternion if the
+    // face id is ever unresolved.
+    let pFace = '';
+    let sFace = '';
     if (target) {
       snapToFace(planet, faceIndexOfId(planet, target.planet));
       snapToFace(sign, faceIndexOfId(sign, target.sign));
@@ -137,11 +142,11 @@ export function createCelestialScene(opts: {
       planet.body.position.set(pc.x, DIE_R, pc.z);
       sign.body.position.set(sc.x, DIE_R, sc.z);
     } else {
-      // Snap to whatever face is currently up.
-      const pIdx = planet.faceIds.indexOf(readTopFace(planet));
-      const sIdx = sign.faceIds.indexOf(readTopFace(sign));
-      snapToFace(planet, pIdx);
-      snapToFace(sign, sIdx);
+      // Capture the up-most face BEFORE snapping, and clamp via faceIndexOfId.
+      pFace = readTopFace(planet);
+      sFace = readTopFace(sign);
+      snapToFace(planet, faceIndexOfId(planet, pFace));
+      snapToFace(sign, faceIndexOfId(sign, sFace));
     }
     syncMesh(planet); syncMesh(sign);
 
@@ -154,8 +159,8 @@ export function createCelestialScene(opts: {
     if (ticks >= SETTLE_TICK_CAP) omens.push('veiled-oracle');
 
     const cast: AstralCast = target ?? {
-      planet: readTopFace(planet) as PlanetId,
-      sign: readTopFace(sign) as SignId,
+      planet: pFace as PlanetId,
+      sign: sFace as SignId,
       planetHouse: sectorOf(pPos.x, pPos.z),
       signHouse: sectorOf(sPos.x, sPos.z),
       omens,
