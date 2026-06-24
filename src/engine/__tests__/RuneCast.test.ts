@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { planRuneCast, resolveGoverning, shouldOfferRecast } from '../runes';
+import { GameEngine } from '../GameEngine';
 import type { RuneScatter, LandedRune } from '../types';
 
 const lo = 20, asc = 70, dom = 90;
@@ -47,5 +48,14 @@ describe('resolveGoverning', () => {
 describe('shouldOfferRecast', () => {
   it('is false below stirring', () => {
     expect(shouldOfferRecast({ will: 10 }, () => 0.0)).toBe(false);
+  });
+});
+
+describe('engine rune integration', () => {
+  it('exposes planRuneCast returning a valid mode', () => {
+    const engine = new GameEngine();
+    engine.startTurn('decision');
+    const p = engine.planRuneCast();
+    expect(['single', 'favored', 'clouded', 'claim']).toContain(p.mode);
   });
 });

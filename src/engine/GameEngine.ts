@@ -17,6 +17,9 @@ import { findScenario, freshStage, DEBUG_SCENARIOS } from './events/scenarios';
 import type { Responder, PhaseContext, PhaseDraft, EffectReport } from './events/types';
 import { planAstralCast as planAstralCastPure, resolveCastSelection as resolveCastSelectionPure, shouldOfferRecast } from './astral';
 import type { AstralCastMode } from './astral';
+import { planRuneCast as planRuneCastPure, resolveGoverning as resolveGoverningPure, shouldOfferRecast as shouldOfferRuneRecast } from './runes';
+import type { RuneCastMode } from './runes';
+import type { RuneScatter } from './types';
 import { deriveMandate, hexagramNudge, planHexagramResolution } from './iching';
 import type { HexagramMode } from './iching';
 
@@ -299,7 +302,7 @@ export class GameEngine {
     if (typeof draft.spawnSecond === 'string') {
       const affinities = this.affinityEngine.getState();
       const second = this.orchestrator.drawSingleResult(
-        draft.spawnSecond as 'tarot' | 'd20' | 'iching' | 'astral',
+        draft.spawnSecond as 'tarot' | 'd20' | 'iching' | 'astral' | 'rune',
         affinities,
       );
       this.state.turnResults = [...this.state.turnResults, second];
@@ -338,7 +341,7 @@ export class GameEngine {
 
     // Between-minigame transition. Ask the minigame:end trigger whether a
     // happening interrupts the flow.
-    this.orchestrator.removeUsedMethod(result.type as 'tarot' | 'd20' | 'iching' | 'astral');
+    this.orchestrator.removeUsedMethod(result.type as 'tarot' | 'd20' | 'iching' | 'astral' | 'rune');
     const { draft: endDraft } = this.dispatchAt('minigame:end', {
       lastReading: completed >= this.minigamesPerTurn,
     });
@@ -483,6 +486,15 @@ export class GameEngine {
 
   resolveCastSelection(casts: AstralCast[], mode: AstralCastMode): { chosen: AstralCast; index: 0 | 1; auto: boolean } {
     return resolveCastSelectionPure(casts, mode);
+  }
+
+  planRuneCast(): { mode: RuneCastMode; drift: number; offerRecast: boolean; sources: string[] } {
+    const affinities = this.affinityEngine.getState();
+    return planRuneCastPure(affinities, shouldOfferRuneRecast(affinities));
+  }
+
+  resolveGoverning(scatter: RuneScatter, mode: RuneCastMode): number {
+    return resolveGoverningPure(scatter, mode);
   }
 
   // Resolves the I Ching transformation fork (willed/fated/unaligned) from the

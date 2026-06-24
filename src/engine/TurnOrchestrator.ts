@@ -106,7 +106,7 @@ export class TurnOrchestrator {
 
   private usedThisTurn: DivinationType[] = [];
 
-  removeUsedMethod(method: 'tarot' | 'd20' | 'iching' | 'astral'): void {
+  removeUsedMethod(method: 'tarot' | 'd20' | 'iching' | 'astral' | 'rune'): void {
     this.usedThisTurn.push(method);
     // Remove the used method from availableMethods (it'll be refilled)
     const idx = this.availableMethods.indexOf(method);
