@@ -4,17 +4,18 @@ import { drawTarotCard } from '../data/tarot';
 import { rollD20 } from '../data/dice';
 import { castHexagram } from '../data/iching';
 import { consolidateCast, drawAstralCast } from '../data/astromancy';
+import { consolidateScatter, drawRuneScatter } from '../data/runes';
 
 const POOL_SIZE = 3;
 
 const QUESTION_WEIGHTS: Record<QuestionType, Partial<Record<DivinationType, number>>> = {
-  decision: { d20: 3, tarot: 1, iching: 1, astral: 2 },
-  relationship: { tarot: 3, d20: 1, iching: 1, astral: 1 },
-  future: { iching: 3, tarot: 1, d20: 1, astral: 2 },
-  self: { tarot: 2, iching: 2, d20: 1, astral: 1 },
+  decision: { d20: 3, tarot: 1, iching: 1, astral: 2, rune: 1 },
+  relationship: { tarot: 3, d20: 1, iching: 1, astral: 1, rune: 1 },
+  future: { iching: 3, tarot: 1, d20: 1, astral: 2, rune: 2 },
+  self: { tarot: 2, iching: 2, d20: 1, astral: 1, rune: 2 },
 };
 
-const POOL_TYPES: DivinationType[] = ['tarot', 'd20', 'iching', 'astral'];
+const POOL_TYPES: DivinationType[] = ['tarot', 'd20', 'iching', 'astral', 'rune'];
 
 export class TurnOrchestrator {
   private availableMethods: DivinationType[] = [];
@@ -85,6 +86,9 @@ export class TurnOrchestrator {
         break;
       case 'astral':
         result = consolidateCast(drawAstralCast(affinities));
+        break;
+      case 'rune':
+        result = consolidateScatter(drawRuneScatter(affinities));
         break;
       case 'happening':
         throw new Error('Happening has no drawSingleResult — use triggerHappening instead');

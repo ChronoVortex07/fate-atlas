@@ -280,11 +280,16 @@ describe('tarot deal + spread orientation', () => {
   });
 
   it('resolveSpreadOrientation passes through when Fate is dormant', () => {
-    const e = new GameEngine();
-    e.startTurn('self');
-    const r = consolidateSpread([buildFace(DECK_BY_ID['the-star'], 'upright'), buildFace(DECK_BY_ID['cups-2'], 'upright'), buildFace(DECK_BY_ID['swords-3'], 'upright')]);
-    const { auto } = e.resolveSpreadOrientation(r);
-    expect(auto).toBe(false);
+    const orig = Math.random; Math.random = () => 0.99; // suppress the probabilistic auto-orient roll
+    try {
+      const e = new GameEngine();
+      e.startTurn('self');
+      const r = consolidateSpread([buildFace(DECK_BY_ID['the-star'], 'upright'), buildFace(DECK_BY_ID['cups-2'], 'upright'), buildFace(DECK_BY_ID['swords-3'], 'upright')]);
+      const { auto } = e.resolveSpreadOrientation(r);
+      expect(auto).toBe(false);
+    } finally {
+      Math.random = orig;
+    }
   });
 });
 

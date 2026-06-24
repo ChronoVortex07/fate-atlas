@@ -43,4 +43,11 @@ export const DIVINATION_PROFILES: Record<string, DivinationProfile> = {
     dimensionStrengths: ['favorability', 'volatility', 'certainty'],
     modifierStrengths: ['subject', 'action', 'effect'],
   },
+  rune: {
+    type: 'rune',
+    themeCoverage: 'all',
+    themePool: ['renewal', 'transformation', 'conflict', 'illumination', 'harmony', 'mystery', 'authority', 'stagnation', 'upheaval', 'surrender'],
+    dimensionStrengths: ['favorability', 'volatility', 'certainty'],
+    modifierStrengths: ['subject', 'effect', 'action'],
+  },
 };
