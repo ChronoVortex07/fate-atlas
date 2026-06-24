@@ -1,7 +1,10 @@
 import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import type { SlotResult } from '../../engine/types';
+import { HOUSES } from '../../data/astromancy';
 import CardSigil from './CardSigil';
+import AstralSigil from './AstralSigil';
+import RuneSigil from './RuneSigil';
 
 const RUNES = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ';
 
@@ -126,6 +129,30 @@ function renderSlotContent(slot: SlotResult) {
             <span style={hexagramNumberStyle}> #{slot.hexagramNumber}</span>
           </div>
           <div style={slotMeaningStyle}>{slot.judgment}</div>
+        </div>
+      );
+
+    case 'astral':
+      return (
+        <div style={contentWrapperStyle}>
+          <div style={slotSymbolStyle}><AstralSigil kind="planet" id={slot.planet} size={34} /></div>
+          <div style={slotNameStyle}>{slot.name}</div>
+          <div style={thresholdLabelStyle}>
+            {slot.aspect.toUpperCase()} · House of {HOUSES[slot.house - 1]?.arena ?? slot.house}
+          </div>
+          <div style={slotMeaningStyle}>{slot.interpretation}</div>
+        </div>
+      );
+
+    case 'rune':
+      return (
+        <div style={contentWrapperStyle}>
+          <div style={slotSymbolStyle}><RuneSigil rune={slot.rune} orientation={slot.orientation} size={34} glow /></div>
+          <div style={slotNameStyle}>{slot.name}</div>
+          <div style={thresholdLabelStyle}>
+            {slot.orientation === 'upright' ? '▲ Upright' : '▼ Merkstave'} · {slot.ring[0].toUpperCase() + slot.ring.slice(1)}
+          </div>
+          <div style={slotMeaningStyle}>{slot.interpretation}</div>
         </div>
       );
 

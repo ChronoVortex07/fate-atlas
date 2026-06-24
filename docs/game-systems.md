@@ -23,6 +23,9 @@ the **meta-interactions** between divination results, and the **happenings**.
 > | I Ching hexagram data (King Wen table, cast, consolidation) | [`src/data/iching.ts`](../src/data/iching.ts) |
 > | I Ching resolution modes, Mandate derivation, nudge | [`src/engine/iching.ts`](../src/engine/iching.ts) |
 > | I Ching line-mutation responders | [`src/engine/responders/iching.ts`](../src/engine/responders/iching.ts) |
+> | Rune dataset, scatter fall, consolidation | [`src/data/runes.ts`](../src/data/runes.ts) |
+> | Rune plan modes, drift, governing resolution | [`src/engine/runes.ts`](../src/engine/runes.ts) |
+> | Rune scatter-omen + cross-type responders | [`src/engine/responders/runes.ts`](../src/engine/responders/runes.ts) |
 
 ---
 
@@ -622,20 +625,22 @@ weight-1 MUTATE rivals in a tie); the rest are weight 1.
 
 | Omen tag | Physics trigger | Responder activated |
 |----------|----------------|---------------------|
-| `errant-star` | A die comes to rest beyond the board rim (chaos raises the odds) | `astral-errant-star` (SPAWN) |
+| `errant-star` | A die comes to rest in the outer ring, beyond the playfield (`BOARD_RADIUS`); chaos raises the odds | `astral-errant-star` (SPAWN) |
 | `crowned-conjunction` | The planet and sign dice settle close together | `astral-conjunction-crowned` (MUTATE weight 2) |
-| `veiled-oracle` | The cast fails to settle before the time cap (timeout-based) | `astral-veiled-oracle` (MUTATE) |
+| `veiled-oracle` | The cast is rushed — the player taps to settle while the dice still tumble hard — or the hang-guard safety cap fires | `astral-veiled-oracle` (MUTATE) |
 
 > **Physics is presentation only.** The engine-side generator `drawAstralCast` produces a
 > plain `AstralCast` with `omens: []`; the React physics renderer populates the omen tags
-> before passing the cast to `consolidateCast`. Affinities act as physical forces during the
-> throw: **Chaos** makes dice bouncier with wider scatter and turbulence (more extreme
-> aspects); **Order** applies gentle centering and a calmer settle — the center pull is
-> deliberately light so dice still spread across slices. **Light/Shadow** introduce lateral
-> drift. This is cosmetic — the same affinity influence is already baked into the
+> before passing the cast to `consolidateCast`. The dice are kept in play by a real circular
+> **collision wall** at `WALL_RADIUS` (a ring of inward-facing planes) — no artificial
+> centering, turbulence, or drift. Affinities tune only the throw and settle: **Chaos** makes the
+> dice bouncier, with a wider throw and longer spin (more extreme aspects); **Order** calms the
+> settle with more damping. This is cosmetic — the same affinity influence is already baked into the
 > engine-side `drawAstralCast` fallback. *(A dedicated "cocked die"/"lands askew on an
-> edge" signal is not used with the sphere-collider physics; `veiled-oracle` is
-> timeout-based.)*
+> edge" signal is not used with the sphere-collider physics. The dice settle naturally when
+> they come to rest; the player can **tap the board** to hasten the settle. `veiled-oracle`
+> fires when that tap comes while the dice are still tumbling hard — the rushed oracle keeps
+> its secret — or when a long hang-guard cap is hit.)*
 
 ---
 
@@ -802,3 +807,90 @@ Note: `chaos-line-cascade` can *create* a transformation from scratch — its co
 otherwise stable cast, producing a relating hexagram where none would have existed.
 
 See §5 for the full responder catalog entry.
+
+---
+
+## 10. Rune Casting
+
+Rune Casting (`type: 'rune'`) is the fifth divination method. The player flings a handful of
+**6 Elder Futhark stones** onto a concentric casting cloth and reads the **scatter**: which
+stones land face-up, how they are oriented, and where they fall. Data lives in
+[`src/data/runes.ts`](../src/data/runes.ts); plan/governing logic in
+[`src/engine/runes.ts`](../src/engine/runes.ts); responders in
+[`src/engine/responders/runes.ts`](../src/engine/responders/runes.ts).
+
+### 10a. The rune dataset (24 staves, 3 aettir)
+
+Each `RuneDef` carries a glyph, aett (`freyr` / `heimdall` / `tyr`), `reversible` flag, a theme,
+a modifier role, upright `dimensions`, and upright/merkstave meanings. The eight **symmetric**
+runes — **Gebo, Hagalaz, Isa, Jera, Eihwaz, Sowilo, Ingwaz, Dagaz** — are `reversible: false`:
+they never fall merkstave and are tagged `non-reversible`.
+
+### 10b. The cloth and the scatter fall (`resolveScatter`)
+
+The cloth has three concentric rings by normalized radius `r = hypot(x, y)`: **Heart**
+(`r < 0.33`), **Field** (`0.33 ≤ r < 0.75`), **Margin** (`r ≥ 0.75`); a stone past `r > 1.1` is
+**off-cloth**. `resolveScatter({ affinities, aim, drift, reveal, rng })` draws 6 distinct runes
+and, per stone, computes a position (cluster centroid from the aim, jitter **widened by Chaos /
+tightened by Order**, then lerped toward the Heart by the Fate **drift**), a `faceUp` roll
+(base 0.6, **+Light / −Shadow**, or forced up by `reveal`), and an orientation (merkstave base
+0.35, **+Chaos / −Order**; never for `non-reversible` runes). The default `governingIndex` is the
+face-up stone nearest the Heart (a stone is force-revealed if all land silent). `drawRuneScatter`
+wraps this with no aim for engine-spawned results (spawn-second / reroll).
+
+### 10c. Consolidation (`consolidateScatter`)
+
+- **Governing** stone (nearest the Heart): full `dimensions` + theme + modifier role. A merkstave
+  governing first takes the fixed shadow transform **favor −1.0, volatility +0.5, certainty −0.5**.
+- **Supporting** stones (other face-up *upright* stones): **half** their dimensions + their theme
+  (themes deduped, capped at 2).
+- **Crossing** stones (face-up *merkstave*, or any stone in the **Margin**): **favor −0.5,
+  volatility +0.5** each.
+- Sum, then ÷2, then clamp to ±2 at 0.5 granularity (same pipeline as `consolidateCast`).
+
+**Tags emitted:** `draw rune random`, `rune-<id>`, `aett-<x>`, `ring-<r>`,
+`orientation-<upright|merkstave>`, then `upright` **or** `reversed` (feeds Order vs Chaos),
+`reversible` **or** `non-reversible`, plus any scatter omen tags.
+
+### 10d. Plan modes (`planRuneCast`)
+
+| Mode | Affinity required | What happens |
+|------|-------------------|--------------|
+| `single` | *(default)* | Nearest-Heart stone governs, as-fallen |
+| `favored` | Light ascendant+ | Silent stones revealed; the **brighter** of the two nearest-Heart stones governs |
+| `clouded` | Shadow ascendant+ | Reading veiled; the **dimmer** of the two nearest governs |
+| `claim` | Will dominant | Player picks which face-up stone governs and may **turn** one merkstave upright (suppresses the Re-cast offer) |
+
+`claim` wins over `favored`/`clouded`. Independently, **Fate** sets `drift` (0 / .33 / .66 / 1.0
+by band). **Offer-recast** is `shouldOfferRecast(will) && mode !== 'claim' && fateBand < ascendant`
+— Will stirring+ probabilistic (notable tier, like the dice reroll offer), suppressed once Fate
+"moves the hand". `resolveGoverning(scatter, mode)` re-picks the brighter/dimmer stone for
+favored/clouded (by `stoneBrightness` = favorability with a merkstave penalty); single/claim keep
+the default.
+
+### 10e. Scatter-omen + cross-type responders
+
+Eight rune responders trigger at `rune:commit`; all are deterministic (`roll → true`). Six compete
+in the `MUTATE` exclusive band; `rune-errant` and `rune-perthro` are in `SPAWN` (Perthro carries
+weight 2).
+
+| Responder | Band | Condition | Effect |
+|-----------|------|-----------|--------|
+| `rune-bindrune` | MUTATE | `bindrune` omen | Governing's dominant axis ×1.5 |
+| `rune-merkstave-cascade` | MUTATE | `merkstave-cascade` omen | Volatility +1.0, favor −0.5, upheaval theme |
+| `rune-true-cast` | MUTATE | `true-cast` omen | Certainty +1.0, illumination theme |
+| `rune-silent-field` | MUTATE | `silent-field` omen | Certainty −1.0, mystery theme |
+| `rune-hagalaz` | MUTATE | governing = Hagalaz + ≥1 other face-up stone | Volatility +1.0, favor −0.5, upheaval theme |
+| `rune-isa` | MUTATE | governing = Isa | Volatility −1.0, certainty +0.5, stagnation theme |
+| `rune-errant` | SPAWN | `errant-rune` omen | Spawns a second rune result |
+| `rune-perthro` | SPAWN (w2) | governing = Perthro | Spawns a second rune result |
+
+**Scatter omens** (set by `resolveScatter`): `bindrune` (≥2 supporting upright stones share an
+aett), `merkstave-cascade` (every face-up stone reversed), `true-cast` (governing upright in the
+Heart), `silent-field` (≥ half face-down), `errant-rune` (a stone off-cloth).
+
+One cross-type responder, **`rune-tiwaz-victory`** (`MUTATE`, triggers `dice:commit` + `rune:commit`):
+when a Tiwaz rune and a critical-high d20 are both in the spread, favorability +1.0 on the
+committed result. Because rune results emit `reversible` and `reversed`, they also **automatically
+participate** in the existing `mirror` and `iching-resonant-change` interactions (§6) with no extra
+code. Each responder has a matching `rune-*` entry in `DEBUG_SCENARIOS`.

@@ -40,12 +40,15 @@ npm run dev        # → http://localhost:5173
 | **d20 Dice** | 1d20 roll, 5-tier thresholds (critical-low → critical-high) | `roll` `numeric` `threshold` |
 | **I Ching** | 64 hexagrams (King Wen), authentic 3-coin casting per line. Changing lines (old yang/yin) transform the **primary hexagram** into a **relating hexagram**. Affinities gate whether the player chooses which to commit (Will ascendant), fate chooses (Fate ascendant), or a re-cast is offered (unaligned). The committed hexagram sets a lingering **Mandate of Change** (per-affinity multiplier on all future shift magnitude) that decays 40%/commit toward ×1.0. | `draw` `random` `binary` `governing-primary\|relating` · `changing-lines` `reversible` *(only when changing lines exist)* |
 | **Astromancy** | Two 3D d12 dice (planet + sign) thrown onto a 12-house zodiac board (board visible before cast) | `draw` `random` `astral` `planet-<id>` `sign-<id>` `house-<N>` ... |
+| **Rune Casting** | A handful of 6 Elder Futhark stones flung onto a concentric cloth (Heart / Field / Margin). Each lands upright, reversed (**merkstave**), or face-down (**silent**). The **governing** stone (nearest the Heart) is read, modified by supporting and crossing stones. **Will** lets you claim/turn a stone; **Fate** drifts the throw and reads it as-fallen; **Light/Shadow** reveal/veil; **Chaos/Order** widen/tighten the scatter and bias merkstave. | `draw` `random` `rune` `rune-<id>` `aett-<x>` `ring-<heart\|field\|margin>` `orientation-<upright\|merkstave>` `upright\|reversed` `reversible\|non-reversible` + omen tags |
 | **Happenings** | 8 authored cryptic scenes with 2-3 choices each | `event` `choice` `affinity-shift` |
 
 ### Astromancy: Planet-in-Sign-in-House
 
 Two **3D d12 dice** are thrown onto a 12-house zodiac board — the board is **visible before
-casting**, with each slice decorated in natural-zodiac art (CC0 OpenClipart). The **Planet
+casting**. Each slice shows its zodiac **constellation** on a blue field, a small element-colored
+sign icon at the edge, and the sign's **name** in a divider band; an astrolabe-style **outer
+ring** rims the wheel and is the out-of-bounds zone, with a collision wall at its edge. The **Planet
 die** (12 faces: Sun through South Node) lands in a house and contributes the planet's theme
 and dimension values. The **Sign die** (12 faces: Aries through Pisces) lands in a house; its
 element and modality add dimension leans. The up-most face of each die decides the
@@ -84,24 +87,69 @@ Eight special conditions are checked when the cast is committed:
 | **The Duel** | Mars in square or opposition | Volatility +1.0, favor −0.5, conflict theme forced |
 | **Saturn's Gate** | Saturn in House 1 or 10 | Certainty +1.0, favor −0.5, authority theme forced |
 | **Conjunction Crowned** | Planet and sign dice settle close together *(omen)* | Dominant dimension amplified +1.0 |
-| **The Veiled Oracle** | Cast fails to settle before the time cap *(omen, timeout-based)* | Certainty −1.0, mystery theme forced |
-| **The Errant Star** | A die flies off the board *(omen)* | A second astral result is spawned |
+| **The Veiled Oracle** | You tap to settle while the dice still tumble hard *(omen — the rushed oracle keeps its secret; also the hang-guard cap)* | Certainty −1.0, mystery theme forced |
+| **The Errant Star** | A die comes to rest in the outer ring (out of bounds) *(omen)* | A second astral result is spawned |
 
 #### Affinity and the cast
 
 Affinities shape the throw in two ways — as physical forces and as cast modes:
 
-- **Chaos** makes dice bouncier with wider scatter and turbulence (more extreme aspects).
-  **Order** applies gentle centering and a calmer settle — the center vortex is deliberately
-  soft so dice spread across slices rather than clumping at center. **Light/Shadow** introduce
-  lateral drift. This is cosmetic; the same influence is baked into the engine-side fallback
-  generator.
+- **Chaos** makes the dice bouncier, with a wider throw and longer spin (more extreme aspects).
+  **Order** calms the settle (more damping). The dice are kept in play by a real collision wall
+  at the rim, so there is no artificial centering, turbulence, or drift. This is cosmetic; the
+  same affinity influence is baked into the engine-side fallback generator.
 - **Will dominant** → `choice` mode: two casts are drawn and the player picks one.
 - **Light ascendant** → `favored` mode: two casts drawn; the higher-favorability result is kept automatically.
 - **Shadow ascendant** → `clouded` mode: two casts drawn; the lower-favorability result is kept automatically.
 - **Will stirring** → may offer a free recast prompt (probabilistic, same chance as the dice reroll offer).
 
 See [`docs/game-systems.md §8`](docs/game-systems.md) for the full data tables and responder catalogue.
+
+---
+
+### Rune Casting: The Scatter
+
+A fistful of **6 Elder Futhark stones** is flung onto a dark casting cloth marked with three
+concentric rings — the **Heart** (center), the **Field**, and the **Margin** (edge). The player
+**aims by pulling back** from the rune-bag and releasing — a slingshot throw. The stones tumble
+and settle scattered: each lands **upright**, **reversed (merkstave)**, or **face-down (silent)**.
+
+The reading is read off the scatter. The **governing** stone is the face-up stone nearest the
+Heart; its rune (and orientation) sets the base dimensions, theme, and modifier role. A merkstave
+governing takes a fixed shadow transform (favor −1.0, volatility +0.5, certainty −0.5). Other
+face-up **upright** stones in Heart/Field are **supporting** (half their dimensions + their theme);
+face-up **merkstave** stones or any stone in the **Margin** are **crossing** (favor −0.5,
+volatility +0.5 each). Silent stones say nothing unless **Light** reveals them.
+
+The 24 runes split into three **aettir** (Freyr's, Heimdall's, Tyr's). The eight **symmetric**
+runes (Gebo, Hagalaz, Isa, Jera, Eihwaz, Sowilo, Ingwaz, Dagaz) never fall merkstave — they carry
+`non-reversible` and anchor Order.
+
+#### Affinity and the cast
+
+- **Fate** drifts the fling toward the Heart's fated anchor (drift 0 / .33 / .66 / 1.0 by band);
+  at ascendant+ the cast is read **as-fallen** with no Keep/Re-cast prompt.
+- **Will dominant** → `claim` mode: you pick which face-up stone governs and may **turn** one
+  merkstave upright. **Will stirring** → a probabilistic **Re-cast / Keep** offer.
+- **Light ascendant** → `favored`: silent stones are revealed; the brighter of the two nearest governs.
+- **Shadow ascendant** → `clouded`: the reading is veiled; the dimmer of the two nearest governs.
+- **Chaos** widens the scatter and raises merkstave; **Order** tightens it toward the Heart and
+  favors upright. The governing stone emits `upright` or `reversed`, feeding Order or Chaos.
+
+#### Scatter omens
+
+| Omen | Fires when… | Effect |
+|------|-------------|--------|
+| **Bindrune** | ≥2 supporting upright stones share an aett | Governing's dominant dimension amplified ×1.5 |
+| **Merkstave Cascade** | every face-up stone is reversed | Volatility +1.0, favor −0.5, upheaval theme |
+| **True Cast** | governing is upright in the Heart | Certainty +1.0, illumination theme |
+| **The Silent Field** | half or more stones are face-down | Certainty −1.0, mystery theme |
+| **The Errant Rune** | a stone flies clear off the cloth | A second rune result is spawned |
+| **Perthro, the Lot-Cup** | Perthro is the governing stone | The cup spills — a second rune result is spawned |
+| **Hagalaz, the Hailstone** | Hagalaz governs with another face-up stone | Volatility +1.0, favor −0.5, upheaval theme |
+| **Isa, the Standstill** | Isa governs | Volatility −1.0, certainty +0.5, stagnation theme |
+
+See [`docs/game-systems.md`](docs/game-systems.md) for the full rune data tables and responder catalogue.
 
 ---
 
@@ -135,6 +183,12 @@ new entity with the right tags automatically participates.
 | **Major Convergence** | spread-internal | two or more Major Arcana in the spread | Emits a fated-current report |
 | **Spread Aligned** | spread-internal | every spread face is upright | Emits a clarity report |
 | **Spread Cascade** | spread-internal | every spread face is reversed | Emits an upheaval report |
+| **Tiwaz's Victory** | cross-slot | a Tiwaz rune + a critical-high d20 in the spread | Favorability +1.0 on the committed result |
+
+Rune scatters carry the `reversible` and `reversed` tags, so they **automatically participate** in
+The Mirror and I Ching Resonant Change with no extra code. The eight rune-internal scatter omens
+(Bindrune, Merkstave Cascade, True Cast, Silent Field, Errant Rune, Perthro, Hagalaz, Isa) are
+catalogued in the Rune Casting section above.
 
 Affinity bands add their own probabilistic effects (widen/thin the pool, shroud methods,
 spawn a second result, force a method, advantage/disadvantage, …) — see
