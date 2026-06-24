@@ -1,6 +1,7 @@
 import type { SlotResult, TarotCardFace, TarotResult } from '../../engine/types';
 import CardSigil from './CardSigil';
 import AstralSigil from './AstralSigil';
+import RuneSigil from './RuneSigil';
 import { HOUSES } from '../../data/astromancy';
 
 function getResultDisplay(result: SlotResult): {
@@ -53,6 +54,12 @@ function getResultDisplay(result: SlotResult): {
         name: result.name,
         subtitle: `in the House of ${HOUSES[result.house - 1]?.arena ?? result.house} — ${result.aspect}`,
       };
+    case 'rune':
+      return {
+        symbol: result.symbol,
+        name: result.name,
+        subtitle: `in the ${result.ring[0].toUpperCase() + result.ring.slice(1)} — ${result.interpretation.slice(0, 100)}`,
+      };
     case 'happening':
       return {
         symbol: String.fromCodePoint(0x2726),
@@ -78,9 +85,11 @@ export default function CardReadingDetail({ result, index }: { result: SlotResul
       <div style={resultSymbolStyle}>
         {result.type === 'astral'
           ? <AstralSigil kind="planet" id={result.planet} size={32} />
-          : result.type === 'tarot'
-            ? <CardSigil card={result} size={28} color="#d4a854" />
-            : d.symbol}
+          : result.type === 'rune'
+            ? <RuneSigil rune={result.rune} orientation={result.orientation} size={32} />
+            : result.type === 'tarot'
+              ? <CardSigil card={result} size={28} color="#d4a854" />
+              : d.symbol}
       </div>
       <div style={resultNameStyle}>{d.name}</div>
       {result.type === 'astral' ? (

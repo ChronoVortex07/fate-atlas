@@ -21,6 +21,7 @@ function slotLabel(s: SlotResult): string {
   if (s.type === 'tarot') return `${s.name} (${s.orientation})`;
   if (s.type === 'd20') return `D20 → ${s.result}`;
   if (s.type === 'iching') return `${s.name} (Hexagram ${s.hexagramNumber})`;
+  if (s.type === 'rune') return `${s.name} (${s.ring})`;
   return s.type;
 }
 

@@ -86,6 +86,13 @@ function getCardDisplay(result: SlotResult): {
         detail: result.aspect.toUpperCase(),
         borderColor: '#6a8fd0',                   // celestial blue
       };
+    case 'rune':
+      return {
+        symbol: result.symbol,                    // the rune glyph
+        name: result.name.replace(' — Merkstave', ''),
+        detail: result.orientation === 'upright' ? '▲ Upright' : '▼ Merkstave',
+        borderColor: '#c8a86a',                   // rune gold
+      };
     case 'happening':
       return {
         symbol: String.fromCodePoint(0x2726),
