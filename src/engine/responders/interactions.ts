@@ -7,8 +7,8 @@ const reversibles = (spread: SlotResult[]) => spread.filter((s) => s.tags.includ
 const criticalDie = (spread: SlotResult[], threshold: DiceResult['threshold']) =>
   spread.find((s): s is DiceResult => s.type === 'd20' && (s as DiceResult).threshold === threshold);
 
-function report(id: string, label: string, description: string, animation: string, targetSlot?: number): EffectReport {
-  return { responderId: id, label, description, animation, targetSlot };
+function report(id: string, label: string, description: string, animation: string, targetSlot?: number, sourceSlot?: number): EffectReport {
+  return { responderId: id, label, description, animation, targetSlot, sourceSlot };
 }
 
 // ── Spread-internal helpers ──
@@ -50,7 +50,8 @@ export function buildInteractionResponders(): Responder[] {
       roll: () => true,
       apply: (c) => {
         c.draft.rerollOutcome = true;
-        return report('fool-reroll', "The Fool", "The Fool's wild energy ripples through fate — the dice must be cast again.", 'reroll');
+        const i = c.spread.findIndex((s) => has(s, 'major-arcana', 'fool-archetype'));
+        return report('fool-reroll', "The Fool", "The Fool's wild energy ripples through fate — the dice must be cast again.", 'reroll', undefined, i < 0 ? undefined : i);
       },
     },
     {
@@ -66,10 +67,12 @@ export function buildInteractionResponders(): Responder[] {
       apply: (c) => {
         const card = c.draft.outcome as TarotResult;
         const wasUpright = card.orientation === 'upright';
+        const wanted: DiceResult['threshold'] = wasUpright ? 'critical-low' : 'critical-high';
+        const i = c.spread.findIndex((s) => s.type === 'd20' && (s as DiceResult).threshold === wanted);
         c.draft.outcome = reverseSpread(card);
         return report('critical-resonance', 'Critical Resonance',
           wasUpright ? 'A dire omen drags the spread down — it inverts.' : 'A bright omen lifts the spread — it rights itself.',
-          'flip');
+          'flip', undefined, i < 0 ? undefined : i);
       },
     },
     {
@@ -78,10 +81,11 @@ export function buildInteractionResponders(): Responder[] {
       condition: (c) => reversibles(c.spread).length === 2,
       roll: (c) => c.rng() < 0.85,
       apply: (c) => {
+        const idxs = c.spread.map((s, i) => (s.tags.includes('reversible') ? i : -1)).filter((i) => i >= 0);
         if (c.draft.outcome?.type === 'tarot') {
           c.draft.outcome = reverseSpread(c.draft.outcome as TarotResult);
         }
-        return report('mirror', 'The Mirror', 'Two forces reflect each other across the weave — both turn.', 'mirror');
+        return report('mirror', 'The Mirror', 'Two forces reflect each other across the weave — both turn.', 'mirror', idxs[1], idxs[0]);
       },
     },
     {
@@ -91,7 +95,8 @@ export function buildInteractionResponders(): Responder[] {
       roll: () => true,
       apply: (c) => {
         c.draft.addChoice = true;
-        return report('iching-happening-boost', 'I Ching', 'The changing lines reveal hidden branches — more choices emerge.', 'add-choice');
+        const i = c.spread.findIndex((s) => s.type === 'iching' && s.tags.includes('changing-lines'));
+        return report('iching-happening-boost', 'I Ching', 'The changing lines reveal hidden branches — more choices emerge.', 'add-choice', undefined, i < 0 ? undefined : i);
       },
     },
     // ── Spread-internal interactions ──
@@ -126,7 +131,10 @@ export function buildInteractionResponders(): Responder[] {
         && (c.draft.outcome as IChingResult).tags.includes('changing-lines')
         && c.spread.some((s) => s.type !== 'iching' && s.tags.includes('reversible')),
       roll: () => true,
-      apply: () => report('iching-resonant-change', 'I Ching', 'The changing lines resonate outward — a kindred force stirs in sympathy.', 'mirror'),
+      apply: (c) => {
+        const i = c.spread.findIndex((s) => s.type !== 'iching' && s.tags.includes('reversible'));
+        return report('iching-resonant-change', 'I Ching', 'The changing lines resonate outward — a kindred force stirs in sympathy.', 'mirror', undefined, i < 0 ? undefined : i);
+      },
     },
   ];
 }

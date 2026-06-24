@@ -75,4 +75,48 @@ describe('interaction responders', () => {
     dispatch('happening:start', c, buildInteractionResponders(), noDebug);
     expect(c.draft.addChoice).toBe(true);
   });
+
+  it('fool-reroll reports the Fool index as sourceSlot', () => {
+    const other = { type: 'iching', tags: [] } as any;
+    const c = ctx({ trigger: 'dice:commit', slots: [other, fool], spread: [other, fool], draft: { outcome: { type: 'd20' } as any } });
+    const { reports } = dispatch('dice:commit', c, buildInteractionResponders(), noDebug);
+    const r = reports.find((x) => x.responderId === 'fool-reroll')!;
+    expect(r.sourceSlot).toBe(1);
+  });
+
+  it('critical-resonance reports the critical die index as sourceSlot', () => {
+    const card = spreadCard('the-fool', 'upright');
+    const c = ctx({ trigger: 'tarot:commit', slots: [critLow], spread: [critLow, card], draft: { outcome: card } });
+    const { reports } = dispatch('tarot:commit', c, buildInteractionResponders(), noDebug);
+    const r = reports.find((x) => x.responderId === 'critical-resonance')!;
+    expect(r.sourceSlot).toBe(0);
+  });
+
+  it('mirror reports both reversible indices as sourceSlot/targetSlot', () => {
+    const a = { type: 'tarot', orientation: 'upright', tags: ['reversible'] } as any;
+    const b = spreadCard('the-tower', 'reversed');
+    const c = ctx({ trigger: 'tarot:commit', spread: [a, b], rng: () => 0, draft: { outcome: b } });
+    const { reports } = dispatch('tarot:commit', c, buildInteractionResponders(), noDebug);
+    const r = reports.find((x) => x.responderId === 'mirror')!;
+    expect(r.sourceSlot).toBe(0);
+    expect(r.targetSlot).toBe(1);
+  });
+
+  it('iching-happening-boost reports the changing-lines hex index as sourceSlot', () => {
+    const pad = { type: 'd20', tags: [] } as any;
+    const hex = { type: 'iching', tags: ['changing-lines'], changingLines: [0, 2] } as any;
+    const c = ctx({ trigger: 'happening:start', slots: [pad, hex], spread: [pad, hex], draft: {} });
+    const { reports } = dispatch('happening:start', c, buildInteractionResponders(), noDebug);
+    const r = reports.find((x) => x.responderId === 'iching-happening-boost')!;
+    expect(r.sourceSlot).toBe(1);
+  });
+
+  it('iching-resonant-change reports the reversible non-iching index as sourceSlot', () => {
+    const rev = { type: 'tarot', orientation: 'upright', tags: ['reversible'] } as any;
+    const out = { type: 'iching', tags: ['changing-lines'] } as any;
+    const c = ctx({ trigger: 'iching:commit', slots: [rev], spread: [rev], draft: { outcome: out } });
+    const { reports } = dispatch('iching:commit', c, buildInteractionResponders(), noDebug);
+    const r = reports.find((x) => x.responderId === 'iching-resonant-change')!;
+    expect(r.sourceSlot).toBe(0);
+  });
 });
