@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import type { SlotResult } from '../../engine/types';
+import { SIGNS } from '../../data/astromancy';
 import CardSigil from './CardSigil';
 
 export type FanCardState = 'idle' | 'source' | 'target' | 'animating' | 'reroll-target';
@@ -11,11 +12,23 @@ interface FanCardProps {
   isExpanded: boolean;
   fanAngle: number;       // rotation angle in degrees for radial fan position
   isTopCard: boolean;     // true when this card is the visible top of the collapsed stack
-  // New — desktop responsive
+  // Desktop responsive (collapsed stack)
   isDesktop?: boolean;
-  polarX?: number;      // pre-computed x offset in px from center (desktop expanded)
-  polarY?: number;      // pre-computed y offset in px upward from bottom (desktop expanded)
-  polarAngle?: number;  // pre-computed rotation in degrees (desktop expanded)
+  // Expanded rotating wheel — pre-computed transform for this card's arc slot.
+  wheelX?: number;
+  wheelY?: number;
+  wheelRotate?: number;
+  wheelScale?: number;
+  wheelOpacity?: number;
+  wheelZ?: number;
+  glowing?: boolean;      // meta-interaction spotlight
+  instant?: boolean;      // disable the spring while actively dragging (1:1 follow)
+  // Interaction — wired by the wheel container.
+  onSelect?: () => void;
+  onPointerDown?: (e: React.PointerEvent) => void;
+  onPointerMove?: (e: React.PointerEvent) => void;
+  onPointerUp?: (e: React.PointerEvent) => void;
+  onWheelSpin?: (e: React.WheelEvent) => void;
 }
 
 function getCardDisplay(result: SlotResult): {
@@ -65,6 +78,13 @@ function getCardDisplay(result: SlotResult): {
           : '',
         borderColor: '#5b8c5a',
       };
+    case 'astral':
+      return {
+        symbol: `${result.symbol}︎`,         // planet glyph, text-presentation form
+        name: SIGNS[result.sign].name,            // the sign the planet sits in
+        detail: result.aspect.toUpperCase(),
+        borderColor: '#6a8fd0',                   // celestial blue
+      };
     case 'happening':
       return {
         symbol: String.fromCodePoint(0x2726),
@@ -90,15 +110,28 @@ export default function FanCard({
   fanAngle,
   isTopCard,
   isDesktop: isDesktopProp,
-  polarX,
-  polarY,
-  polarAngle,
+  wheelX,
+  wheelY,
+  wheelRotate,
+  wheelScale,
+  wheelOpacity,
+  wheelZ,
+  glowing,
+  instant,
+  onSelect,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onWheelSpin,
 }: FanCardProps) {
   const isDesktop = isDesktopProp ?? false;
 
   const isSource = slotState === 'source' || slotState === 'animating';
   const isTarget = slotState === 'target' || slotState === 'animating';
   const isRerollTarget = slotState === 'reroll-target';
+
+  // Expanded uses the rotating wheel when a wheel transform is supplied.
+  const wheel = isExpanded && wheelX !== undefined;
 
   // Desktop sizes vs mobile
   const width = isDesktop
@@ -125,72 +158,95 @@ export default function FanCard({
 
   const display = getCardDisplay(result);
 
-  // --- Animate target ---
-  // Mobile: rotate + vertical stack offset (unchanged)
-  // Desktop collapsed: centered stack with larger vertical offsets
-  // Desktop expanded: polar-coordinate position + tangent rotation
-
+  // --- Animate ---
+  // Wheel (expanded): pre-computed polar slot + tangent rotation, scale/opacity by distance.
+  // Collapsed: centered (desktop) / right-anchored (mobile) stack.
   let animateX: number;
   let animateY: number;
   let animateRotate: number;
+  let animateScale: number;
+  let animateOpacity: number;
 
-  if (isDesktop && isExpanded && polarX !== undefined && polarY !== undefined && polarAngle !== undefined) {
-    // Desktop expanded: use pre-computed polar position
-    animateX = polarX;
-    animateY = polarY;
-    animateRotate = polarAngle;
+  if (wheel) {
+    animateX = wheelX as number;
+    animateY = wheelY ?? 0;
+    animateRotate = wheelRotate ?? 0;
+    animateScale = wheelScale ?? 1;
+    animateOpacity = wheelOpacity ?? 1;
   } else if (isDesktop) {
-    // Desktop collapsed: centered stack
     animateX = 0;
     animateY = -(index * 14 + 60);
     animateRotate = 0;
+    animateScale = isRerollTarget ? 1.08 : 1;
+    animateOpacity = isTopCard ? 0.85 : 0.4 + index * 0.05;
   } else {
-    // Mobile (unchanged)
     animateX = 0;
-    animateY = isExpanded ? -(index * 10 + 42) : -(index * 6 + 36);
+    animateY = -(index * 6 + 36);
     animateRotate = fanAngle;
+    animateScale = isRerollTarget ? 1.08 : 1;
+    animateOpacity = isTopCard ? 0.85 : 0.4 + index * 0.05;
   }
+
+  const zIndex = wheel
+    ? (wheelZ ?? 1)
+    : (isRerollTarget ? 5 : index);
+
+  const pointerEvents: React.CSSProperties['pointerEvents'] = wheel
+    ? (animateOpacity <= 0.02 ? 'none' : 'auto')
+    : 'none';
 
   return (
     <motion.div
+      onPointerDown={wheel ? onPointerDown : undefined}
+      onPointerMove={wheel ? onPointerMove : undefined}
+      onPointerUp={wheel ? onPointerUp : undefined}
+      onPointerCancel={wheel ? onPointerUp : undefined}
+      onWheel={wheel ? onWheelSpin : undefined}
+      onClick={wheel ? onSelect : undefined}
       style={{
         position: 'absolute',
         bottom: 0,
-        left: isDesktop ? '50%' : undefined,
-        right: isDesktop ? undefined : 0,
-        marginLeft: isDesktop ? `${-(width / 2)}px` : undefined,
+        left: isDesktop || wheel ? '50%' : undefined,
+        right: isDesktop || wheel ? undefined : 0,
+        marginLeft: isDesktop || wheel ? `${-(width / 2)}px` : undefined,
         width: `${width}px`,
         height: `${height}px`,
         background: 'linear-gradient(180deg, #0d1220 0%, #0a1020 100%)',
-        border: isRerollTarget
-          ? '1.5px solid #d4a854'
-          : isSource
-            ? '1px solid #d4a854'
-            : isTarget
-              ? '1px solid rgba(200, 120, 80, 0.5)'
-              : `1px solid ${display.borderColor}`,
+        border: glowing
+          ? '1.5px solid #f0c674'
+          : isRerollTarget
+            ? '1.5px solid #d4a854'
+            : isSource
+              ? '1px solid #d4a854'
+              : isTarget
+                ? '1px solid rgba(200, 120, 80, 0.5)'
+                : `1px solid ${display.borderColor}`,
         borderRadius,
         transformOrigin: 'bottom center',
-        opacity: isExpanded ? 1 : isTopCard ? 0.85 : 0.4 + (index * 0.05),
-        zIndex: isRerollTarget ? 5 : isExpanded ? 1 : index,
+        zIndex,
         overflow: 'hidden',
-        boxShadow: isRerollTarget
-          ? '0 0 20px rgba(212,168,84,0.45), 0 0 40px rgba(212,168,84,0.12)'
-          : isSource
-            ? '0 0 16px rgba(212,168,84,0.5)'
-            : isTarget
-              ? '0 0 14px rgba(200,120,80,0.5)'
-              : 'none',
-        pointerEvents: isExpanded ? 'auto' : 'none',
+        boxShadow: glowing
+          ? '0 0 28px rgba(212,168,84,0.85), 0 0 56px rgba(212,168,84,0.4)'
+          : isRerollTarget
+            ? '0 0 20px rgba(212,168,84,0.45), 0 0 40px rgba(212,168,84,0.12)'
+            : isSource
+              ? '0 0 16px rgba(212,168,84,0.5)'
+              : isTarget
+                ? '0 0 14px rgba(200,120,80,0.5)'
+                : 'none',
+        pointerEvents,
+        cursor: wheel ? 'pointer' : undefined,
+        touchAction: wheel ? 'none' : undefined,
       }}
       initial={false}
       animate={{
         x: animateX,
         y: animateY,
         rotate: animateRotate,
-        scale: isRerollTarget ? 1.08 : 1,
+        scale: animateScale,
+        opacity: animateOpacity,
       }}
-      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+      transition={instant ? { duration: 0 } : { type: 'spring', stiffness: wheel ? 260 : 300, damping: 26 }}
     >
       {/* Reroll pulse ring */}
       {isRerollTarget && (
@@ -356,73 +412,6 @@ export default function FanCard({
       >
         ·····
       </div>
-
-      {/* Sub-card spread (expanded tarot) */}
-      {isExpanded && display.subCards && display.subCards.length > 1 && (
-        <motion.div
-          style={{
-            position: 'absolute',
-            bottom: `${height + 6}px`,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            display: 'flex',
-            gap: isDesktop ? '8px' : '4px',
-            pointerEvents: 'none',
-            zIndex: 10,
-          }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.15 }}
-        >
-          {display.subCards.map((sc) => (
-            <div
-              key={sc.position}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '1px',
-                background: '#0d1220',
-                border: '1px solid #1a2440',
-                borderRadius: '4px',
-                padding: '3px 4px',
-                minWidth: isDesktop ? '56px' : '36px',
-              }}
-            >
-              <span style={{
-                fontFamily: "'Cormorant Garamond', serif",
-                fontWeight: 600,
-                fontSize: isDesktop ? '0.45rem' : '0.32rem',
-                color: '#d4a854',
-                letterSpacing: '0.04em',
-              }}>
-                {sc.position}
-              </span>
-              <CardSigil card={sc.face} size={isDesktop ? 14 : 10} color="#7b9ec7" />
-              <span style={{
-                fontFamily: "'Cormorant Garamond', serif",
-                fontWeight: 500,
-                fontSize: isDesktop ? '0.38rem' : '0.28rem',
-                color: '#c8d8f0',
-                textAlign: 'center',
-                maxWidth: isDesktop ? '50px' : '32px',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}>
-                {sc.name}
-              </span>
-              <span style={{
-                fontFamily: "'Inter', sans-serif",
-                fontSize: isDesktop ? '0.35rem' : '0.26rem',
-                color: '#7b9ec7',
-              }}>
-                {sc.orientation}
-              </span>
-            </div>
-          ))}
-        </motion.div>
-      )}
     </motion.div>
   );
 }

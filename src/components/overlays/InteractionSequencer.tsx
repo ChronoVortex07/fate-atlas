@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
+import { useInteractionFocus } from '../../context/InteractionFocusContext';
 import RerollAnimation from './InteractionAnimations/RerollAnimation';
 import FlipAnimation from './InteractionAnimations/FlipAnimation';
 import MirrorAnimation from './InteractionAnimations/MirrorAnimation';
@@ -29,31 +30,63 @@ const DURATION: Record<string, number> = {
 };
 const DEFAULT_DURATION = 1400;
 
+// Hold while the fan expands, scrolls to the triggering card, and it glows
+// before a hand-involved effect's animation plays.
+const FOCUS_BEAT = 750;
+
 export default function InteractionSequencer() {
   const { state, engine } = useGameEngine();
+  const { setFocus } = useInteractionFocus();
   const [i, setI] = useState(0);
+  // Starts hidden ('focusing') so the effect decides per report whether to run a
+  // focus beat (hand-involved) or go straight to the animation (field-only).
+  const [localPhase, setLocalPhase] = useState<'focusing' | 'animating'>('focusing');
 
   const queue = state.eventQueue;
 
   useEffect(() => {
     if (queue.length === 0) return;
     if (i >= queue.length) {
+      setFocus(null, null);
       engine.finishEventBatch();
       setI(0);
       return;
     }
-    const anim = queue[Math.min(i, queue.length - 1)]?.animation;
-    const ms = DURATION[anim] ?? DEFAULT_DURATION;
-    const t = setTimeout(() => setI((n) => n + 1), ms);
-    return () => clearTimeout(t);
-  }, [i, queue.length, engine]);
+    const report = queue[Math.min(i, queue.length - 1)];
+    const hasHand = typeof report.sourceSlot === 'number';
+    let inner: ReturnType<typeof setTimeout> | undefined;
+    let outer: ReturnType<typeof setTimeout>;
+    if (hasHand) {
+      setLocalPhase('focusing');
+      setFocus(report, 'focusing');
+      outer = setTimeout(() => {
+        setLocalPhase('animating');
+        setFocus(report, 'animating');
+        const ms = DURATION[report.animation] ?? DEFAULT_DURATION;
+        inner = setTimeout(() => setI((n) => n + 1), ms);
+      }, FOCUS_BEAT);
+    } else {
+      setLocalPhase('animating');
+      setFocus(report, 'animating');
+      const ms = DURATION[report.animation] ?? DEFAULT_DURATION;
+      outer = setTimeout(() => setI((n) => n + 1), ms);
+    }
+    return () => {
+      clearTimeout(outer);
+      if (inner) clearTimeout(inner);
+    };
+  }, [i, queue.length, engine, setFocus]);
 
   const skip = useCallback(() => {
+    setFocus(null, null);
     engine.finishEventBatch();
     setI(0);
-  }, [engine]);
+  }, [engine, setFocus]);
 
   if (queue.length === 0) return null;
+  // During the focus beat the sequencer shows nothing — the glowing hand card is
+  // the focal point. The centered animation appears once we reach 'animating'.
+  if (localPhase === 'focusing') return null;
 
   const report: EffectReport = queue[Math.min(i, queue.length - 1)];
 

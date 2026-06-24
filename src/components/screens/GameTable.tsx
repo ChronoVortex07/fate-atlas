@@ -13,19 +13,7 @@ import ResultReading from './ResultReading';
 import HistoryModal from '../overlays/HistoryModal';
 import ConstellationFan from '../overlays/ConstellationFan';
 import InteractionSequencer from '../overlays/InteractionSequencer';
-import type { EffectReport } from '../../engine/types';
-
-// While an event batch is in flight, highlight the source/target slots of the
-// first queued report so the fan auto-expands and spotlights the affected card.
-function deriveActiveSlots(queue: EffectReport[]) {
-  const r = queue[0];
-  if (!r) return { sourceIndex: null, targetIndex: null, effect: null };
-  return {
-    sourceIndex: r.sourceSlot ?? null,
-    targetIndex: r.targetSlot ?? null,
-    effect: r.animation ?? null,
-  };
-}
+import { InteractionFocusProvider } from '../../context/InteractionFocusContext';
 
 export default function GameTable() {
   const { state } = useGameEngine();
@@ -88,15 +76,14 @@ export default function GameTable() {
           {renderCenter()}
         </AnimatePresence>
       </div>
-      {showTableau && (
-        <ConstellationFan
-          results={state.turnResults}
-          activeSlots={deriveActiveSlots(state.eventQueue)}
-        />
-      )}
-      {state.eventQueue.length > 0 && (
-        <InteractionSequencer />
-      )}
+      <InteractionFocusProvider>
+        {showTableau && (
+          <ConstellationFan results={state.turnResults} />
+        )}
+        {state.eventQueue.length > 0 && (
+          <InteractionSequencer />
+        )}
+      </InteractionFocusProvider>
       {state.screen === 'minigame' && state.awaitingContinue && state.eventQueue.length === 0 && (
         <ContinueBar />
       )}

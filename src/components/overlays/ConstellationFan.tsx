@@ -1,130 +1,160 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import FanCard, { type FanCardState } from '../cards/FanCard';
-import type { SlotResult } from '../../engine/types';
+import CardDetailModal from './CardDetailModal';
+import { useInteractionFocus } from '../../context/InteractionFocusContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
-
-interface ActiveSlots {
-  sourceIndex: number | null;
-  targetIndex: number | null;
-  effect: string | null;
-}
+import type { SlotResult } from '../../engine/types';
 
 interface Props {
   results: SlotResult[];
-  activeSlots: ActiveSlots;
 }
 
-function getSlotState(index: number, activeSlots: ActiveSlots): FanCardState {
-  if (activeSlots.sourceIndex === index && activeSlots.targetIndex === index) {
-    return 'animating';
-  }
-  if (
-    activeSlots.targetIndex === index &&
-    activeSlots.effect === 'reroll'
-  ) {
-    return 'reroll-target';
-  }
-  if (activeSlots.sourceIndex === index) {
-    return 'source';
-  }
-  if (activeSlots.targetIndex === index) {
-    return 'target';
-  }
-  return 'idle';
-}
-
-export default function ConstellationFan({ results, activeSlots }: Props) {
+export default function ConstellationFan({ results }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const [rotation, setRotation] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [detailIndex, setDetailIndex] = useState<number | null>(null);
+
   const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const prevActiveRef = useRef(activeSlots);
-
-  // Calculate fan angles — spread cards evenly in an arc
-  const arcDegrees = Math.min(140, Math.max(40, results.length * 18));
-  const startAngle = -(arcDegrees / 2);
-  const angleStep = results.length > 1 ? arcDegrees / (results.length - 1) : 0;
-
-  const fanAngles = useMemo(() => {
-    return results.map((_, i) =>
-      results.length === 1 ? 0 : startAngle + angleStep * i,
-    );
-  }, [results.length, startAngle, angleStep]);
+  const dragRef = useRef<{ startX: number; startRot: number } | null>(null);
+  const movedRef = useRef(false);
+  const interactionDrivenRef = useRef(false);
 
   const isDesktop = useMediaQuery('(min-width: 768px)');
+  const { activeReport, phase } = useInteractionFocus();
 
-  // Desktop polar fan positions — non-overlapping arc
-  const desktopPolarPositions = useMemo(() => {
-    if (!isDesktop) return null;
+  const N = results.length;
+  const focusSlot = activeReport?.sourceSlot ?? null;
+  const targetSlot = activeReport?.targetSlot ?? null;
 
-    const degreesPerCard = 26;
-    const arcDeg = Math.min(120, Math.max(40, (results.length - 1) * degreesPerCard));
-    const startAngleDeg = -(arcDeg / 2);
-    const angleStepDeg = results.length > 1 ? arcDeg / (results.length - 1) : 0;
-    const radius = 180; // px from pivot to card bottom-center
+  // Slight fan for the collapsed mobile pile.
+  const arcDegrees = Math.min(140, Math.max(40, N * 18));
+  const startAngle = -(arcDegrees / 2);
+  const angleStep = N > 1 ? arcDegrees / (N - 1) : 0;
+  const fanAngles = useMemo(
+    () => results.map((_, i) => (N === 1 ? 0 : startAngle + angleStep * i)),
+    [N, startAngle, angleStep],
+  );
 
-    return results.map((_, i) => {
-      const angleDeg = results.length === 1 ? 0 : startAngleDeg + angleStepDeg * i;
-      const angleRad = (angleDeg * Math.PI) / 180;
-      return {
-        x: radius * Math.sin(angleRad),
-        y: -(radius * Math.cos(angleRad)), // negative = upward from bottom
-        angleDeg,
-      };
-    });
-  }, [isDesktop, results.length]);
+  // ── Rotating wheel geometry ──
+  const ANGLE_STEP = isDesktop ? 24 : 28; // degrees between adjacent cards
+  const RADIUS = isDesktop ? 210 : 150;   // px from pivot to card bottom-center
+  const MAX_VISIBLE = isDesktop ? 3.2 : 2.4;
 
-  // Auto-expand when an interaction targets a fan card
+  const wrappedOffset = useCallback((i: number, rot: number, n: number): number => {
+    let d = (((i - rot) % n) + n) % n; // [0, n)
+    if (d > n / 2) d -= n;             // (-n/2, n/2]
+    return d;
+  }, []);
+
+  const wheelTransform = useCallback((offset: number) => {
+    const a = (offset * ANGLE_STEP * Math.PI) / 180;
+    const dist = Math.abs(offset);
+    return {
+      x: RADIUS * Math.sin(a),
+      y: -(RADIUS * Math.cos(a)), // front (offset 0) sits highest
+      rotate: offset * ANGLE_STEP,
+      scale: Math.max(0.5, 1 - dist * 0.16),
+      opacity: dist > MAX_VISIBLE ? 0 : Math.max(0.12, 1 - dist * 0.26),
+      zIndex: Math.round(100 - dist * 10),
+    };
+  }, [ANGLE_STEP, RADIUS, MAX_VISIBLE]);
+
+  // ── Drag / wheel scroll (expanded only) ──
+  const PX_PER_CARD = 90;
+
+  const onCardPointerDown = useCallback((e: React.PointerEvent) => {
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+    dragRef.current = { startX: e.clientX, startRot: rotation };
+    movedRef.current = false;
+    setDragging(true);
+  }, [rotation]);
+
+  const onCardPointerMove = useCallback((e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const dx = e.clientX - d.startX;
+    if (Math.abs(dx) > 6) movedRef.current = true;
+    setRotation(d.startRot - dx / PX_PER_CARD);
+  }, []);
+
+  const onCardPointerUp = useCallback(() => {
+    if (!dragRef.current) return;
+    dragRef.current = null;
+    setDragging(false);
+    setRotation((r) => Math.round(r)); // snap-to-front
+  }, []);
+
+  const onWheelSpin = useCallback((e: React.WheelEvent) => {
+    const delta = e.deltaX !== 0 ? e.deltaX : e.deltaY;
+    setRotation((r) => r + delta / 400);
+  }, []);
+
+  const onCardSelect = useCallback((i: number) => {
+    if (movedRef.current) return; // it was a drag, not a tap
+    setDetailIndex(i);
+  }, []);
+
+  const handleToggle = useCallback(() => {
+    interactionDrivenRef.current = false;
+    setExpanded((prev) => !prev);
+    if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
+  }, []);
+
+  const closeExpanded = useCallback(() => {
+    interactionDrivenRef.current = false;
+    setExpanded(false);
+    setDetailIndex(null);
+  }, []);
+
+  // Auto-expand + scroll the wheel to the triggering hand card.
   useEffect(() => {
-    const prev = prevActiveRef.current;
-    const curr = activeSlots;
+    if (focusSlot === null) return;
+    interactionDrivenRef.current = true;
+    setExpanded(true);
+    setRotation((r) => {
+      // Rotate to focusSlot via the shortest looping path.
+      let t = focusSlot;
+      while (t - r > N / 2) t -= N;
+      while (t - r < -N / 2) t += N;
+      return t;
+    });
+  }, [focusSlot, N]);
 
-    const hasNewHighlight =
-      (curr.sourceIndex !== null || curr.targetIndex !== null) &&
-      (curr.sourceIndex !== prev.sourceIndex ||
-        curr.targetIndex !== prev.targetIndex);
-
-    if (hasNewHighlight) {
-      setExpanded(true);
-    }
-
-    prevActiveRef.current = curr;
-  }, [activeSlots]);
-
-  // Auto-collapse after interactions finish
+  // Auto-collapse after an interaction-driven expansion finishes (never collapse
+  // a hand the player opened themselves, nor while dragging / inspecting a card).
   useEffect(() => {
     if (
       expanded &&
-      activeSlots.sourceIndex === null &&
-      activeSlots.targetIndex === null
+      interactionDrivenRef.current &&
+      activeReport === null &&
+      detailIndex === null &&
+      !dragging
     ) {
       collapseTimerRef.current = setTimeout(() => {
         setExpanded(false);
-      }, 3000);
+        interactionDrivenRef.current = false;
+      }, 2500);
     }
-
     return () => {
-      if (collapseTimerRef.current) {
-        clearTimeout(collapseTimerRef.current);
-      }
+      if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
     };
-  }, [expanded, activeSlots]);
+  }, [expanded, activeReport, detailIndex, dragging]);
 
-  const handleToggle = useCallback(() => {
-    setExpanded((prev) => !prev);
-    if (collapseTimerRef.current) {
-      clearTimeout(collapseTimerRef.current);
-    }
-  }, []);
+  const isGlowing = useCallback(
+    (i: number) => phase !== null && (i === focusSlot || (targetSlot !== null && i === targetSlot)),
+    [phase, focusSlot, targetSlot],
+  );
 
   if (results.length === 0) return null;
 
   // Collapsed footprint — sized to the FULL visible stack so the whole pile is
-  // tappable (the cards translate upward out of a bottom-anchored box, so a
-  // short wrapper would leave the top cards outside the hit target).
+  // tappable (the cards translate upward out of a bottom-anchored box).
   const collapsedCardH = isDesktop ? 116 : 72;
   const collapsedStep = isDesktop ? 14 : 6;
   const collapsedBase = isDesktop ? 60 : 36;
-  const collapsedStackH = collapsedBase + Math.max(0, results.length - 1) * collapsedStep + collapsedCardH + 12;
+  const collapsedStackH = collapsedBase + Math.max(0, N - 1) * collapsedStep + collapsedCardH + 12;
   const collapsedStackW = (isDesktop ? 80 : 50) + 24;
 
   return (
@@ -144,7 +174,7 @@ export default function ConstellationFan({ results, activeSlots }: Props) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
-            onClick={() => setExpanded(false)}
+            onClick={closeExpanded}
           />
         )}
       </AnimatePresence>
@@ -178,51 +208,33 @@ export default function ConstellationFan({ results, activeSlots }: Props) {
             >
               ✧ Your Constellation
             </span>
+            <div
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                fontWeight: 300,
+                fontSize: isDesktop ? '0.6rem' : '0.5rem',
+                color: '#5b7290',
+                letterSpacing: '0.05em',
+                marginTop: '2px',
+              }}
+            >
+              drag to scroll · tap a card to inspect
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Subtle arc guide line when expanded */}
-      {expanded && results.length > 1 && (
-        <svg
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            right: isDesktop ? undefined : 0,
-            left: isDesktop ? '50%' : undefined,
-            transform: isDesktop ? 'translateX(-50%)' : undefined,
-            width: isDesktop ? '600px' : '280px',
-            height: isDesktop ? '340px' : '220px',
-            pointerEvents: 'none',
-            zIndex: 15,
-            overflow: 'visible',
-          }}
-        >
-          <path
-            d={isDesktop
-              ? "M 540 326 Q 300 260 60 326"
-              : "M 252 206 Q 120 175 50 212"
-            }
-            fill="none"
-            stroke="rgba(212,168,84,0.08)"
-            strokeWidth="1"
-            strokeDasharray="3,5"
-          />
-        </svg>
-      )}
-
-      {/* Fan cards — rendered in reverse so first-drawn is on top of stack */}
+      {/* Fan cards */}
       <div
         style={{
           position: 'absolute',
           bottom: isDesktop ? '14px' : '56px',
-          // Collapsed: bottom-right on both breakpoints (clears centred minigame UI).
-          // Expanded: centred on desktop so the wheel has symmetric room.
+          // Collapsed: bottom-right on both breakpoints. Expanded: centred wheel.
           right: expanded ? (isDesktop ? undefined : '14px') : (isDesktop ? '20px' : '14px'),
-          left: expanded && isDesktop ? '50%' : undefined,
-          transform: expanded && isDesktop ? 'translateX(-50%)' : undefined,
-          width: expanded ? (isDesktop ? '100%' : '220px') : `${collapsedStackW}px`,
-          height: expanded ? (isDesktop ? '320px' : '220px') : `${collapsedStackH}px`,
+          left: expanded ? '50%' : undefined,
+          transform: expanded ? 'translateX(-50%)' : undefined,
+          width: expanded ? (isDesktop ? '560px' : '320px') : `${collapsedStackW}px`,
+          height: expanded ? (isDesktop ? '340px' : '240px') : `${collapsedStackH}px`,
           zIndex: expanded ? 16 : 8,
           cursor: !expanded ? 'pointer' : undefined,
           WebkitTapHighlightColor: 'transparent',
@@ -231,27 +243,34 @@ export default function ConstellationFan({ results, activeSlots }: Props) {
         }}
         onClick={!expanded ? handleToggle : undefined}
       >
-        {results
-          .map((result, i) => ({ result, i }))
-          .reverse()
-          .map(({ result, i }) => {
-            const polar = desktopPolarPositions?.[i];
-            return (
-              <FanCard
-                key={`fan-${i}`}
-                result={result}
-                index={i}
-                slotState={getSlotState(i, activeSlots)}
-                isExpanded={expanded}
-                fanAngle={fanAngles[i]}
-                isTopCard={i === results.length - 1}
-                isDesktop={isDesktop}
-                polarX={polar?.x}
-                polarY={polar?.y}
-                polarAngle={polar?.angleDeg}
-              />
-            );
-          })}
+        {results.map((result, i) => {
+          const slot = wheelTransform(wrappedOffset(i, rotation, N));
+          return (
+            <FanCard
+              key={`fan-${i}`}
+              result={result}
+              index={i}
+              slotState={'idle' as FanCardState}
+              isExpanded={expanded}
+              fanAngle={fanAngles[i]}
+              isTopCard={i === N - 1}
+              isDesktop={isDesktop}
+              wheelX={expanded ? slot.x : undefined}
+              wheelY={expanded ? slot.y : undefined}
+              wheelRotate={expanded ? slot.rotate : undefined}
+              wheelScale={expanded ? slot.scale : undefined}
+              wheelOpacity={expanded ? slot.opacity : undefined}
+              wheelZ={expanded ? slot.zIndex : undefined}
+              glowing={expanded && isGlowing(i)}
+              instant={dragging}
+              onSelect={() => onCardSelect(i)}
+              onPointerDown={onCardPointerDown}
+              onPointerMove={onCardPointerMove}
+              onPointerUp={onCardPointerUp}
+              onWheelSpin={onWheelSpin}
+            />
+          );
+        })}
       </div>
 
       {/* Collapsed hint — subtle ✧ indicator near the deck */}
@@ -278,10 +297,17 @@ export default function ConstellationFan({ results, activeSlots }: Props) {
               letterSpacing: '0.05em',
             }}
           >
-            {results.length} ✧ tap to expand
+            {N} ✧ tap to expand
           </span>
         </motion.div>
       )}
+
+      {/* Tap-to-inspect detail modal */}
+      <AnimatePresence>
+        {detailIndex !== null && results[detailIndex] && (
+          <CardDetailModal result={results[detailIndex]} onClose={() => setDetailIndex(null)} />
+        )}
+      </AnimatePresence>
     </>
   );
 }
