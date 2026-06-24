@@ -1,24 +1,29 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import type { PlanetId, SignId } from '../../../engine/types';
-import { PLANETS, SIGNS } from '../../../data/astromancy';
+import { PLANETS, SIGNS, ELEMENT_BY_SIGN } from '../../../data/astromancy';
 import { topFaceIndex, type Vec3 } from '../../../engine/astralGeometry';
+import { ZODIAC_ICONS, ELEMENT_COLOR, iconImage } from './icons';
 
 // Face → id ordering. Index i of these arrays maps to face i of the geometry.
 export const PLANET_FACE_IDS = Object.keys(PLANETS) as PlanetId[];     // 12
 export const SIGN_FACE_IDS = Object.keys(SIGNS) as SignId[];           // 12
 
+interface FaceData { center: Vec3; normal: Vec3 }
+
 export interface Die {
   object: THREE.Group;
   body: CANNON.Body;
-  faceNormals: Vec3[]; // local-space outward normal per face (index = face id index)
+  faceData: FaceData[];        // local-space center + outward normal per face
+  faceNormals: Vec3[];         // = faceData.map(f => f.normal); kept for hot paths
   faceIds: string[];
+  radius: number;
   kind: 'planet' | 'sign';
 }
 
 // Cluster a DodecahedronGeometry's 36 triangles into its 12 pentagon faces by
 // grouping near-parallel triangle normals. Returns { center, normal } per face.
-function computeFaceData(geo: THREE.BufferGeometry): { center: Vec3; normal: Vec3 }[] {
+function computeFaceData(geo: THREE.BufferGeometry): FaceData[] {
   const pos = geo.getAttribute('position');
   const tris: { c: THREE.Vector3; n: THREE.Vector3 }[] = [];
   const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
@@ -52,6 +57,9 @@ function computeFaceData(geo: THREE.BufferGeometry): { center: Vec3; normal: Vec
   return faces.map((f) => ({ center: f.center, normal: f.normal })); // expect length 12
 }
 
+// Text-presentation glyph (VS-15 forces the symbol form, not the emoji form
+// Windows otherwise substitutes for ♀/♂ etc.). Used for the planet die and as
+// the sign-face fallback if an icon image fails to load.
 function glyphTexture(glyph: string, color: string): THREE.CanvasTexture {
   const S = 256;
   const cv = document.createElement('canvas');
@@ -62,10 +70,39 @@ function glyphTexture(glyph: string, color: string): THREE.CanvasTexture {
   ctx.font = `${S * 0.62}px "Cormorant Garamond", serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(glyph, S / 2, S / 2 + 6);
+  ctx.fillText(`${glyph}︎`, S / 2, S / 2 + 6); // VS-15 forces text (non-emoji) form
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
+}
+
+// Composite an icon image onto a face-sized canvas at the same ~62% scale the
+// planet glyph uses, so the sign die reads at the same weight as the planet die.
+function iconTexture(img: HTMLImageElement): THREE.CanvasTexture {
+  const S = 256;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = S;
+  const ctx = cv.getContext('2d')!;
+  ctx.clearRect(0, 0, S, S);
+  const d = S * 0.6;
+  ctx.drawImage(img, (S - d) / 2, (S - d) / 2, d, d);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// Attach one outward-facing plane carrying `tex` to a die face.
+function addFacePlane(die: Die, faceIndex: number, tex: THREE.Texture): void {
+  const f = die.faceData[faceIndex];
+  const plane = new THREE.Mesh(
+    new THREE.PlaneGeometry(die.radius * 0.9, die.radius * 0.9),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }),
+  );
+  const c = new THREE.Vector3(f.center.x, f.center.y, f.center.z);
+  const n = new THREE.Vector3(f.normal.x, f.normal.y, f.normal.z);
+  plane.position.copy(c).addScaledVector(n, 0.01);
+  plane.lookAt(c.clone().add(n));
+  die.object.add(plane);
 }
 
 export function createDie(
@@ -86,22 +123,6 @@ export function createDie(
   object.add(bodyMesh);
 
   const faceData = computeFaceData(geo);
-  const glyphColor = kind === 'planet' ? '#d4a854' : '#9bc4e2';
-
-  // One glyph plane per face, positioned just outside the face, facing outward.
-  faceData.forEach((f, i) => {
-    const id = faceIds[i];
-    const glyph = kind === 'planet' ? PLANETS[id as PlanetId].glyph : SIGNS[id as SignId].glyph;
-    const plane = new THREE.Mesh(
-      new THREE.PlaneGeometry(radius * 0.9, radius * 0.9),
-      new THREE.MeshBasicMaterial({ map: glyphTexture(glyph, glyphColor), transparent: true, depthWrite: false }),
-    );
-    const c = new THREE.Vector3(f.center.x, f.center.y, f.center.z);
-    const n = new THREE.Vector3(f.normal.x, f.normal.y, f.normal.z);
-    plane.position.copy(c).addScaledVector(n, 0.01);
-    plane.lookAt(c.clone().add(n));
-    object.add(plane);
-  });
 
   // Sphere collider (radius ≈ dodeca inradius so the snapped face sits ~flush).
   const body = new CANNON.Body({
@@ -111,12 +132,35 @@ export function createDie(
   world.addBody(body);
 
   return {
-    object,
-    body,
-    faceNormals: faceData.map((f) => f.normal),
-    faceIds,
-    kind,
+    object, body, faceData, faceNormals: faceData.map((f) => f.normal),
+    faceIds, radius, kind,
   };
+}
+
+// Planet faces: astrological glyph in gold, drawn synchronously.
+export function addPlanetFaces(die: Die): void {
+  die.faceIds.forEach((id, i) => {
+    addFacePlane(die, i, glyphTexture(PLANETS[id as PlanetId].glyph, '#d4a854'));
+  });
+}
+
+// Sign faces: gi zodiac icon tinted to the sign's element color. Async (icon
+// images decode off a data URL); `isAlive` guards against the scene disposing
+// mid-load so we don't add textures to a torn-down graph.
+export async function addSignFaces(die: Die, isAlive: () => boolean): Promise<void> {
+  const imgs = await Promise.all(
+    die.faceIds.map((id) => {
+      const sign = id as SignId;
+      return iconImage(ZODIAC_ICONS[sign], ELEMENT_COLOR[ELEMENT_BY_SIGN[sign]]);
+    }),
+  );
+  if (!isAlive()) return;
+  die.faceIds.forEach((id, i) => {
+    const sign = id as SignId;
+    const color = ELEMENT_COLOR[ELEMENT_BY_SIGN[sign]];
+    const img = imgs[i];
+    addFacePlane(die, i, img ? iconTexture(img) : glyphTexture(SIGNS[sign].glyph, color));
+  });
 }
 
 export function faceIndexOfId(die: Die, id: string): number {

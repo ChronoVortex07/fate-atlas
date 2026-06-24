@@ -196,6 +196,17 @@ export default function AstralMinigame() {
           <p style={modeLabelStyle}>{modeLabel}</p>
         )}
 
+        {isCasting && (
+          <motion.p
+            style={settleHintStyle}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 0.7, 0.7] }}
+            transition={{ duration: 1.4, times: [0, 0.6, 1] }}
+          >
+            Tap the board to settle the stars
+          </motion.p>
+        )}
+
         {/* Persistent 3D board — visible from idle through the result */}
         <div style={boardWrapStyle}>
           <CelestialCast
@@ -333,6 +344,17 @@ const modeLabelStyle: React.CSSProperties = {
   fontSize: 'clamp(0.8rem, 1.5vw, 0.95rem)',
   color: '#7b9ec7',
   fontStyle: 'italic',
+  textAlign: 'center',
+  margin: 0,
+};
+
+const settleHintStyle: React.CSSProperties = {
+  fontFamily: "'Inter', sans-serif",
+  fontWeight: 300,
+  fontSize: '0.7rem',
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+  color: '#5b7290',
   textAlign: 'center',
   margin: 0,
 };

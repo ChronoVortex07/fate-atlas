@@ -3,19 +3,21 @@ import * as CANNON from 'cannon-es';
 import type { AstralCast, OmenTag, PlanetId, SignId } from '../../../engine/types';
 import { castTuning } from '../../../engine/astralPhysics';
 import {
-  sectorOf, sectorCenter, isErrantStar, isCrownedConjunction, BOARD_RADIUS,
+  sectorOf, sectorCenter, isErrantStar, isCrownedConjunction, BOARD_RADIUS, WALL_RADIUS,
 } from '../../../engine/astralGeometry';
 import { createBoard } from './board';
 import {
-  createDie, readTopFace, faceIndexOfId, snapToFace,
+  createDie, addPlanetFaces, addSignFaces, readTopFace, faceIndexOfId, snapToFace,
   PLANET_FACE_IDS, SIGN_FACE_IDS, type Die,
 } from './dice';
 
 const DIE_R = 0.55;
-const SETTLE_FRAMES = 35;      // frames of near-stillness before settling
-const SETTLE_TICK_CAP = 600;   // hard timeout → veiled-oracle
-const CAM_TILT = new THREE.Vector3(0, 7, 9);     // during roll
-const CAM_TOP = new THREE.Vector3(0, 14, 0.001); // settled
+const SETTLE_FRAMES = 24;        // frames of near-stillness before settling
+const SAFETY_CAP = 900;          // hang-guard only: force a settle (→ veiled-oracle)
+const VEIL_THRESHOLD = 5;        // dice energy above which a hurried click veils the cast
+const HURRY_DAMP = 0.82;         // per-tick velocity bleed once the player taps to settle
+const CAM_TILT = new THREE.Vector3(0, 9.5, 14.5);  // during roll
+const CAM_TOP = new THREE.Vector3(0, 19, 0.001);   // settled
 
 export interface CelestialSceneController {
   roll(target: AstralCast | null): void;
@@ -59,7 +61,19 @@ export function createCelestialScene(opts: {
   floor.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
   world.addBody(floor);
 
+  // Circular collision wall at the rim — a 24-gon of inward-facing planes so the
+  // dice bounce and stay in bounds instead of flying off and being pulled back.
+  const WALL_SEGMENTS = 24;
+  for (let i = 0; i < WALL_SEGMENTS; i++) {
+    const a = (i / WALL_SEGMENTS) * Math.PI * 2;
+    const wall = new CANNON.Body({ mass: 0, shape: new CANNON.Plane(), material: floorMat });
+    wall.quaternion.setFromVectors(new CANNON.Vec3(0, 0, 1), new CANNON.Vec3(-Math.cos(a), 0, -Math.sin(a)));
+    wall.position.set(Math.cos(a) * WALL_RADIUS, 0, Math.sin(a) * WALL_RADIUS);
+    world.addBody(wall);
+  }
+
   // ── Dice ──
+  let disposed = false;
   const planet = createDie('planet', world, PLANET_FACE_IDS, DIE_R);
   const sign = createDie('sign', world, SIGN_FACE_IDS, DIE_R);
   [planet, sign].forEach((d) => {
@@ -68,6 +82,9 @@ export function createCelestialScene(opts: {
     d.body.angularDamping = tuning.angularDamping;
     scene.add(d.object);
   });
+  // Faces: planet glyphs are sync; sign icons decode off data URLs (async).
+  addPlanetFaces(planet);
+  void addSignFaces(sign, () => !disposed);
 
   // Board (async). Dice rest off-board until the texture is ready / a roll starts.
   const boardGroup = new THREE.Group();
@@ -90,6 +107,8 @@ export function createCelestialScene(opts: {
   let still = 0, ticks = 0, raf = 0;
   let target: AstralCast | null = null;
   let settledFired = false;
+  let hurry = false;       // player tapped to hasten the settle
+  let rushedVeil = false;  // tapped while the dice were still tumbling hard
 
   const throwDie = (d: Die, dx: number) => {
     d.body.position.set(dx, 6 + Math.random() * 1.5, BOARD_RADIUS * 0.35 + Math.random());
@@ -99,22 +118,6 @@ export function createCelestialScene(opts: {
       (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10,
     );
     d.body.quaternion.setFromEuler(Math.random() * 6, Math.random() * 6, Math.random() * 6);
-  };
-
-  const applyForces = () => {
-    for (const d of [planet, sign]) {
-      const p = d.body.position;
-      // Gentle radial centering (the weakened vortex).
-      d.body.applyForce(new CANNON.Vec3(-p.x * tuning.centering, 0, -p.z * tuning.centering), p);
-      // Lateral light/shadow drift.
-      if (tuning.lateralBias) d.body.applyForce(new CANNON.Vec3(tuning.lateralBias, 0, 0), p);
-      // Chaos turbulence.
-      if (tuning.turbulence && ticks % 8 === 0) {
-        d.body.applyForce(new CANNON.Vec3(
-          (Math.random() - 0.5) * tuning.turbulence * 6, 0, (Math.random() - 0.5) * tuning.turbulence * 6,
-        ), p);
-      }
-    }
   };
 
   const syncMesh = (d: Die) => {
@@ -127,6 +130,7 @@ export function createCelestialScene(opts: {
     if (settledFired) return;
     settledFired = true;
     phase = 'done';
+    canvas.style.cursor = 'default';
 
     // Snap each die flat (to target face if provided, else to up-most face).
     // Capture face ids BEFORE snapping so the cast is built from the pre-snap
@@ -156,7 +160,8 @@ export function createCelestialScene(opts: {
     if (isCrownedConjunction(
       { x: pPos.x, y: pPos.y, z: pPos.z }, { x: sPos.x, y: sPos.y, z: sPos.z },
     )) omens.push('crowned-conjunction');
-    if (ticks >= SETTLE_TICK_CAP) omens.push('veiled-oracle');
+    // Veiled when the cast was rushed (tapped mid-tumble) or hit the hang-guard.
+    if (rushedVeil || ticks >= SAFETY_CAP) omens.push('veiled-oracle');
 
     // Target-driven (debug): preserve the staged omens and add any
     // physically-derived ones (deduped). Real casts build from the dice.
@@ -178,7 +183,13 @@ export function createCelestialScene(opts: {
 
     if (phase === 'rolling') {
       ticks++;
-      applyForces();
+      if (hurry) {
+        // Tap-to-settle: bleed off momentum and let them fall to a clean rest.
+        for (const d of [planet, sign]) {
+          d.body.velocity.scale(HURRY_DAMP, d.body.velocity);
+          d.body.angularVelocity.scale(HURRY_DAMP, d.body.angularVelocity);
+        }
+      }
       world.fixedStep();
       syncMesh(planet); syncMesh(sign);
 
@@ -191,7 +202,7 @@ export function createCelestialScene(opts: {
       camera.position.lerpVectors(CAM_TILT, CAM_TOP, t * t);
       camera.lookAt(0, 0, 0);
 
-      if (still > SETTLE_FRAMES || ticks >= SETTLE_TICK_CAP) settle();
+      if (still > SETTLE_FRAMES || ticks >= SAFETY_CAP) settle();
     } else if (phase === 'idle') {
       boardGroup.rotation.y += 0.0015; // ambient life
       syncMesh(planet); syncMesh(sign);
@@ -208,19 +219,34 @@ export function createCelestialScene(opts: {
   const onResize = () => { const s = size(); renderer.setSize(s, s, false); };
   window.addEventListener('resize', onResize);
 
+  // Tap the board to hasten the settle. Tapping while the dice still tumble hard
+  // veils the cast (the player rushed the oracle).
+  const onPointerDown = () => {
+    if (phase !== 'rolling' || hurry) return;
+    hurry = true;
+    const energy = planet.body.velocity.length() + sign.body.velocity.length()
+      + planet.body.angularVelocity.length() + sign.body.angularVelocity.length();
+    if (energy > VEIL_THRESHOLD) rushedVeil = true;
+  };
+  canvas.addEventListener('pointerdown', onPointerDown);
+
   return {
     roll(t: AstralCast | null) {
       target = t;
       settledFired = false;
+      hurry = false; rushedVeil = false;
       still = 0; ticks = 0;
       boardGroup.rotation.y = 0;
       phase = 'rolling';
+      canvas.style.cursor = 'pointer';
       throwDie(planet, -DIE_R * 1.4);
       throwDie(sign, DIE_R * 1.4);
     },
     dispose() {
+      disposed = true;
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', onResize);
+      canvas.removeEventListener('pointerdown', onPointerDown);
       scene.traverse((obj) => {
         const mesh = obj as THREE.Mesh;
         if (mesh.geometry) mesh.geometry.dispose();

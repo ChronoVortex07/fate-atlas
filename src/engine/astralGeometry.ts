@@ -6,7 +6,12 @@ export interface Quat { x: number; y: number; z: number; w: number }
 
 // World-space board radius (three.js units). The board plane is X–Z; +Y is up;
 // the camera looks down −Y. "Top" of the board is −Z.
+//
+// BOARD_RADIUS is the playfield / out-of-bounds threshold: a die resting beyond
+// it has rolled into the outer ring (errant-star). The visible disc and the
+// collision wall extend out to WALL_RADIUS — the exterior of that outer ring.
 export const BOARD_RADIUS = 5;
+export const WALL_RADIUS = 6.1;
 export const CONJUNCTION_DIST = 1.4;
 
 const TAU = Math.PI * 2;
