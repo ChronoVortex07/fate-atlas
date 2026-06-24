@@ -69,7 +69,7 @@ export type RollMode = 'single' | 'advantage' | 'disadvantage' | 'choice';
 export type QuestionType = 'decision' | 'relationship' | 'future' | 'self';
 
 // ── Divination Methods ──
-export type DivinationType = 'tarot' | 'd20' | 'iching' | 'astral' | 'happening';
+export type DivinationType = 'tarot' | 'd20' | 'iching' | 'astral' | 'rune' | 'happening';
 
 // ── Thematic Data Layer ──
 
@@ -242,6 +242,43 @@ export interface AstralResult extends ThematicData {
   cast: AstralCast;
 }
 
+// ── Rune Types ──
+export type RuneId =
+  | 'fehu'|'uruz'|'thurisaz'|'ansuz'|'raidho'|'kenaz'|'gebo'|'wunjo'
+  | 'hagalaz'|'nauthiz'|'isa'|'jera'|'eihwaz'|'perthro'|'algiz'|'sowilo'
+  | 'tiwaz'|'berkano'|'ehwaz'|'mannaz'|'laguz'|'ingwaz'|'othala'|'dagaz';
+export type RuneAett = 'freyr' | 'heimdall' | 'tyr';
+export type RuneOrientation = 'upright' | 'merkstave';
+export type RuneRing = 'heart' | 'field' | 'margin';
+export type RuneOmenTag = 'bindrune' | 'merkstave-cascade' | 'true-cast' | 'silent-field' | 'errant-rune';
+
+export interface LandedRune {
+  rune: RuneId;
+  faceUp: boolean;              // false = silent (face-down)
+  orientation: RuneOrientation; // meaningful only when faceUp
+  ring: RuneRing;               // derived from distance to center
+  x: number; y: number;         // normalized cloth coords (~[-1,1]); proximity + render
+}
+
+export interface RuneScatter {
+  stones: LandedRune[];   // length = cast size (6)
+  governingIndex: number; // index into stones — the read governing stone
+  omens: RuneOmenTag[];
+}
+
+export interface RuneResult extends ThematicData {
+  type: 'rune';
+  id: string;
+  name: string;
+  symbol: string;        // governing rune glyph
+  rune: RuneId;
+  orientation: RuneOrientation;
+  ring: RuneRing;
+  interpretation: string;
+  tags: Tag[];
+  scatter: RuneScatter;
+}
+
 export interface HappeningResult extends ThematicData {
   type: 'happening';
   id: string;
@@ -255,7 +292,7 @@ export interface HappeningChoice {
   affinityChanges: Partial<Record<AffinityId, number>>;
 }
 
-export type DivinationResult = TarotResult | DiceResult | IChingResult | AstralResult;
+export type DivinationResult = TarotResult | DiceResult | IChingResult | AstralResult | RuneResult;
 
 export type SlotResult = DivinationResult | HappeningResult;
 

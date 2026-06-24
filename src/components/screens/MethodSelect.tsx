@@ -7,6 +7,7 @@ const METHOD_CARDS: Record<DivinationType, { symbol: string; title: string; desc
   d20: { symbol: String.fromCodePoint(0x2685), title: 'Dice', description: 'Cast the twenty-sided die — fate speaks through numbers.', color: '#c75b4a' },
   iching: { symbol: String.fromCodePoint(0x4DC0), title: 'I Ching', description: 'Consult the Book of Changes — the hexagram illuminates your path.', color: '#5b8c5a' },
   astral: { symbol: '★', title: 'Astral', description: 'Gaze upon the heavens — the celestial bodies reveal their wisdom.', color: '#5b7ec7' },
+  rune: { symbol: 'ᚠ', title: 'Rune Casting', description: 'Cast the lots upon the cloth — the scattered staves speak as they fall.', color: '#c8a86a' },
   happening: { symbol: String.fromCodePoint(0x2726), title: 'Happening', description: 'Something stirs in the weave — a cryptic event awaits.', color: '#d4a854' },
 };
 
