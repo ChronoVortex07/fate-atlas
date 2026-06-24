@@ -452,11 +452,12 @@ the condition requires. Open the debug panel (`?debug` or `Ctrl+Shift+D`) to run
 
 ## 8. Astromancy
 
-Astromancy (`type: 'astral'`) is the fourth divination method. The cast throws two physical
-dice onto a 12-house zodiac board: a **Planet die** (12 faces) and a **Sign die** (12 faces).
-Where each die lands determines a house; the angle between the two houses produces an
-**aspect**. The reading is **Planet-in-Sign-in-House** plus the aspect between them — four
-signals combined into a single `AstralResult`.
+Astromancy (`type: 'astral'`) is the fourth divination method. Two real **3D d12 dice** are
+thrown onto a 12-house zodiac board that is **visible before the cast**: a **Planet die** and a
+**Sign die**. The up-most face of each die decides the planet/sign; the board slice the die
+comes to rest in decides the house. The angle between the two houses produces an **aspect**.
+The reading is **Planet-in-Sign-in-House** plus the aspect between them — four signals
+combined into a single `AstralResult`.
 
 The legacy d20 method coexists with astromancy in the pool; both are available.
 
@@ -621,16 +622,20 @@ weight-1 MUTATE rivals in a tie); the rest are weight 1.
 
 | Omen tag | Physics trigger | Responder activated |
 |----------|----------------|---------------------|
-| `errant-star` | A die slides off the board | `astral-errant-star` (SPAWN) |
-| `crowned-conjunction` | Both dice come to rest in the same house | `astral-conjunction-crowned` (MUTATE weight 2) |
-| `veiled-oracle` | A die lands askew / on an edge | `astral-veiled-oracle` (MUTATE) |
+| `errant-star` | A die comes to rest beyond the board rim (chaos raises the odds) | `astral-errant-star` (SPAWN) |
+| `crowned-conjunction` | The planet and sign dice settle close together | `astral-conjunction-crowned` (MUTATE weight 2) |
+| `veiled-oracle` | The cast fails to settle before the time cap (timeout-based) | `astral-veiled-oracle` (MUTATE) |
 
 > **Physics is presentation only.** The engine-side generator `drawAstralCast` produces a
 > plain `AstralCast` with `omens: []`; the React physics renderer populates the omen tags
 > before passing the cast to `consolidateCast`. Affinities act as physical forces during the
-> throw: **Chaos** adds turbulence (wider scatter, more extreme aspects), **Order** centers
-> the dice (smaller separation between the two landing houses). This is cosmetic — the
-> same affinity influence is already baked into the engine-side `drawAstralCast` fallback.
+> throw: **Chaos** makes dice bouncier with wider scatter and turbulence (more extreme
+> aspects); **Order** applies gentle centering and a calmer settle — the center pull is
+> deliberately light so dice still spread across slices. **Light/Shadow** introduce lateral
+> drift. This is cosmetic — the same affinity influence is already baked into the
+> engine-side `drawAstralCast` fallback. *(A dedicated "cocked die"/"lands askew on an
+> edge" signal is not used with the sphere-collider physics; `veiled-oracle` is
+> timeout-based.)*
 
 ---
 

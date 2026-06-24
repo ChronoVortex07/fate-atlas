@@ -1,8 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
-import { drawAstralCast, consolidateCast, HOUSES } from '../../data/astromancy';
-import CelestialCast from './CelestialCast';
+import { consolidateCast, HOUSES } from '../../data/astromancy';
+import CelestialCast, { type CelestialCastHandle } from './CelestialCast';
 import AstralSigil from '../cards/AstralSigil';
 import type { AstralCast, AstralResult } from '../../engine/types';
 import type { AstralCastMode } from '../../engine/astral';
@@ -20,9 +20,8 @@ export default function AstralMinigame() {
 
   const [plan, setPlan] = useState<{ mode: AstralCastMode; offerRecast: boolean; sources: string[] } | null>(null);
 
-  // Physics faces passed to CelestialCast
-  const [facesA, setFacesA] = useState<AstralCast | null>(null);
-  const [facesB, setFacesB] = useState<AstralCast | null>(null);
+  const castRef = useRef<CelestialCastHandle | null>(null);
+  const castIndexRef = useRef<0 | 1>(0);
 
   // Raw settled casts from physics
   const [castA, setCastA] = useState<AstralCast | null>(null);
@@ -58,48 +57,41 @@ export default function AstralMinigame() {
     engine.completeMinigame(result, meta);
   }, [engine]);
 
+  // Roll cast N. Cast 0 always; cast 1 only for two-cast modes. Debug target
+  // applies to the first (pre-recast) cast when an astral scenario is staged.
+  const rollCast = useCallback((index: 0 | 1) => {
+    castIndexRef.current = index;
+    const useStaged = !!stagedCast && index === 0 && !recastUsedRef.current;
+    castRef.current?.roll(useStaged ? stagedCast! : null);
+  }, [stagedCast]);
+
   const handleCast = useCallback(() => {
     const p = engine.planAstralCast();
     setPlan(p);
     recastUsedRef.current = false;
-
-    // For single/favored/clouded: use staged cast as face-A if available (debug only)
-    const useStaged = !!stagedCast && p.mode !== 'choice';
-
-    if (p.mode === 'single') {
-      setFacesA(useStaged ? stagedCast! : drawAstralCast(state.affinities));
-      setFacesB(null);
-    } else {
-      setFacesA(useStaged ? stagedCast! : drawAstralCast(state.affinities));
-      setFacesB(drawAstralCast(state.affinities));
-    }
+    setCastA(null); setCastB(null); setLocalResult(null);
     setPhase('casting');
-  }, [engine, state.affinities, stagedCast]);
+    rollCast(0);
+  }, [engine, rollCast]);
 
-  // CelestialCast A settled
-  const handleSettledA = useCallback((cast: AstralCast) => {
-    setCastA(cast);
+  // Unified settle handler — the scene calls this once per roll.
+  const handleCastSettled = useCallback((cast: AstralCast) => {
     if (!plan) return;
-    if (plan.mode === 'single') {
-      const result = consolidateCast(cast);
-      setLocalResult(result);
-      // single: if offerRecast and haven't recast yet → offer; else auto-commit
-      if (plan.offerRecast && !recastUsedRef.current) {
-        setPhase('recast-offer');
+    if (castIndexRef.current === 0) {
+      setCastA(cast);
+      if (plan.mode === 'single') {
+        const result = consolidateCast(cast);
+        setLocalResult(result);
+        setPhase(plan.offerRecast && !recastUsedRef.current ? 'recast-offer' : 'settled');
       } else {
-        setPhase('settled');
+        setPhase('settle-b');
+        rollCast(1);
       }
     } else {
-      // Need B to settle first
-      setPhase('settle-b');
+      setCastB(cast);
+      setPhase('both-settled');
     }
-  }, [plan]);
-
-  // CelestialCast B settled
-  const handleSettledB = useCallback((cast: AstralCast) => {
-    setCastB(cast);
-    setPhase('both-settled');
-  }, []);
+  }, [plan, rollCast]);
 
   // Both settled → resolve favored/clouded or enter choice
   useEffect(() => {
@@ -145,16 +137,10 @@ export default function AstralMinigame() {
     if (!plan) return;
     recastUsedRef.current = true;
     committedRef.current = false;
-    setCastA(null);
-    setCastB(null);
-    setLocalResult(null);
-    const a = drawAstralCast(state.affinities);
-    setFacesA(a);
-    if (plan.mode !== 'single') {
-      setFacesB(drawAstralCast(state.affinities));
-    }
+    setCastA(null); setCastB(null); setLocalResult(null);
     setPhase('casting');
-  }, [plan, state.affinities]);
+    rollCast(0);
+  }, [plan, rollCast]);
 
   // Cleanup choice-path commit timer on unmount
   useEffect(() => {
@@ -210,43 +196,27 @@ export default function AstralMinigame() {
           <p style={modeLabelStyle}>{modeLabel}</p>
         )}
 
-        {/* Idle: tap-to-cast button */}
-        {isIdle && (
-          <motion.button
-            style={castButtonStyle}
-            animate={{ rotate: 360 }}
-            transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={handleCast}
-          >
-            <span style={castGlyphStyle}>✦</span>
-            <span style={tapHintStyle}>Tap to cast</span>
-          </motion.button>
-        )}
-
-        {/* Casting: one or two CelestialCast boards */}
-        {isCasting && facesA && (
-          <motion.div
-            style={castRowStyle}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
-          >
-            <CelestialCast
-              affinities={state.affinities}
-              faces={facesA}
-              onSettled={handleSettledA}
-            />
-            {facesB && (
-              <CelestialCast
-                affinities={state.affinities}
-                faces={facesB}
-                onSettled={handleSettledB}
-              />
-            )}
-          </motion.div>
-        )}
+        {/* Persistent 3D board — visible from idle through the result */}
+        <div style={boardWrapStyle}>
+          <CelestialCast
+            ref={castRef}
+            affinities={state.affinities}
+            onSettled={handleCastSettled}
+          />
+          {isIdle && (
+            <motion.button
+              style={castOverlayBtnStyle}
+              animate={{ rotate: 360 }}
+              transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.92 }}
+              onClick={handleCast}
+            >
+              <span style={castGlyphStyle}>✦</span>
+              <span style={tapHintStyle}>Tap to cast</span>
+            </motion.button>
+          )}
+        </div>
 
         {/* Single settled result (single / favored / clouded after resolution) */}
         {showResult && displayResult && (
@@ -367,20 +337,20 @@ const modeLabelStyle: React.CSSProperties = {
   margin: 0,
 };
 
-const castButtonStyle: React.CSSProperties = {
-  width: '120px',
-  height: '120px',
-  background: '#0d1220',
-  border: '2px solid #d4a854',
-  borderRadius: '50%',
+const boardWrapStyle: React.CSSProperties = {
+  position: 'relative',
   display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
   justifyContent: 'center',
-  gap: '0.5rem',
-  cursor: 'pointer',
-  outline: 'none',
-  fontFamily: 'inherit',
+  alignItems: 'center',
+};
+
+const castOverlayBtnStyle: React.CSSProperties = {
+  position: 'absolute',
+  width: '120px', height: '120px',
+  background: 'rgba(13, 18, 32, 0.72)',
+  border: '2px solid #d4a854', borderRadius: '50%',
+  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+  gap: '0.5rem', cursor: 'pointer', outline: 'none', fontFamily: 'inherit',
 };
 
 const castGlyphStyle: React.CSSProperties = {
@@ -395,14 +365,6 @@ const tapHintStyle: React.CSSProperties = {
   fontSize: '0.6rem',
   color: '#5b7290',
   letterSpacing: '0.1em',
-};
-
-const castRowStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: '1.5rem',
-  flexWrap: 'wrap',
-  justifyContent: 'center',
-  alignItems: 'flex-start',
 };
 
 const resultStyle: React.CSSProperties = {

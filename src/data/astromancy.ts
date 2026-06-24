@@ -52,6 +52,10 @@ export const SIGNS: Record<SignId, SignDef> = Object.fromEntries(
 export const ELEMENT_BY_SIGN: Record<SignId, SignDef['element']> =
   Object.fromEntries(SIGN_ROWS.map(([id, , , element]) => [id, element])) as Record<SignId, SignDef['element']>;
 
+// The "natural zodiac": House 1 ↔ Aries … House 12 ↔ Pisces. Cosmetic mapping
+// used to decorate the 12 board slices; gameplay house = the physical sector.
+export const NATURAL_ZODIAC_BY_HOUSE: SignId[] = SIGN_ROWS.map(([id]) => id);
+
 export const HOUSES: HouseDef[] = [
   { house: 1,  arena: 'Self',          theme: 'authority' },
   { house: 2,  arena: 'Resources',     theme: 'stagnation' },
