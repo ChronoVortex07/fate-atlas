@@ -1,56 +1,22 @@
 import { useState, useCallback } from 'react';
 import { useGameEngine } from '../../hooks/useGameEngine';
-import StateViewer from './StateViewer';
-import JsonInjector from './JsonInjector';
-import StepControls from './StepControls';
+import Dashboard from './Dashboard';
+import RawDataTab from './RawDataTab';
+import EventsTab from './EventsTab';
 
-type Tab = 'State' | 'Inject' | 'Steps' | 'Events';
+type Tab = 'Dashboard' | 'Raw Data' | 'Events';
 
-const TABS: Tab[] = ['State', 'Inject', 'Steps', 'Events'];
+const TABS: Tab[] = ['Dashboard', 'Raw Data', 'Events'];
 
 export default function DebugPanel() {
   const { state, engine } = useGameEngine();
-  const [activeTab, setActiveTab] = useState<Tab>('State');
-  const [scenarioId, setScenarioId] = useState('');
-
-  // Ad-hoc forcing state
-  const responderIds = engine.getResponderIds();
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [isolate, setIsolate] = useState(false);
-
-  const presets = engine.getScenarioPresets();
-  const groupedPresets = presets.reduce<Record<string, typeof presets>>((acc, p) => {
-    (acc[p.group] ??= []).push(p);
-    return acc;
-  }, {});
+  const [activeTab, setActiveTab] = useState<Tab>('Dashboard');
 
   const handleClose = useCallback(() => {
     engine.loadState({ debug: false });
   }, [engine]);
 
-  const handleLoadScenario = useCallback(() => {
-    if (scenarioId) engine.loadScenarioById(scenarioId);
-  }, [scenarioId, engine]);
-
-  const handleToggleResponder = useCallback((id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
-  }, []);
-
-  const handleArm = useCallback(() => {
-    engine.forceEffects(selectedIds, isolate);
-  }, [engine, selectedIds, isolate]);
-
-  const handleClearArmed = useCallback(() => {
-    engine.forceEffects([], false);
-    setSelectedIds([]);
-    setIsolate(false);
-  }, [engine]);
-
   if (!state.debug) return null;
-
-  const { forced: armedIds, isolate: armedIsolate } = state.debugConfig;
 
   return (
     <div style={panelStyle}>
@@ -58,7 +24,7 @@ export default function DebugPanel() {
       <div style={headerStyle}>
         <span style={titleStyle}>Debug</span>
         <button style={closeButtonStyle} onClick={handleClose}>
-          X
+          ✕
         </button>
       </div>
 
@@ -80,105 +46,10 @@ export default function DebugPanel() {
 
       {/* Tab content */}
       <div style={contentStyle}>
-        {activeTab === 'State' && <StateViewer />}
-        {activeTab === 'Inject' && <JsonInjector />}
-        {activeTab === 'Steps' && <StepControls />}
+        {activeTab === 'Dashboard' && <Dashboard />}
+        {activeTab === 'Raw Data' && <RawDataTab />}
         {activeTab === 'Events' && <EventsTab />}
       </div>
-
-      {/* Scenario controls */}
-      <div style={scenarioSectionStyle}>
-        <label style={labelStyle}>Scenario Preset</label>
-        <div style={scenarioRowStyle}>
-          <select
-            value={scenarioId}
-            onChange={(e) => setScenarioId(e.target.value)}
-            style={selectStyle}
-          >
-            <option value="">-- Select --</option>
-            {Object.entries(groupedPresets).map(([group, items]) => (
-              <optgroup key={group} label={group}>
-                {items.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-          <button onClick={handleLoadScenario} style={btnStyle}>
-            Load
-          </button>
-        </div>
-      </div>
-
-      {/* Ad-hoc force controls */}
-      <div style={scenarioSectionStyle}>
-        <label style={labelStyle}>Force Effects (Ad-hoc)</label>
-        <div style={responderListStyle}>
-          {responderIds.map((id) => (
-            <label key={id} style={checkLabelStyle}>
-              <input
-                type="checkbox"
-                checked={selectedIds.includes(id)}
-                onChange={() => handleToggleResponder(id)}
-                style={checkboxStyle}
-              />
-              <span style={checkTextStyle}>{id}</span>
-            </label>
-          ))}
-        </div>
-        <label style={{ ...checkLabelStyle, marginTop: '6px' }}>
-          <input
-            type="checkbox"
-            checked={isolate}
-            onChange={(e) => setIsolate(e.target.checked)}
-            style={checkboxStyle}
-          />
-          <span style={checkTextStyle}>Isolate (suppress all others)</span>
-        </label>
-        <div style={armRowStyle}>
-          <button onClick={handleArm} style={btnStyle}>
-            Arm
-          </button>
-          <button onClick={handleClearArmed} style={clearBtnStyle}>
-            Clear
-          </button>
-        </div>
-        {armedIds.length > 0 || armedIsolate ? (
-          <div style={armedStatusStyle}>
-            Armed: [{armedIds.join(', ') || 'none'}]{armedIsolate ? ' isolate=on' : ''}
-          </div>
-        ) : (
-          <div style={armedStatusStyle}>No effects armed</div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function EventsTab() {
-  const { state } = useGameEngine();
-
-  const events = state.eventLog;
-
-  return (
-    <div style={eventsContainerStyle}>
-      {events.length === 0 ? (
-        <div style={emptyStyle}>No events yet</div>
-      ) : (
-        events
-          .slice()
-          .reverse()
-          .map((event, i) => (
-            <div key={i} style={eventRowStyle}>
-              <span style={eventTypeStyle}>{event.type}</span>
-              <span style={eventTimeStyle}>
-                {new Date(event.timestamp).toLocaleTimeString()}
-              </span>
-            </div>
-          ))
-      )}
     </div>
   );
 }
@@ -260,148 +131,4 @@ const activeTabButtonStyle: React.CSSProperties = {
 const contentStyle: React.CSSProperties = {
   flex: 1,
   overflow: 'hidden',
-};
-
-const eventsContainerStyle: React.CSSProperties = {
-  padding: '0.5rem',
-  overflow: 'auto',
-  height: '100%',
-};
-
-const emptyStyle: React.CSSProperties = {
-  fontFamily: "'Inter', sans-serif",
-  fontSize: '0.7rem',
-  color: '#7b9ec7',
-  fontStyle: 'italic',
-  textAlign: 'center',
-  padding: '1rem',
-};
-
-const eventRowStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  padding: '0.3rem 0',
-  borderBottom: '1px solid rgba(26, 36, 64, 0.4)',
-  gap: '0.5rem',
-};
-
-const eventTypeStyle: React.CSSProperties = {
-  fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-  fontSize: '0.6rem',
-  color: '#c8d8f0',
-};
-
-const eventTimeStyle: React.CSSProperties = {
-  fontFamily: "'Inter', sans-serif",
-  fontSize: '0.55rem',
-  color: '#7b9ec7',
-  whiteSpace: 'nowrap',
-};
-
-// ── Scenario controls ──
-
-const scenarioSectionStyle: React.CSSProperties = {
-  padding: '0.5rem 0.75rem',
-  borderTop: '1px solid #1a2440',
-  flexShrink: 0,
-};
-
-const scenarioRowStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: '0.4rem',
-  alignItems: 'center',
-};
-
-const labelStyle: React.CSSProperties = {
-  fontFamily: "'Inter', sans-serif",
-  fontWeight: 500,
-  fontSize: '0.65rem',
-  color: '#7b9ec7',
-  display: 'block',
-  marginBottom: '4px',
-};
-
-const selectStyle: React.CSSProperties = {
-  flex: 1,
-  fontFamily: "'Inter', sans-serif",
-  fontSize: '0.65rem',
-  color: '#c8d8f0',
-  background: 'rgba(26, 36, 64, 0.6)',
-  border: '1px solid #1a2440',
-  borderRadius: '3px',
-  padding: '0.25rem 0.3rem',
-  outline: 'none',
-};
-
-const btnStyle: React.CSSProperties = {
-  fontFamily: "'Inter', sans-serif",
-  fontWeight: 600,
-  fontSize: '0.65rem',
-  color: '#d4a854',
-  background: 'rgba(26, 36, 64, 0.6)',
-  border: '1px solid #d4a854',
-  borderRadius: '3px',
-  padding: '0.25rem 0.5rem',
-  cursor: 'pointer',
-  whiteSpace: 'nowrap',
-  outline: 'none',
-};
-
-// ── Ad-hoc force styles ──
-
-const responderListStyle: React.CSSProperties = {
-  maxHeight: '120px',
-  overflowY: 'auto',
-  border: '1px solid #1a2440',
-  borderRadius: '3px',
-  padding: '0.25rem',
-  background: 'rgba(13, 18, 32, 0.6)',
-};
-
-const checkLabelStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '0.3rem',
-  cursor: 'pointer',
-  padding: '0.1rem 0',
-};
-
-const checkboxStyle: React.CSSProperties = {
-  accentColor: '#d4a854',
-  cursor: 'pointer',
-};
-
-const checkTextStyle: React.CSSProperties = {
-  fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-  fontSize: '0.6rem',
-  color: '#c8d8f0',
-};
-
-const armRowStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: '0.4rem',
-  marginTop: '6px',
-};
-
-const clearBtnStyle: React.CSSProperties = {
-  fontFamily: "'Inter', sans-serif",
-  fontWeight: 600,
-  fontSize: '0.65rem',
-  color: '#7b9ec7',
-  background: 'rgba(26, 36, 64, 0.6)',
-  border: '1px solid #7b9ec7',
-  borderRadius: '3px',
-  padding: '0.25rem 0.5rem',
-  cursor: 'pointer',
-  whiteSpace: 'nowrap',
-  outline: 'none',
-};
-
-const armedStatusStyle: React.CSSProperties = {
-  fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-  fontSize: '0.55rem',
-  color: '#d4a854',
-  marginTop: '4px',
-  wordBreak: 'break-all',
 };
