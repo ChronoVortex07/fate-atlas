@@ -155,7 +155,10 @@ Combining the static effects above with the event-driven responders in §5:
   method pool (`will-widen-pool`). *dominant:* up to two disliked positions may be redrawn
   (`spreadRedraws = 2`); you may cast two dice and keep one (`will-choice`).
 - **Light** — *ascendant:* foresight (peek) becomes available; pool preview and reading detail
-  increase; dice gain advantage (`light-advantage`). *dominant:* the reading is laid bare.
+  increase; dice gain advantage (`light-advantage`); **Major Arcana cards on the table
+  and in hand glow gold, even while face-down.** *dominant:* the reading is laid bare;
+  **Major Arcana glow differentiates by archetype family — warm gold (benevolent),
+  pale silver (challenging), soft white (neutral/transitional).**
 - **Shadow** — *ascendant:* method cards may be shrouded (`shadow-shroud`); results show less;
   dice suffer disadvantage (`shadow-disadvantage`); pool preview hidden. *dominant:* up to
   three method cards shrouded; cryptic, sparse readings.
@@ -189,6 +192,12 @@ Minor arcana cards carry `minor-arcana`, `suit-<suit>`, `element-<element>`, and
 volatility) but theme-light (most ranks have 0 themes -- only Aces, court cards, and tens
 carry a theme). This makes minor arcana a strong signal for dimension-averaging but a weak
 signal for theme-matching interactions, by design.
+
+**Major Arcana glow families (Light ascendant+):** 22 Majors are classified into three
+families for the golden glow mechanic (§3b). *Benevolent* (9): Sun, Star, World, Strength,
+Empress, Temperance, Lovers, Hierophant, Magician. *Challenging* (5): Tower, Death, Devil,
+Hanged Man, Moon. *Neutral* (8): Fool, Justice, Chariot, Hermit, High Priestess, Emperor,
+Wheel of Fortune, Judgement.
 
 ### 4b. The card-drafting minigame
 
@@ -346,6 +355,7 @@ higher bands (§1).
 | `shadow-shroud` | `select:draw:end` | MUTATE | Shadow ascendant · flat 20%/step | Shrouds **1–3 distinct** method cards (1 at ascendant, +1 roll at ascendant, +1 at dominant; capped at pool size) | `shroud` |
 | `fate-force-method` | `select:pick` | OVERRIDE | Fate ascendant · major | Redirects your method choice to a different one | `override` |
 | `fate-deal-swap` | `tarot:deal` | OVERRIDE | Fate ascendant · major | Swaps one dealt face for a fresh distinct draw before reveal | `override` |
+| `fate-fated-card` | `tarot:picked` | OVERRIDE | Fate ascendant · notable | Substitutes the picked card for a different one and locks it into the hand slot (immutable — cannot be returned, swapped, or removed). Once per draft. | `shroud` |
 | `fate-auto-orient` | `tarot:orient` | OVERRIDE | Fate stirring · notable | Sets the spread-wide orientation for you (coin flip) | `override` |
 | `chaos-wild-card` | `tarot:orient` | MUTATE | Chaos ascendant · notable | Flips one random face in the spread to the opposite orientation | `flip` |
 | `order-anchor` | `tarot:orient` | MUTATE | Order ascendant · notable | Sets every reversed face upright — coerces the spread to full upright | `anchor` |
