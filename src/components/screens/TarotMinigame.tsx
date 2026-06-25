@@ -9,6 +9,10 @@ import OrnamentalBorder from '../shared/OrnamentalBorder';
 import RunicBand from '../shared/RunicBand';
 import { restCenters, computeFanLayout } from '../../engine/fanLayout';
 import { GiCardRandom, GiCardPickup, GiEyeball } from 'react-icons/gi';
+import ChainsOfFate from '../cards/ChainsOfFate';
+import { MAJOR_GLOW_FAMILY } from '../../data/tarot';
+import { bandOf } from '../../data/affinities';
+import type { MajorGlowFamily } from '../../data/tarot';
 
 const TABLE_CARD_WIDTH = 58;          // px per card face (max repulsion = side by side)
 const TABLE_REST_STEP = 42;           // center-to-center at rest (overlapped)
@@ -21,6 +25,29 @@ const SLOT_THEMES = [
   { key: 'present', accent: '#d4a854', label: 'Present', glow: 'rgba(212,168,84,0.30)' },
   { key: 'future',  accent: '#9b6bb0', label: 'Future',  glow: 'rgba(155,107,176,0.30)' },
 ] as const;
+
+const GLOW_COLORS: Record<MajorGlowFamily, { ascendant: string; dominant: string }> = {
+  benevolent: {
+    ascendant: '0 0 12px rgba(212,168,84,0.6)',
+    dominant: '0 0 16px rgba(212,168,84,0.8)',
+  },
+  challenging: {
+    ascendant: '0 0 12px rgba(155,180,210,0.6)',
+    dominant: '0 0 16px rgba(155,180,210,0.7)',
+  },
+  neutral: {
+    ascendant: '0 0 12px rgba(200,216,240,0.55)',
+    dominant: '0 0 16px rgba(200,216,240,0.65)',
+  },
+};
+
+function majorGlow(cardId: string, lightBand: string): string | undefined {
+  if (lightBand === 'latent' || lightBand === 'stirring') return undefined;
+  const family = MAJOR_GLOW_FAMILY[cardId];
+  if (!family) return undefined;
+  const colors = GLOW_COLORS[family];
+  return lightBand === 'dominant' ? colors.dominant : colors.ascendant;
+}
 
 export default function TarotMinigame() {
   const { state, engine } = useGameEngine();
@@ -282,6 +309,8 @@ export default function TarotMinigame() {
                 const dist = fan.active ? Math.abs((fc?.center ?? 0) - fan.centerX) : Infinity;
                 const scale = fan.active && dist < FAN_RADIUS ? 1 + 0.06 * (1 - dist / FAN_RADIUS) : 1;
                 const isPicking = animatingPick?.tableIndex === card.originIndex;
+                const lightBand = bandOf(state.affinities.light);
+                const glowShadow = majorGlow(card.cardId, lightBand);
 
                 return (
                   <motion.div
@@ -294,7 +323,12 @@ export default function TarotMinigame() {
                       width: `${TABLE_CARD_WIDTH}px`,
                       zIndex: fan.active ? Math.max(1, Math.round(1000 - dist)) : 1,
                       background: card.faceUp ? '#0d1220' : '#080d18',
-                      borderColor: card.faceUp ? '#7b9ec7' : '#1a2440',
+                      borderColor: glowShadow
+                        ? GLOW_COLORS[MAJOR_GLOW_FAMILY[card.cardId]!].ascendant.replace(/0\.\d+\)$/, '0.4)')
+                        : card.faceUp ? '#7b9ec7' : '#1a2440',
+                      boxShadow: glowShadow
+                        ? glowShadow
+                        : card.faceUp ? 'none' : undefined,
                       cursor: handFull ? 'default' : 'pointer',
                     }}
                     whileHover={!handFull ? { y: -3, boxShadow: '0 0 14px rgba(212,168,84,0.5)' } : {}}
@@ -364,6 +398,8 @@ export default function TarotMinigame() {
               const card = draft.hand[i];
               const isReturning = animatingReturn === i;
               const revealed = committedSpread?.[i]?.card;
+              const handLightBand = bandOf(state.affinities.light);
+              const handGlowShadow = card ? majorGlow(card.cardId, handLightBand) : undefined;
               return (
                 <div
                   key={label}
@@ -397,11 +433,15 @@ export default function TarotMinigame() {
                     ) : card ? (
                       <div
                         key={`hand-wrap-${card.cardId}-${card.tableOriginIndex}`}
-                        draggable
-                        onDragStart={(e) => handleHandDragStart(e as unknown as React.DragEvent, i)}
+                        draggable={!card.fated}
+                        onDragStart={(e) => {
+                          if (card.fated) { e.preventDefault(); return; }
+                          handleHandDragStart(e as unknown as React.DragEvent, i);
+                        }}
                         style={{
                           ...slotCardStyle(theme.accent),
                           opacity: draggingHandIdx === i ? 0.5 : 1,
+                          boxShadow: handGlowShadow ?? `0 0 14px ${theme.accent}33, inset 0 0 18px rgba(8,13,24,0.6)`,
                         }}
                       >
                         <svg width="14" height="14" viewBox="0 0 22 22" aria-hidden
@@ -445,15 +485,18 @@ export default function TarotMinigame() {
                               <GiEyeball />
                             </motion.button>
                           )}
-                          <motion.button
-                            style={handIconBtnStyle}
-                            whileHover={{ scale: 1.2 }}
-                            onClick={(e) => { e.stopPropagation(); handleReturnToDeck(i); }}
-                            title="Return to deck"
-                          >
-                            <GiCardPickup />
-                          </motion.button>
+                          {!card.fated && (
+                            <motion.button
+                              style={handIconBtnStyle}
+                              whileHover={{ scale: 1.2 }}
+                              onClick={(e) => { e.stopPropagation(); handleReturnToDeck(i); }}
+                              title="Return to deck"
+                            >
+                              <GiCardPickup />
+                            </motion.button>
+                          )}
                         </div>
+                        {card.fated && <ChainsOfFate />}
                       </motion.div>
                       </div>
                     ) : (
