@@ -42,8 +42,7 @@ export default function SynthesisPreview() {
 
   // Always compute aggregated (pure function, no side effects)
   const aggregated: AggregatedReading | null = useMemo(() => {
-    const results = state.turnResults.filter((r) => r.type !== 'happening');
-    if (results.length === 0) return null;
+    if (state.turnResults.length === 0) return null;
     return engine.getReadingPlanner().aggregate(
       state.turnResults,
       state.questionType ?? 'self',
@@ -56,14 +55,12 @@ export default function SynthesisPreview() {
     : cachedSynth;
 
   const handleToggleLive = useCallback(() => {
-    setLive((prev) => {
-      if (prev) {
-        // Freezing: snapshot current result
-        setCachedSynth(engine.previewSynthesis());
-      }
-      return !prev;
-    });
-  }, [engine]);
+    if (live) {
+      // Freezing: snapshot current result before toggling
+      setCachedSynth(engine.previewSynthesis());
+    }
+    setLive((prev) => !prev);
+  }, [engine, live]);
 
   const handleRefresh = useCallback(() => {
     setCachedSynth(engine.previewSynthesis());
