@@ -146,6 +146,7 @@ export const FATE_AFFINITY: AffinityDefinition = {
     { id: 'hollow-reroll',    tier: 'major',   band: 'ascendant', description: 'A reroll may return the same result.' },
     { id: 'the-hand-chooses', tier: 'major',   band: 'dominant',  description: 'Sometimes the hand is picked for you.' },
     { id: 'force-method',     tier: 'notable', band: 'dominant',  description: 'The method may be forced.' },
+    { id: 'fated-card',       tier: 'notable', band: 'ascendant', description: 'A picked card may be fated — immutable and locked.' },
   ],
 };
 

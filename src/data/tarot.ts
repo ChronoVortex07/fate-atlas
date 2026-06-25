@@ -63,6 +63,22 @@ export const MAJOR_ARCANA: TarotCardData[] = [
     themes: ['harmony', 'transformation'], dimensions: { favorability: 2.0, certainty: 2.0, volatility: -2.0 }, arcana: 'major', modifierRoles: ['subject', 'effect'] },
 ];
 
+export type MajorGlowFamily = 'benevolent' | 'challenging' | 'neutral';
+
+export const MAJOR_GLOW_FAMILY: Record<string, MajorGlowFamily> = {
+  // Benevolent
+  'the-sun': 'benevolent', 'the-star': 'benevolent', 'the-world': 'benevolent',
+  'strength': 'benevolent', 'the-empress': 'benevolent', 'temperance': 'benevolent',
+  'the-lovers': 'benevolent', 'the-hierophant': 'benevolent', 'the-magician': 'benevolent',
+  // Challenging
+  'the-tower': 'challenging', 'death': 'challenging', 'the-devil': 'challenging',
+  'the-hanged-man': 'challenging', 'the-moon': 'challenging',
+  // Neutral / transitional
+  'the-fool': 'neutral', 'justice': 'neutral', 'the-chariot': 'neutral',
+  'the-hermit': 'neutral', 'the-high-priestess': 'neutral', 'the-emperor': 'neutral',
+  'wheel-of-fortune': 'neutral', 'judgement': 'neutral',
+};
+
 // ── Minor Arcana ──
 
 type Suit = 'wands' | 'cups' | 'swords' | 'pentacles';

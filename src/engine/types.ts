@@ -354,6 +354,7 @@ export interface HandCard {
   tableOriginIndex: number; // so returnToTable puts it back in the right spot
   peeked: boolean;
   revealedFace?: TarotCardFace; // set after successful peek — shows orientation
+  fated?: boolean; // immutable when true — locked into slot by fate
 }
 
 export type HandSlot = HandCard | null; // hand[0]=Past, [1]=Present, [2]=Future
@@ -366,6 +367,7 @@ export interface TarotDraftState {
   dealCount: number;           // current number of table slots (starts 9, grows with returns)
   shufflesRemaining: number;   // from affinityEffects.spreadRedraws
   phase: 'drafting' | 'committing';
+  fatedDrawnThisDraft?: boolean; // once-per-draft gate for fate-fated-card
 }
 
 export interface DiceMinigameState {
