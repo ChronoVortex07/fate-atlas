@@ -38,6 +38,16 @@ export class NarrativeAssembler {
     this.rotationState.clear();
   }
 
+  /** Snapshot rotation state so preview calls don't consume template rotation. */
+  getRotationSnapshot(): Map<string, number> {
+    return new Map(this.rotationState);
+  }
+
+  /** Restore rotation state from a snapshot. */
+  restoreRotation(snapshot: Map<string, number>): void {
+    this.rotationState = new Map(snapshot);
+  }
+
   /**
    * Select a template from a pool and advance rotation index.
    * Returns the template string; wraps to 0 after exhausting the pool.
