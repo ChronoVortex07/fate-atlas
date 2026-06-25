@@ -719,7 +719,11 @@ export class GameEngine {
       handIndex,
       tableIndex,
       fatedDrawnThisDraft: draft.fatedDrawnThisDraft,
-      usedCardIds: [originalCardId, ...draft.hand.filter((h): h is HandCard => h !== null).map((h) => h.cardId)],
+      usedCardIds: [
+        originalCardId,
+        ...draft.hand.filter((h): h is HandCard => h !== null).map((h) => h.cardId),
+        ...draft.table.filter((t): t is TableCard => t !== null).map((t) => t.cardId),
+      ],
     });
 
     // Apply fated substitution if responder fired

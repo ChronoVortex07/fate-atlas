@@ -41,6 +41,12 @@ const GLOW_COLORS: Record<MajorGlowFamily, { ascendant: string; dominant: string
   },
 };
 
+const GLOW_BORDER_COLORS: Record<MajorGlowFamily, string> = {
+  benevolent: 'rgba(212,168,84,0.4)',
+  challenging: 'rgba(155,180,210,0.4)',
+  neutral: 'rgba(200,216,240,0.4)',
+};
+
 function majorGlow(cardId: string, lightBand: string): string | undefined {
   if (lightBand === 'latent' || lightBand === 'stirring') return undefined;
   const family = MAJOR_GLOW_FAMILY[cardId];
@@ -324,7 +330,7 @@ export default function TarotMinigame() {
                       zIndex: fan.active ? Math.max(1, Math.round(1000 - dist)) : 1,
                       background: card.faceUp ? '#0d1220' : '#080d18',
                       borderColor: glowShadow
-                        ? GLOW_COLORS[MAJOR_GLOW_FAMILY[card.cardId]!].ascendant.replace(/0\.\d+\)$/, '0.4)')
+                        ? GLOW_BORDER_COLORS[MAJOR_GLOW_FAMILY[card.cardId]!]
                         : card.faceUp ? '#7b9ec7' : '#1a2440',
                       boxShadow: glowShadow
                         ? glowShadow
