@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { consolidateSpread, drawTarotCard, drawTarotSpread, reverseSpread, MAJOR_ARCANA, MINOR_ARCANA, FULL_DECK, DECK_BY_ID, buildFace } from '../../data/tarot';
+import { consolidateSpread, drawTarotCard, drawTarotSpread, reverseSpread, MAJOR_ARCANA, MINOR_ARCANA, FULL_DECK, DECK_BY_ID, buildFace, MAJOR_GLOW_FAMILY, MajorGlowFamily } from '../../data/tarot';
 import { DIVINATION_PROFILES } from '../../data/divination-profiles';
 import { GameEngine } from '../GameEngine';
 
@@ -361,5 +361,29 @@ describe('tarot draft state', () => {
     // Card should be back on table
     expect(draft.table[0]).not.toBeNull();
     expect(draft.hand[0]).toBeNull();
+  });
+});
+
+describe('MAJOR_GLOW_FAMILY', () => {
+  it('covers all 22 Major Arcana cards', () => {
+    const majorIds = MAJOR_ARCANA.map((c) => c.id);
+    expect(majorIds.length).toBe(22);
+
+    const classified = Object.keys(MAJOR_GLOW_FAMILY);
+    for (const id of majorIds) {
+      expect(classified).toContain(id);
+    }
+  });
+
+  it('has no duplicate entries', () => {
+    const keys = Object.keys(MAJOR_GLOW_FAMILY);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('every entry has a valid family', () => {
+    const validFamilies: MajorGlowFamily[] = ['benevolent', 'challenging', 'neutral'];
+    for (const family of Object.values(MAJOR_GLOW_FAMILY)) {
+      expect(validFamilies).toContain(family);
+    }
   });
 });
