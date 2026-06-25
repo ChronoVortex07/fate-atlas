@@ -331,7 +331,7 @@ export default function TarotMinigame() {
                         : card.faceUp ? 'none' : undefined,
                       cursor: handFull ? 'default' : 'pointer',
                     }}
-                    whileHover={!handFull ? { y: -3, boxShadow: '0 0 14px rgba(212,168,84,0.5)' } : {}}
+                    whileHover={!handFull ? { y: -3, boxShadow: glowShadow ?? '0 0 14px rgba(212,168,84,0.5)' } : {}}
                     onClick={() => !handFull && !animatingPick && handlePick(card.originIndex)}
                     initial={shuffleKey > 0 ? { opacity: 0, y: -30 } : { opacity: 0, y: -20 }}
                     animate={
