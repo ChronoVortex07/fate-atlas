@@ -92,6 +92,36 @@ export class GameEngine {
     this.listeners.forEach((fn) => fn(this.cachedSnapshot));
   }
 
+  // ---------- Public accessors for debug panel ----------
+
+  getReadingPlanner(): ReadingPlanner { return this.readingPlanner; }
+  getNarrativeAssembler(): NarrativeAssembler { return this.narrativeAssembler; }
+
+  /**
+   * Compute a synthesis preview without consuming template rotation state.
+   * Safe to call every render — snapshots and restores the assembler's rotation.
+   */
+  previewSynthesis(): import('./types').SynthesisResult | null {
+    const results = this.state.turnResults;
+    if (results.length === 0) return null;
+
+    const rotSnapshot = this.narrativeAssembler.getRotationSnapshot();
+    try {
+      const question = this.state.questionType ?? 'self';
+      const affinities = this.affinityEngine.getState();
+      const aggregated = this.readingPlanner.aggregate(results, question);
+      return this.narrativeAssembler.assemble(
+        aggregated,
+        results,
+        question,
+        affinities,
+        this.affinityEngine.getEffects(),
+      );
+    } finally {
+      this.narrativeAssembler.restoreRotation(rotSnapshot);
+    }
+  }
+
   // ---------- Dispatch wiring ----------
 
   private buildContext(trigger: string, draft: PhaseDraft, payload?: unknown): PhaseContext {
@@ -862,9 +892,16 @@ export class GameEngine {
     const scenario = findScenario(id);
     if (!scenario) return false;
 
+    // Preserve debug state across scenario load
+    const { debug, debugConfig } = this.state;
+
     // Reset to a fresh game, then stage the scenario.
     this.affinityEngine.setState(defaultAffinityState());
     this.state = this.defaultState();
+
+    // Restore debug state
+    this.state.debug = debug;
+    this.state.debugConfig = debugConfig;
 
     const stage = freshStage();
     scenario.setup(stage);
@@ -977,12 +1014,19 @@ export class GameEngine {
   }
 
   returnToTitle(): void {
+    // Preserve debug state
+    const { debug, debugConfig } = this.state;
+
     const saved = {
       affinities: this.affinityEngine.getState(),
       history: this.state.history,
       usedHappeningIds: Array.from(this.usedHappeningIds),
     };
     this.state = this.defaultState();
+
+    // Restore debug state
+    this.state.debug = debug;
+    this.state.debugConfig = debugConfig;
     this.affinityEngine.setState(saved.affinities);
     this.state.affinities = this.affinityEngine.getState();
     this.state.history = saved.history;
@@ -993,10 +1037,17 @@ export class GameEngine {
   }
 
   reset(): void {
+    // Preserve debug state
+    const { debug, debugConfig } = this.state;
+
     const affinities = this.affinityEngine.getState();
     const history = this.state.history;
     const usedIds = Array.from(this.usedHappeningIds);
     this.state = this.defaultState();
+
+    // Restore debug state
+    this.state.debug = debug;
+    this.state.debugConfig = debugConfig;
     this.affinityEngine.setState(affinities);
     this.state.affinities = this.affinityEngine.getState();
     this.state.history = history;
