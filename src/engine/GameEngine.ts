@@ -1,4 +1,4 @@
-import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, RollMode, DivinationType, TarotCardFace, TableCard, TarotDraftState, AstralCast, IChingResult } from './types';
+import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, RollMode, DivinationType, TarotCardFace, TableCard, TarotDraftState, AstralCast, IChingResult, HandCard } from './types';
 import { FULL_DECK, buildFace, pickOrientation, DECK_BY_ID, consolidateSpread, reverseSpread } from '../data/tarot';
 import { EventBus } from './EventBus';
 import { AffinityEngine } from './AffinityEngine';
@@ -704,14 +704,40 @@ export class GameEngine {
     const slot = draft.table[tableIndex];
     if (!slot) throw new Error(`Table slot ${tableIndex} is empty`);
 
-    draft.hand[handIndex] = {
-      cardId: slot.cardId,
+    const originalCardId = slot.cardId;
+
+    const handCard: HandCard = {
+      cardId: originalCardId,
       tableOriginIndex: slot.originIndex,
       peeked: false,
     };
+    draft.hand[handIndex] = handCard;
     draft.table[tableIndex] = null;
 
-    this.dispatchAt('tarot:picked', { handIndex, tableIndex });
+    // Dispatch tarot:picked so fate-fated-card responder can intercept
+    const { draft: dispatchedDraft } = this.dispatchAt('tarot:picked', {
+      handIndex,
+      tableIndex,
+      fatedDrawnThisDraft: draft.fatedDrawnThisDraft,
+      usedCardIds: [originalCardId, ...draft.hand.filter((h): h is HandCard => h !== null).map((h) => h.cardId)],
+    });
+
+    // Apply fated substitution if responder fired
+    if (typeof dispatchedDraft.fatedHandIndex === 'number'
+        && dispatchedDraft.fatedHandIndex === handIndex
+        && typeof dispatchedDraft.fatedCardId === 'string') {
+      handCard.cardId = dispatchedDraft.fatedCardId;
+      handCard.fated = true;
+      draft.fatedDrawnThisDraft = true;
+
+      // Return the original table card to the deck (shuffled)
+      draft.deck.push(originalCardId);
+      for (let i = draft.deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [draft.deck[i], draft.deck[j]] = [draft.deck[j], draft.deck[i]];
+      }
+    }
+
     this.notify();
   }
 
@@ -720,6 +746,7 @@ export class GameEngine {
     if (!draft || draft.method !== 'tarot') throw new Error('No active tarot draft');
     const handCard = draft.hand[handIndex];
     if (!handCard) throw new Error(`Hand slot ${handIndex} is empty`);
+    if (handCard.fated) throw new Error('Cannot return a fated card to the table');
 
     // Find target: origin slot if free, else lowest open slot, else append
     let targetIdx = handCard.tableOriginIndex;
@@ -757,6 +784,7 @@ export class GameEngine {
     if (!draft || draft.method !== 'tarot') throw new Error('No active tarot draft');
     const handCard = draft.hand[handIndex];
     if (!handCard) throw new Error(`Hand slot ${handIndex} is empty`);
+    if (handCard.fated) throw new Error('Cannot return a fated card to the deck');
 
     draft.deck.push(handCard.cardId);
     // Shuffle deck so the returned card isn't predictably on top
@@ -838,7 +866,11 @@ export class GameEngine {
     const draft = this.state.minigameState as TarotDraftState | null;
     if (!draft || draft.method !== 'tarot') throw new Error('No active tarot draft');
     if (a < 0 || a > 2 || b < 0 || b > 2) throw new Error('Invalid hand index');
-    [draft.hand[a], draft.hand[b]] = [draft.hand[b], draft.hand[a]];
+    const cardA = draft.hand[a];
+    const cardB = draft.hand[b];
+    if (cardA?.fated) throw new Error('Cannot swap a fated card');
+    if (cardB?.fated) throw new Error('Cannot swap a fated card');
+    [draft.hand[a], draft.hand[b]] = [cardB, cardA];
     this.dispatchAt('tarot:swapped', { a, b });
     this.notify();
   }

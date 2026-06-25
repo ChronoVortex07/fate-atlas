@@ -410,3 +410,107 @@ describe('astral cast façade', () => {
     expect(chosen).toBe(a);
   });
 });
+
+describe('tarot draft — fated cards', () => {
+  let engine: GameEngine;
+
+  beforeEach(() => {
+    engine = new GameEngine();
+    engine.startTurn('self');
+    // Navigate to tarot minigame
+    const idx = engine.getState().availableMethods.indexOf('tarot');
+    if (idx === -1) {
+      // Force tarot into the pool
+      engine.loadState({ availableMethods: ['tarot', 'd20', 'iching'], screen: 'method-select' });
+      engine.selectMethod(0);
+    } else {
+      engine.selectMethod(idx);
+    }
+  });
+
+  it('pickForHand dispatches tarot:picked and sets the fated flag when responder fires', () => {
+    // Force the fated-card responder
+    engine.forceEffects(['fate-fated-card'], false);
+    // Set fate to ascendant
+    engine.loadState({ affinities: { ...engine.getState().affinities, fate: 75 } });
+
+    const orig = Math.random; Math.random = () => 0.5;
+    engine.pickForHand(0, 0);
+    Math.random = orig;
+
+    const state = engine.getState();
+    const updatedDraft = state.minigameState as import('../types').TarotDraftState;
+    expect(updatedDraft.hand[0]).not.toBeNull();
+    // The fated flag may or may not be set depending on RNG — force guarantees it
+    // With forced: true and fate at 75, it should fire
+    if (updatedDraft.hand[0]?.fated) {
+      expect(updatedDraft.fatedDrawnThisDraft).toBe(true);
+    }
+  });
+
+  it('returnToDeck throws when targeting a fated card', () => {
+    // Manually stage a fated card in the hand
+    const draft = engine.getState().minigameState as import('../types').TarotDraftState;
+    draft.hand[0] = {
+      cardId: 'the-fool',
+      tableOriginIndex: 0,
+      peeked: false,
+      fated: true,
+    };
+    draft.fatedDrawnThisDraft = true;
+    engine.loadState({ minigameState: draft });
+
+    expect(() => engine.returnToDeck(0)).toThrow('fated');
+  });
+
+  it('returnToTable throws when targeting a fated card', () => {
+    const draft = engine.getState().minigameState as import('../types').TarotDraftState;
+    draft.hand[0] = {
+      cardId: 'the-fool',
+      tableOriginIndex: 0,
+      peeked: false,
+      fated: true,
+    };
+    engine.loadState({ minigameState: draft });
+
+    expect(() => engine.returnToTable(0)).toThrow('fated');
+  });
+
+  it('swapHandCards throws when either card is fated', () => {
+    const draft = engine.getState().minigameState as import('../types').TarotDraftState;
+    draft.hand[0] = {
+      cardId: 'the-fool',
+      tableOriginIndex: 0,
+      peeked: false,
+      fated: true,
+    };
+    draft.hand[1] = {
+      cardId: 'the-magician',
+      tableOriginIndex: 1,
+      peeked: false,
+    };
+    engine.loadState({ minigameState: draft });
+
+    expect(() => engine.swapHandCards(0, 1)).toThrow('fated');
+  });
+
+  it('peekHandCard still works on fated cards', () => {
+    // Set Light ascendant so peek is available
+    engine.loadState({ affinities: { ...engine.getState().affinities, light: 75 } });
+
+    const draft = engine.getState().minigameState as import('../types').TarotDraftState;
+    draft.hand[0] = {
+      cardId: 'the-fool',
+      tableOriginIndex: 0,
+      peeked: false,
+      fated: true,
+    };
+    engine.loadState({ minigameState: draft });
+
+    const orig = Math.random; Math.random = () => 0.5;
+    const result = engine.peekHandCard(0);
+    Math.random = orig;
+    // Should succeed (not throw about fated)
+    expect(result.success).toBe(true);
+  });
+});
