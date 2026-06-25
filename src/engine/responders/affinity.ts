@@ -2,7 +2,7 @@ import type { Responder, PhaseContext, EffectReport } from '../events/types';
 import type { AffinityId, SlotResult, RollModifier, TarotResult, TarotCardFace } from '../types';
 import { bandRoll } from '../events/eligibility';
 import { TIER_BASE_CHANCE, bandOf, BAND_ORDER } from '../../data/affinities';
-import { reverseSpread, buildFace, DECK_BY_ID, drawTarotCard, consolidateSpread } from '../../data/tarot';
+import { reverseSpread, buildFace, DECK_BY_ID, drawTarotCard, consolidateSpread, FULL_DECK } from '../../data/tarot';
 
 const T = TIER_BASE_CHANCE;
 const SHROUD_STEP_CHANCE = 0.20; // flat per-step chance (not bandRoll-scaled — see A3 note)
@@ -112,6 +112,27 @@ export function buildAffinityResponders(): Responder[] {
         c.draft.faces = faces as unknown as typeof c.draft.faces;
         c.draft.swappedIndex = idx;
         return report('fate-deal-swap', 'Fate', 'The weave deals you another — a card changes before it turns.', 'override');
+      },
+    },
+    {
+      id: 'fate-fated-card', source: 'affinity', triggers: ['tarot:picked'],
+      group: { kind: 'exclusive', band: 'OVERRIDE' }, weight: w('fate'),
+      condition: (c) =>
+        typeof c.draft.handIndex === 'number'
+        && typeof c.draft.tableIndex === 'number'
+        && c.draft.fatedDrawnThisDraft !== true,
+      roll: (c) => bandRoll(c, 'fate', 'ascendant', T.notable),
+      apply: (c) => {
+        // Draw a fresh card distinct from the original
+        const usedIds = new Set((c.draft.usedCardIds as string[] | undefined) ?? []);
+        const pool = FULL_DECK.filter((cd) => !usedIds.has(cd.id));
+        const pick = pool.length > 0 ? pool[Math.floor(c.rng() * pool.length)] : FULL_DECK[0];
+        c.draft.fatedHandIndex = c.draft.handIndex as number;
+        c.draft.fatedCardId = pick.id;
+        c.draft.fatedDrawnThisDraft = true;
+        return report('fate-fated-card', 'Fate',
+          'The weave tightens — this card is not yours to refuse.',
+          'shroud');
       },
     },
     {
