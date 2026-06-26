@@ -14,7 +14,7 @@ describe('TurnOrchestrator', () => {
     const orchestrator = new TurnOrchestrator(bus);
     const pool = orchestrator.generatePool('decision', affinities);
     expect(pool.length).toBeGreaterThanOrEqual(3);
-    expect(pool.every((t) => ['tarot', 'd20', 'iching', 'astral', 'rune'].includes(t))).toBe(true);
+    expect(pool.every((t) => ['tarot', 'd20', 'iching', 'astral', 'rune', 'strings'].includes(t))).toBe(true);
   });
 
   it('generatePool returns `count` methods when fewer are requested (Fate methodCount)', () => {
@@ -33,7 +33,7 @@ describe('TurnOrchestrator', () => {
   it('generatePool clamps a request above the available methods to that many', () => {
     const orchestrator = new TurnOrchestrator(bus);
     const pool = orchestrator.generatePool('self', affinities, 99);
-    expect(pool.length).toBe(5); // never more than POOL_TYPES.length
+    expect(pool.length).toBe(6); // never more than POOL_TYPES.length
   });
 
   it('generatePool clamps below 1 up to a single method', () => {
@@ -98,7 +98,7 @@ describe('TurnOrchestrator', () => {
       iching: 0,
     });
     expect(pool.length).toBeGreaterThanOrEqual(3);
-    expect(pool.every((t) => ['tarot', 'd20', 'iching', 'astral', 'rune'].includes(t))).toBe(true);
+    expect(pool.every((t) => ['tarot', 'd20', 'iching', 'astral', 'rune', 'strings'].includes(t))).toBe(true);
   });
 
   it('refillPool with no bias uses base weights', () => {

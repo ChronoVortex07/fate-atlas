@@ -179,3 +179,17 @@ describe('drawWeave', () => {
     expect(CONCEPTS[r.destinationId].questionTypes).toContain('decision');
   });
 });
+
+import { TurnOrchestrator } from '../TurnOrchestrator';
+import { EventBus } from '../EventBus';
+
+describe('TurnOrchestrator strings', () => {
+  it('drawSingleResult draws a strings result tailored to the question', () => {
+    const orch = new TurnOrchestrator(new EventBus());
+    const r = orch.drawSingleResult('strings', baseAff, 'future');
+    expect(r.type).toBe('strings');
+    if (r.type === 'strings') {
+      expect(CONCEPTS[r.destinationId].questionTypes).toContain('future');
+    }
+  });
+});
