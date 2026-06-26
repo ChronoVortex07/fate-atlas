@@ -47,7 +47,7 @@ export interface MinigameMeta {
 // Static, band-derived modifiers components render directly (no per-event roll).
 export interface AffinityEffects {
   spreadRedraws: number;  // disliked spread positions the player may redraw (Will)
-  methodCount: number;    // methods offered in the pool (base 3; Fate lowers)
+  methodCount: number;    // base methods in the pool (always 3; Will/Fate shift it probabilistically at draw time)
   hintClarity: number;    // -2 near-opaque .. 0 normal .. +2 names the forces
   readingDetail: number;  // -1 terse .. 0 normal .. +1 rich
   poolPreview: 'none' | 'theme' | 'full' | 'hidden';

@@ -25,10 +25,14 @@ describe('AffinityEngine.getEffects', () => {
     expect(e.getEffects().spreadRedraws).toBe(2);
   });
 
-  it('Fate Ascendant lowers methodCount to 2', () => {
+  it('methodCount stays 3 regardless of Fate — pool size shifts only probabilistically', () => {
+    // Fate no longer statically lowers the pool; the fate-thin-pool responder
+    // thins it (probabilistically) at draw time instead.
     const e = make();
-    e.setState({ fate: 70 });
-    expect(e.getEffects().methodCount).toBe(2);
+    e.setState({ fate: 70 });  // ascendant
+    expect(e.getEffects().methodCount).toBe(3);
+    e.setState({ fate: 95 });  // dominant
+    expect(e.getEffects().methodCount).toBe(3);
   });
 
   it('Light raises clarity/detail/peek; Shadow lowers them', () => {

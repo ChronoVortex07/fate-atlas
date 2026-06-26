@@ -132,7 +132,6 @@ export class AffinityEngine {
   // Static, band-derived modifiers (no per-event roll). Carried in the snapshot.
   getEffects(): AffinityEffects {
     const willIdx   = bandIndex(bandOf(this.state.will));
-    const fateIdx   = bandIndex(bandOf(this.state.fate));
     const lightIdx  = bandIndex(bandOf(this.state.light));
     const shadowIdx = bandIndex(bandOf(this.state.shadow));
 
@@ -146,7 +145,9 @@ export class AffinityEngine {
 
     return {
       spreadRedraws: clamp(willIdx - 1, 0, 2),  // latent/stirring 0, ascendant 1, dominant 2
-      methodCount: fateIdx >= 2 ? 2 : 3,          // Fate Ascendant+ → fewer methods
+      // Pool size is always 3 here; Will/Fate shift it only probabilistically at
+      // draw time (will-widen-pool / fate-thin-pool responders), not statically.
+      methodCount: 3,
       hintClarity: clamp(info, -2, 2),
       readingDetail: clamp(info, -1, 1),
       poolPreview,

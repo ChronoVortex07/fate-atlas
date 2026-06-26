@@ -127,7 +127,7 @@ roll) and **event-driven** effects (probabilistic responders, see §4).
 | Modifier | Driven by | Value by band |
 |----------|-----------|---------------|
 | **spreadRedraws** (disliked spread positions the player may redraw) | Will | latent/stirring **0** · ascendant **1** · dominant **2** |
-| **methodCount** (methods in the pool) | Fate | ascendant+ → **2**, otherwise **3** |
+| **methodCount** (base methods in the pool) | — | always **3**; Will/Fate shift the pool size only *probabilistically* at draw time (`will-widen-pool` / `fate-thin-pool`), never statically |
 | **hintClarity** (−2 opaque … +2 names the forces) | Light − Shadow band index | clamped to −2…+2 |
 | **readingDetail** (−1 terse … +1 rich) | Light − Shadow band index | clamped to −1…+1 |
 | **poolPreview** | Light vs Shadow | Shadow ascendant+ → `hidden`; else Light ascendant+ → `full`; else Light stirring+ & > Shadow → `theme`; else `none` |
@@ -147,9 +147,10 @@ Combining the static effects above with the event-driven responders in §5:
 - **Order** — steadier flavor and clarity as it rises; opposes Chaos via coupling. (Order has
   no dedicated responders; its influence is suppressing Chaos and feeding stable outcomes.)
 - **Fate** — *stirring:* the spread-wide orientation may be decided for you (`fate-auto-orient`).
-  *ascendant:* the pool narrows to 2 methods; a dealt card may be swapped before reveal
-  (`fate-deal-swap`); a reroll may ring hollow (`fate-hollow-reroll`); your method choice
-  may be redirected (`fate-force-method`). *dominant:* those effects intensify.
+  *ascendant:* the method pool may be thinned by one (`fate-thin-pool`, probabilistic, won't
+  drop below 2); a dealt card may be swapped before reveal (`fate-deal-swap`); a reroll may
+  ring hollow (`fate-hollow-reroll`); your method choice may be redirected (`fate-force-method`).
+  *dominant:* those effects intensify.
 - **Will** — *stirring:* a "reroll?" prompt may appear (`will-offer-reroll`). *ascendant:*
   a disliked spread position may be redrawn (`spreadRedraws = 1`); your will may widen the
   method pool (`will-widen-pool`). *dominant:* up to two disliked positions may be redrawn

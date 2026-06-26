@@ -143,12 +143,26 @@ describe('planDiceRoll', () => {
 });
 
 describe('method control', () => {
-  it('Fate Ascendant trims the pool to 2 methods at startTurn', () => {
+  it('Fate Ascendant no longer statically trims the pool (base stays 3)', () => {
     const e = new GameEngine();
-    // Seed Fate high before the turn; beginRun drifts 95→~80, still Ascendant.
-    e.loadState({ affinities: { ...e.getState().affinities, fate: 95 } });
+    const orig = Math.random;
+    Math.random = () => 0.99; // suppress the probabilistic fate-thin-pool roll
+    try {
+      e.loadState({ affinities: { ...e.getState().affinities, fate: 95 } });
+      e.startTurn('self');
+      expect(e.getState().availableMethods.length).toBe(3);
+    } finally {
+      Math.random = orig;
+    }
+  });
+
+  it('fate-thin-pool thins the pool to 2 when it fires (probabilistic, forced here)', () => {
+    const e = new GameEngine();
+    e.forceEffects(['fate-thin-pool'], true);
+    e.loadState({ affinities: { ...e.getState().affinities, fate: 70 } });
     e.startTurn('self');
     expect(e.getState().availableMethods.length).toBe(2);
+    expect(e.getState().drawPhase!.effectReports.some((r) => r.responderId === 'fate-thin-pool')).toBe(true);
   });
 
   it('swapMethod feeds Will and yields a fresh pool', () => {
