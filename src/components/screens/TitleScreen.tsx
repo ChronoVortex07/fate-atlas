@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
 import RunicBand from '../shared/RunicBand';
+import Wordmark from '../shared/Wordmark';
 
 export default function TitleScreen() {
   const { engine } = useGameEngine();
@@ -25,7 +26,7 @@ export default function TitleScreen() {
           style={titleSectionStyle}
         >
           <RunicBand opacity={0.5} fontSize="clamp(0.7rem, 1.5vw, 1rem)" />
-          <h1 style={titleStyle}>ATLAS OF FATE</h1>
+          <Wordmark variant="stacked" />
           <div style={{
             ...runicBandStyle,
             transform: 'scaleX(-1)',
@@ -87,21 +88,6 @@ const titleSectionStyle: React.CSSProperties = {
   flexDirection: 'column',
   alignItems: 'center',
   gap: '0.75rem',
-};
-
-const titleStyle: React.CSSProperties = {
-  // Min kept small enough that the full title fits on narrow phones without
-  // clipping; letter-spacing scales with width so it stays generous on desktop
-  // (max 5rem / 0.3em) but tightens on mobile.
-  fontSize: 'clamp(1.9rem, 8vw, 5rem)',
-  color: '#c8d8f0',
-  fontFamily: "'Cormorant Garamond', serif",
-  fontWeight: 700,
-  letterSpacing: 'clamp(0.12em, 1.2vw, 0.3em)',
-  margin: 0,
-  lineHeight: 1.1,
-  maxWidth: '100%',
-  textShadow: '0 0 40px rgba(200, 216, 240, 0.15)',
 };
 
 const runicBandStyle: React.CSSProperties = {
