@@ -79,3 +79,17 @@ describe('strings weave — agency', () => {
     expect(e.getState().affinities.light).toBeGreaterThan(before);
   });
 });
+
+describe('strings weave — commit', () => {
+  it('commitWeave consolidates the path into a strings slot', () => {
+    const e = startWeaveWith(HI());
+    let guard = 0;
+    while (weave(e).phase === 'drawing' && guard++ < 12) {
+      e.stepTo(weave(e).candidateIds[0]);
+    }
+    expect(weave(e).phase).toBe('arrived');
+    e.commitWeave();
+    const slot = e.getState().turnResults[e.getState().turnResults.length - 1];
+    expect(slot.type).toBe('strings');
+  });
+});

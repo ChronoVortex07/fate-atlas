@@ -23,7 +23,8 @@ import type { RuneScatter } from './types';
 import { deriveMandate, hexagramNudge, planHexagramResolution } from './iching';
 import type { HexagramMode } from './iching';
 import { planWeave, generateWeave, revealFrom } from './strings';
-import type { StringsMinigameState } from './types';
+import { consolidatePath, pathCoherence } from '../data/strings';
+import type { StringsMinigameState, StringsResult } from './types';
 
 const STORAGE_KEY = 'fate-atlas-save';
 
@@ -334,6 +335,13 @@ export class GameEngine {
       else if (faces.every((f) => f.orientation === 'reversed')) this.affinityEngine.shift('chaos', 6, 'spread-cascade');
     }
 
+    // Strings coherence feeds (mirrors the tarot spread-coherence rule).
+    if (result.type === 'strings') {
+      const coh = pathCoherence((result as StringsResult).path);
+      if (coh === 'coherent') this.affinityEngine.shift('order', 6, 'strings-coherent');
+      else if (coh === 'tangled') this.affinityEngine.shift('chaos', 6, 'strings-tangled');
+    }
+
     // Player-action feeds derived from how this result was reached.
     if (meta) {
       if (meta.reversed) this.affinityEngine.applyAction('reverse');
@@ -383,8 +391,9 @@ export class GameEngine {
     if (typeof draft.spawnSecond === 'string') {
       const affinities = this.affinityEngine.getState();
       const second = this.orchestrator.drawSingleResult(
-        draft.spawnSecond as 'tarot' | 'd20' | 'iching' | 'astral' | 'rune',
+        draft.spawnSecond as 'tarot' | 'd20' | 'iching' | 'astral' | 'rune' | 'strings',
         affinities,
+        this.state.questionType ?? undefined,
       );
       this.state.turnResults = [...this.state.turnResults, second];
       const newIndex = this.state.turnResults.length - 1;
@@ -422,7 +431,7 @@ export class GameEngine {
 
     // Between-minigame transition. Ask the minigame:end trigger whether a
     // happening interrupts the flow.
-    this.orchestrator.removeUsedMethod(result.type as 'tarot' | 'd20' | 'iching' | 'astral' | 'rune');
+    this.orchestrator.removeUsedMethod(result.type as 'tarot' | 'd20' | 'iching' | 'astral' | 'rune' | 'strings');
     const { draft: endDraft } = this.dispatchAt('minigame:end', {
       lastReading: completed >= this.minigamesPerTurn,
     });
@@ -868,6 +877,15 @@ export class GameEngine {
     w.foresightId = nodeId;
     this.affinityEngine.applyAction('use-peek'); // Light
     this.notify();
+  }
+
+  commitWeave(): void {
+    const w = this.state.minigameState;
+    if (!w || w.method !== 'strings') throw new Error('No active weave');
+    if (w.phase !== 'arrived') throw new Error('Weave has not reached a destination');
+    const byId = new Map(w.graph.nodes.map((n) => [n.id, n]));
+    const path = w.visitedPath.map((id) => byId.get(id)!);
+    this.completeMinigame(consolidatePath(path));
   }
 
   pickForHand(handIndex: number, tableIndex: number): void {
