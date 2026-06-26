@@ -193,3 +193,17 @@ describe('TurnOrchestrator strings', () => {
     }
   });
 });
+
+import { ReadingPlanner } from '../ReadingPlanner';
+
+describe('ReadingPlanner strings expansion', () => {
+  it('expands the path into atomic signals so an adverse crossing surfaces', () => {
+    const planner = new ReadingPlanner();
+    // destination-governed favorability is net-positive (the-dawn ×2), so without
+    // path expansion there is NO adverse signal; with expansion the-undertow (−1) shows.
+    const result = consolidatePath([node('the-self', 0), node('the-undertow', 1), node('the-dawn', 3)]);
+    const agg = planner.aggregate([result], 'self');
+    expect(agg.strongestAdverse).not.toBeNull();
+    expect(agg.strongestAdverse!.label).toContain('Undertow');
+  });
+});

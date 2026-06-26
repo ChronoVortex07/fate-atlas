@@ -3,6 +3,7 @@ import type {
   DivinationType, QuestionType, ModifierRole, ThemeTag, DimensionValues,
 } from './types';
 import { DIVINATION_PROFILES } from '../data/divination-profiles';
+import { CONCEPTS } from '../data/strings';
 
 // Theme opposition pairs for tension detection
 const THEME_OPPOSITIONS: [ThemeTag, ThemeTag][] = [
@@ -289,6 +290,16 @@ export class ReadingPlanner {
         signals.push({ label: `the dice (${r.result})`, themes: r.themes, dimensions: r.dimensions, modifierRoles: r.modifierRoles });
       } else if (r.type === 'iching') {
         signals.push({ label: `Hexagram ${r.hexagramNumber}`, themes: r.themes, dimensions: r.dimensions, modifierRoles: r.modifierRoles });
+      } else if (r.type === 'strings' && r.path && r.path.length > 1) {
+        for (const n of r.path) {
+          const def = CONCEPTS[n.conceptId];
+          signals.push({
+            label: `the ${def.name}`,
+            themes: def.themes,
+            dimensions: def.dimensions,
+            modifierRoles: [def.modifierRole],
+          });
+        }
       } else {
         // single-card tarot or astral: use the result itself
         const label = r.type === 'tarot' && r.spread?.[0]

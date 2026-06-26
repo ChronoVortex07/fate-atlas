@@ -50,4 +50,11 @@ export const DIVINATION_PROFILES: Record<string, DivinationProfile> = {
     dimensionStrengths: ['favorability', 'volatility', 'certainty'],
     modifierStrengths: ['subject', 'effect', 'action'],
   },
+  strings: {
+    type: 'strings',
+    themeCoverage: 'all',
+    themePool: ['mystery', 'transformation', 'harmony', 'conflict', 'renewal', 'authority', 'illumination', 'stagnation', 'surrender', 'upheaval'],
+    dimensionStrengths: ['favorability', 'certainty', 'volatility'],
+    modifierStrengths: ['subject', 'action', 'effect'],
+  },
 };
