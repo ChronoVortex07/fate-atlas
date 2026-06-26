@@ -164,6 +164,28 @@ export function revealFrom(
   return { candidateIds, veiledCandidateIds, lookAheadIds };
 }
 
-// drawWeave is added in Task 7.
+export function drawWeave(
+  affinities: Record<string, number>,
+  rng: () => number = Math.random,
+  question: QuestionType = 'self',
+): StringsResult {
+  const plan = planWeave(affinities);
+  const graph = generateWeave(question, plan, rng);
+  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+  const forward = (id: string) => graph.edges.filter((e) => e.from === id).map((e) => e.to);
+
+  const path: WovenNode[] = [byId.get(graph.originId)!];
+  let cur = graph.originId;
+  // Walk forward until a destination (last band) is reached.
+  for (let guard = 0; guard < graph.bandCount + 2; guard++) {
+    if (byId.get(cur)!.band === graph.bandCount - 1) break;
+    const next = forward(cur);
+    if (next.length === 0) break;
+    cur = next[Math.floor(rng() * next.length)];
+    path.push(byId.get(cur)!);
+  }
+  return consolidatePath(path);
+}
+
 export type { WeaveGraph, WeavePlan, WovenNode, WovenEdge, StringsResult, QuestionType };
 export { CONCEPTS, ORIGIN_IDS, CROSSING_IDS, destinationsFor, consolidatePath };

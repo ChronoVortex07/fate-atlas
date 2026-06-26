@@ -164,3 +164,18 @@ describe('revealFrom', () => {
     expect(revealFrom(lg, lightPlan, lg.originId).lookAheadIds.length).toBeGreaterThan(0);
   });
 });
+
+import { drawWeave } from '../strings';
+
+describe('drawWeave', () => {
+  it('auto-traverses a full path to a question destination and consolidates it', () => {
+    const r = drawWeave(baseAff, () => 0.5, 'decision');
+    expect(r.type).toBe('strings');
+    expect(r.path.length).toBeGreaterThanOrEqual(2);
+    expect(r.path[0].band).toBe(0);
+    // a full auto-traversal walks one node per band, so the last node sits on the
+    // destination band and its band index equals the final path index.
+    expect(r.path[r.path.length - 1].band).toBe(r.path.length - 1);
+    expect(CONCEPTS[r.destinationId].questionTypes).toContain('decision');
+  });
+});
