@@ -26,6 +26,8 @@ import type { HexagramMode } from './iching';
 import { planWeave, generateWeave, revealFrom } from './strings';
 import { consolidatePath, pathCoherence } from '../data/strings';
 import type { StringsMinigameState, StringsResult } from './types';
+import { planDiceCheck, resolveCheck } from './dice';
+import type { DiceCheckPlan, DiceCheckBreakdown } from './types';
 
 const STORAGE_KEY = 'fate-atlas-save';
 
@@ -610,10 +612,28 @@ export class GameEngine {
   }
 
   // Resolves every active roll modifier into one plan for the dice minigame.
-  planDiceRoll(): { mode: RollMode; offerReroll: boolean; reports: EffectReport[] } {
+  planDiceRoll(): {
+    mode: RollMode; offerReroll: boolean;
+    dc: number; bless: number; bane: number; sources: string[];
+    reports: EffectReport[];
+  } {
     const { draft, reports } = this.dispatchAt('dice:roll', { rollMods: [], outcome: undefined });
+    // DC + Bless/Bane from the slots already committed this turn (the active dice
+    // slot is not appended until completeMinigame, so turnResults == prior slots).
+    const check = planDiceCheck(this.state.turnResults);
     this.notify();
-    return { mode: draft.rollMode ?? 'single', offerReroll: draft.offerReroll ?? false, reports };
+    return {
+      mode: draft.rollMode ?? 'single',
+      offerReroll: draft.offerReroll ?? false,
+      dc: check.dc, bless: check.bless, bane: check.bane, sources: check.sources,
+      reports,
+    };
+  }
+
+  // Resolve a thrown d20 against its check plan: rolls the Bless/Bane d4s and
+  // returns the committed-shaped result plus the breakdown for the tally UI.
+  resolveDiceCheck(d20: number, plan: DiceCheckPlan): { result: DiceResult; breakdown: DiceCheckBreakdown } {
+    return resolveCheck(d20, plan);
   }
 
   // Fate (OVERRIDE) may swap one dealt position for a fresh single card before reveal.
