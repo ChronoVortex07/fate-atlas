@@ -128,6 +128,42 @@ export function generateWeave(question: QuestionType, plan: WeavePlan, rng: () =
   return { nodes: bands.flat(), edges, originId: bands[0][0].id, bandCount };
 }
 
-// revealFrom / drawWeave are added in Tasks 6–7.
+export function revealFrom(
+  graph: WeaveGraph,
+  plan: WeavePlan,
+  activeId: string,
+  rng?: () => number,
+): { candidateIds: string[]; veiledCandidateIds: string[]; lookAheadIds: string[] } {
+  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+  const forward = (id: string) => graph.edges.filter((e) => e.from === id).map((e) => e.to);
+
+  let neighbors = forward(activeId);
+  if (rng) neighbors = [...neighbors].sort(() => rng() - 0.5); // re-draw reshuffles
+  const windowSize = Math.min(plan.width, neighbors.length);
+  const windowIds = neighbors.slice(0, windowSize);
+
+  // Veil the last `veil` of the window, but never the last pickable.
+  const veilCount = Math.min(plan.veil, Math.max(0, windowIds.length - 1));
+  const veiledCandidateIds = veilCount > 0 ? windowIds.slice(windowIds.length - veilCount) : [];
+  const candidateIds = windowIds.filter((id) => !veiledCandidateIds.includes(id));
+
+  // Look-ahead: silhouettes `lookAhead` bands beyond the active node.
+  const lookAheadIds: string[] = [];
+  if (plan.lookAhead > 0) {
+    let frontier = [...windowIds];
+    const seen = new Set<string>([activeId, ...windowIds]);
+    for (let depth = 0; depth < plan.lookAhead; depth++) {
+      const next: string[] = [];
+      for (const id of frontier) for (const to of forward(id)) {
+        if (!seen.has(to) && byId.has(to)) { seen.add(to); next.push(to); lookAheadIds.push(to); }
+      }
+      frontier = next;
+    }
+  }
+
+  return { candidateIds, veiledCandidateIds, lookAheadIds };
+}
+
+// drawWeave is added in Task 7.
 export type { WeaveGraph, WeavePlan, WovenNode, WovenEdge, StringsResult, QuestionType };
 export { CONCEPTS, ORIGIN_IDS, CROSSING_IDS, destinationsFor, consolidatePath };

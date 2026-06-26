@@ -135,3 +135,32 @@ describe('generateWeave', () => {
     }
   });
 });
+
+import { revealFrom } from '../strings';
+
+describe('revealFrom', () => {
+  const plan = planWeave(baseAff);
+  const g = generateWeave('self', plan, () => 0.42);
+
+  it('reveals up to width pickable candidates from the active node', () => {
+    const r = revealFrom(g, plan, g.originId);
+    const fwd = g.edges.filter((e) => e.from === g.originId).map((e) => e.to);
+    expect(r.candidateIds.length).toBe(Math.min(plan.width, fwd.length));
+    for (const id of r.candidateIds) expect(fwd).toContain(id);
+  });
+
+  it('Shadow veils some candidates but always leaves at least one pickable', () => {
+    const shadowPlan = planWeave({ ...baseAff, shadow: 90 }); // veil 2, silhouette
+    const sg = generateWeave('self', shadowPlan, () => 0.42);
+    const r = revealFrom(sg, shadowPlan, sg.originId);
+    expect(r.candidateIds.length).toBeGreaterThanOrEqual(1);
+    for (const id of r.veiledCandidateIds) expect(r.candidateIds).not.toContain(id);
+  });
+
+  it('Light surfaces look-ahead silhouettes; baseline does not', () => {
+    expect(revealFrom(g, plan, g.originId).lookAheadIds).toHaveLength(0);
+    const lightPlan = planWeave({ ...baseAff, light: 70 });
+    const lg = generateWeave('self', lightPlan, () => 0.42);
+    expect(revealFrom(lg, lightPlan, lg.originId).lookAheadIds.length).toBeGreaterThan(0);
+  });
+});
