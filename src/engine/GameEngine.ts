@@ -22,6 +22,8 @@ import type { RuneCastMode } from './runes';
 import type { RuneScatter } from './types';
 import { deriveMandate, hexagramNudge, planHexagramResolution } from './iching';
 import type { HexagramMode } from './iching';
+import { planWeave, generateWeave, revealFrom } from './strings';
+import type { StringsMinigameState } from './types';
 
 const STORAGE_KEY = 'fate-atlas-save';
 
@@ -299,6 +301,8 @@ export class GameEngine {
     this.state.drawPhase = null;
     if (pending.method === 'tarot') {
       this.startTarotDraft(); // notifies
+    } else if (pending.method === 'strings') {
+      this.startWeave(); // notifies
     }
     this.notify();
   }
@@ -738,6 +742,34 @@ export class GameEngine {
 
     this.state.minigameState = draft;
     this.dispatchAt('tarot:draft:started', {});
+    this.notify();
+  }
+
+  // ── Strings of Fate Minigame ──
+
+  startWeave(): void {
+    const affinities = this.affinityEngine.getState();
+    const plan = planWeave(affinities);
+    const graph = generateWeave(this.state.questionType ?? 'self', plan, Math.random);
+    const originId = graph.originId;
+    const { candidateIds, veiledCandidateIds, lookAheadIds } = revealFrom(graph, plan, originId);
+    const weave: StringsMinigameState = {
+      method: 'strings',
+      graph,
+      plan,
+      visitedPath: [originId],
+      activeId: originId,
+      candidateIds,
+      veiledCandidateIds,
+      lookAheadIds,
+      revealedIds: [...new Set([originId, ...candidateIds, ...veiledCandidateIds, ...lookAheadIds])],
+      foresightId: null,
+      backtracksRemaining: plan.backtracks,
+      redrawUsed: false,
+      phase: 'drawing',
+    };
+    this.state.minigameState = weave;
+    this.dispatchAt('strings:start', {});
     this.notify();
   }
 
