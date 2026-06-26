@@ -90,3 +90,48 @@ describe('planWeave', () => {
     expect(planWeave({ ...baseAff, chaos: 90 }).bandCount).toBe(5);
   });
 });
+
+import { generateWeave } from '../strings';
+import type { WeaveGraph } from '../types';
+
+function reaches(graph: WeaveGraph): boolean {
+  const last = graph.bandCount - 1;
+  const fwd = new Map<string, string[]>();
+  for (const e of graph.edges) (fwd.get(e.from) ?? fwd.set(e.from, []).get(e.from)!).push(e.to);
+  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+  const seen = new Set<string>([graph.originId]);
+  const stack = [graph.originId];
+  while (stack.length) {
+    const id = stack.pop()!;
+    if (byId.get(id)!.band === last) return true;
+    for (const to of fwd.get(id) ?? []) if (!seen.has(to)) { seen.add(to); stack.push(to); }
+  }
+  return false;
+}
+
+describe('generateWeave', () => {
+  it('builds the planned bands with a reachable destination', () => {
+    const plan = planWeave(baseAff);
+    for (let i = 0; i < 25; i++) {
+      const g = generateWeave('relationship', plan, () => (i * 0.37 + 0.13) % 1);
+      expect(g.bandCount).toBe(4);
+      expect(g.nodes.filter((n) => n.band === 0)).toHaveLength(1);
+      expect(g.nodes.filter((n) => n.band === g.bandCount - 1).length).toBeGreaterThanOrEqual(1);
+      // every non-destination node has a forward edge
+      for (const n of g.nodes) {
+        if (n.band < g.bandCount - 1) {
+          expect(g.edges.some((e) => e.from === n.id)).toBe(true);
+        }
+      }
+      expect(reaches(g)).toBe(true);
+    }
+  });
+
+  it('only seeds destinations that answer the question', () => {
+    const g = generateWeave('relationship', planWeave(baseAff), Math.random);
+    const dests = g.nodes.filter((n) => n.band === g.bandCount - 1);
+    for (const d of dests) {
+      expect(CONCEPTS[d.conceptId].questionTypes).toContain('relationship');
+    }
+  });
+});
