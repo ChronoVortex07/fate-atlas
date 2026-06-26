@@ -41,7 +41,7 @@ export default function CardSpread({ methods, visualFor, motionFor, interactive,
 
 const spreadStyle: React.CSSProperties = {
   display: 'flex', flexWrap: 'nowrap', alignItems: 'center', justifyContent: 'safe center',
-  gap: 'clamp(0.6rem, 2.5vw, 1.4rem)',
+  gap: 'clamp(0.45rem, 2.2vw, 1.4rem)',
   width: '100%', maxWidth: '100%', padding: '2.2rem 1rem',
   overflowX: 'auto', overflowY: 'visible',
   scrollbarWidth: 'thin', scrollbarColor: '#2a3358 transparent',
