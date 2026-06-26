@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import type { SlotResult } from '../../engine/types';
 import { SIGNS } from '../../data/astromancy';
+import { CONCEPTS } from '../../data/strings';
 import CardSigil from './CardSigil';
 
 export type FanCardState = 'idle' | 'source' | 'target' | 'animating' | 'reroll-target';
@@ -92,6 +93,13 @@ function getCardDisplay(result: SlotResult): {
         name: result.name.replace(' — Merkstave', ''),
         detail: result.orientation === 'upright' ? '▲ Upright' : '▼ Merkstave',
         borderColor: '#c8a86a',                   // rune gold
+      };
+    case 'strings':
+      return {
+        symbol: result.symbol,                       // destination glyph
+        name: CONCEPTS[result.destinationId].name,   // destination name (concise)
+        detail: 'WEAVE',
+        borderColor: '#c33b5e',                      // crimson-garnet
       };
     case 'happening':
       return {

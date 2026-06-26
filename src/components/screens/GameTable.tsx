@@ -9,6 +9,7 @@ import DiceMinigame from './DiceMinigame';
 import IChingMinigame from './IChingMinigame';
 import AstralMinigame from './AstralMinigame';
 import RuneMinigame from './RuneMinigame';
+import StringsMinigame from './StringsMinigame';
 import HappeningScene from './HappeningScene';
 import ResultReading from './ResultReading';
 import HistoryModal from '../overlays/HistoryModal';
@@ -53,6 +54,8 @@ export default function GameTable() {
         return <AstralMinigame key="astral-minigame" />;
       case 'rune':
         return <RuneMinigame key="rune-minigame" />;
+      case 'strings':
+        return <StringsMinigame key="strings-minigame" />;
       default:
         return null;
     }
