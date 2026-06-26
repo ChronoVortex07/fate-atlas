@@ -55,3 +55,27 @@ describe('strings weave — stepping', () => {
     expect(e.getState().affinities.shadow).toBeGreaterThan(shadowBefore);
   });
 });
+
+describe('strings weave — agency', () => {
+  it('Will backtrack returns to the previous node and feeds Will', () => {
+    const e = startWeaveWith(HI({ will: 70 })); // backtracks 1
+    const first = weave(e).candidateIds[0];
+    e.stepTo(first);
+    const willBefore = e.getState().affinities.will;
+    e.backtrack();
+    const s = weave(e);
+    expect(s.visitedPath).not.toContain(first);
+    expect(s.activeId).toBe(s.visitedPath[s.visitedPath.length - 1]);
+    expect(s.backtracksRemaining).toBe(0);
+    expect(e.getState().affinities.will).toBeGreaterThan(willBefore);
+  });
+
+  it('Light foresight marks the candidate and feeds Light', () => {
+    const e = startWeaveWith(HI({ light: 70 }));
+    const before = e.getState().affinities.light;
+    const cand = weave(e).candidateIds[0];
+    e.useForesight(cand);
+    expect(weave(e).foresightId).toBe(cand);
+    expect(e.getState().affinities.light).toBeGreaterThan(before);
+  });
+});

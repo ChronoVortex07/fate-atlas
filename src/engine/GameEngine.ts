@@ -828,6 +828,48 @@ export class GameEngine {
     w.revealedIds = [...new Set([...w.revealedIds, nodeId, ...r.candidateIds, ...r.veiledCandidateIds, ...r.lookAheadIds])];
   }
 
+  backtrack(): void {
+    const w = this.state.minigameState;
+    if (!w || w.method !== 'strings') throw new Error('No active weave');
+    if (w.phase !== 'drawing') throw new Error('Cannot backtrack after arrival');
+    if (w.backtracksRemaining <= 0 || w.visitedPath.length <= 1) throw new Error('No backtrack available');
+    const prev = w.visitedPath[w.visitedPath.length - 2];
+    w.visitedPath = w.visitedPath.slice(0, -1);
+    w.activeId = prev;
+    const r = revealFrom(w.graph, w.plan, prev);
+    w.candidateIds = r.candidateIds;
+    w.veiledCandidateIds = r.veiledCandidateIds;
+    w.lookAheadIds = r.lookAheadIds;
+    w.backtracksRemaining -= 1;
+    this.affinityEngine.applyAction('take-reroll'); // Will
+    this.notify();
+  }
+
+  redrawCandidates(): void {
+    const w = this.state.minigameState;
+    if (!w || w.method !== 'strings') throw new Error('No active weave');
+    if (w.phase !== 'drawing') throw new Error('Cannot redraw after arrival');
+    if (!w.plan.allowRedraw || w.redrawUsed) throw new Error('No redraw available');
+    const r = revealFrom(w.graph, w.plan, w.activeId, Math.random); // rng → reshuffled subset
+    w.candidateIds = r.candidateIds;
+    w.veiledCandidateIds = r.veiledCandidateIds;
+    w.lookAheadIds = r.lookAheadIds;
+    w.revealedIds = [...new Set([...w.revealedIds, ...r.candidateIds, ...r.veiledCandidateIds, ...r.lookAheadIds])];
+    w.redrawUsed = true;
+    this.affinityEngine.applyAction('take-reroll'); // Will
+    this.notify();
+  }
+
+  useForesight(nodeId: string): void {
+    const w = this.state.minigameState;
+    if (!w || w.method !== 'strings') throw new Error('No active weave');
+    if (!w.plan.foresight) throw new Error('Foresight unavailable');
+    if (!w.candidateIds.includes(nodeId)) throw new Error('Not a candidate');
+    w.foresightId = nodeId;
+    this.affinityEngine.applyAction('use-peek'); // Light
+    this.notify();
+  }
+
   pickForHand(handIndex: number, tableIndex: number): void {
     const draft = this.state.minigameState as TarotDraftState | null;
     if (!draft || draft.method !== 'tarot') throw new Error('No active tarot draft');
