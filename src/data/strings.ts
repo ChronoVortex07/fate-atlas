@@ -82,5 +82,69 @@ export function conceptTags(c: ConceptDef): Tag[] {
   return [`concept-${c.id}`, `family-${c.family}`, ...c.themes];
 }
 
-// consolidatePath / pathCoherence are added in Task 3.
-export type { WovenNode, StringsResult };
+// ── Consolidation ──
+const AXES: (keyof DimensionValues)[] = ['favorability', 'certainty', 'volatility'];
+const clampDim = (v: number) => Math.max(-2, Math.min(2, Math.round(v * 2) / 2));
+
+// Theme opposition pairs (mirrors ReadingPlanner's THEME_OPPOSITIONS).
+const THEME_OPPOSED: [ThemeTag, ThemeTag][] = [
+  ['upheaval', 'harmony'], ['renewal', 'stagnation'],
+  ['illumination', 'mystery'], ['conflict', 'surrender'], ['authority', 'surrender'],
+];
+
+/** Destination-governed: destination weight 2, origin & crossings weight 1. */
+export function consolidatePath(path: WovenNode[]): StringsResult {
+  const defs = path.map((n) => CONCEPTS[n.conceptId]);
+  const destIdx = path.length - 1;
+  const weightOf = (i: number) => (i === destIdx ? 2 : 1);
+  const totalW = defs.reduce((s, _d, i) => s + weightOf(i), 0);
+
+  const dims: DimensionValues = { favorability: 0, certainty: 0, volatility: 0 };
+  for (let i = 0; i < defs.length; i++) {
+    for (const a of AXES) dims[a] += defs[i].dimensions[a] * weightOf(i);
+  }
+  for (const a of AXES) dims[a] = clampDim(dims[a] / totalW);
+
+  // Themes: weighted frequency, destination themes forced in, cap 2.
+  const freq = new Map<ThemeTag, number>();
+  defs.forEach((d, i) => d.themes.forEach((t) => freq.set(t, (freq.get(t) ?? 0) + weightOf(i))));
+  const destThemes = defs[destIdx].themes;
+  const ranked = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t);
+  const themes: ThemeTag[] = [...new Set<ThemeTag>([...destThemes, ...ranked])].slice(0, 2);
+
+  const roles = [...new Set<ModifierRole>(defs.map((d) => d.modifierRole))];
+  const tags: Tag[] = [
+    'draw', 'random', 'strings', 'weave',
+    ...new Set(defs.flatMap((d) => conceptTags(d))),
+  ];
+
+  const dest = defs[destIdx];
+  return {
+    type: 'strings',
+    id: `strings:${dest.id}`,
+    name: defs.map((d) => d.name).join(' · '),
+    symbol: dest.glyph,
+    interpretation: `${dest.name} — ${dest.meaning}`,
+    path,
+    destinationId: dest.id,
+    themes,
+    dimensions: dims,
+    modifierRoles: roles,
+    tags,
+  };
+}
+
+/** A path is `tangled` if it spans an opposed theme pair; else `coherent` if its
+ *  themes cluster and favorability is steady; else null. */
+export function pathCoherence(path: WovenNode[]): 'coherent' | 'tangled' | null {
+  const defs = path.map((n) => CONCEPTS[n.conceptId]);
+  const themes = new Set<ThemeTag>(defs.flatMap((d) => d.themes));
+  for (const [a, b] of THEME_OPPOSED) if (themes.has(a) && themes.has(b)) return 'tangled';
+
+  const favs = defs.map((d) => d.dimensions.favorability);
+  const mean = favs.reduce((s, v) => s + v, 0) / favs.length;
+  const variance = favs.reduce((s, v) => s + (v - mean) ** 2, 0) / favs.length;
+  const sharedTheme = defs.every((d) => d.themes.some((t) => defs[0].themes.includes(t)));
+  if (sharedTheme || Math.sqrt(variance) < 0.6) return 'coherent';
+  return null;
+}
