@@ -388,6 +388,29 @@ export type MinigameState =
   | DiceMinigameState
   | IChingMinigameState;
 
+// ── Draw Phase (card-draw method selection) ──
+
+/** A selection in flight, awaiting the card-draw UI to finish animating before
+ *  the screen transitions to the minigame. Set by beginSelection(). */
+export interface PendingSelection {
+  chosenIndex: number;            // index in availableMethods the player clicked
+  finalIndex: number;             // index actually selected (Fate may redirect)
+  method: DivinationType;         // availableMethods[finalIndex]
+  wasForced: boolean;             // true when finalIndex !== chosenIndex (Fate force)
+  shrouded: boolean;              // finalIndex was shrouded → play the reveal
+  forceReport: EffectReport | null; // fate-force-method report, for overlay text
+}
+
+/** Snapshot of the current method-select draw, consumed by MethodSelect. The
+ *  pool/shroud themselves remain on GameState.availableMethods/shroudedMethods;
+ *  this carries the ordered pre-selection effect reports (diverted from the
+ *  generic eventQueue) plus any in-flight selection. */
+export interface DrawPhase {
+  nonce: number;                  // bumps on each (re)deal — keys the UI deal/sequence
+  effectReports: EffectReport[];  // ordered widen/thin/shroud reports to narrate
+  pendingSelection: PendingSelection | null;
+}
+
 // ── Engine State ──
 export type Screen =
   | 'title'
@@ -404,6 +427,7 @@ export interface GameState {
   questionType: QuestionType | null;
   availableMethods: DivinationType[];
   shroudedMethods: number[];
+  drawPhase: DrawPhase | null;
   selectedMethod: DivinationType | null;
   turnResults: SlotResult[];
   minigamesCompleted: number;
