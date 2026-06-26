@@ -81,3 +81,15 @@ describe('strings commit-time responders', () => {
     expect(reports.some((r) => r.responderId === 'woven-echo')).toBe(true);
   });
 });
+
+import { buildAffinityResponders } from '../responders/affinity';
+
+describe('chaos-second-result on strings', () => {
+  it('spawns a strings second when forced on a strings commit', () => {
+    const affRs = buildAffinityResponders();
+    const outcome = consolidatePath([node('the-self', 0), node('a-rising-tide', 1), node('the-dawn', 3)]);
+    const c = ctx('strings:commit', { outcome });
+    dispatch('strings:commit', c, affRs, { forced: ['chaos-second-result'], isolate: true });
+    expect(c.draft.spawnSecond).toBe('strings');
+  });
+});

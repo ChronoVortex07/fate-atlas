@@ -158,7 +158,7 @@ export function buildAffinityResponders(): Responder[] {
     },
     {
       id: 'chaos-second-result', source: 'affinity',
-      triggers: ['dice:commit', 'tarot:commit', 'iching:commit'],
+      triggers: ['dice:commit', 'tarot:commit', 'iching:commit', 'strings:commit'],
       group: { kind: 'exclusive', band: 'SPAWN' }, weight: w('chaos'),
       condition: (c) => !!c.draft.outcome && c.draft.outcome.type !== 'happening',
       roll: (c) => bandRoll(c, 'chaos', 'dominant', T.major),
