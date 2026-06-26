@@ -1,6 +1,8 @@
-import type { DiceResult, ThemeTag, DimensionValues, ModifierRole } from '../engine/types';
+import type {
+  DiceResult, ThemeTag, DimensionValues, ModifierRole, Tag, Threshold, DiceCheckBreakdown,
+} from '../engine/types';
 
-export type Threshold = 'critical-low' | 'low' | 'neutral' | 'high' | 'critical-high';
+export type { Threshold }; // re-export so existing `from '../data/dice'` imports keep resolving
 
 interface ThresholdData {
   interpretation: string;
@@ -9,7 +11,7 @@ interface ThresholdData {
   modifierRoles: ModifierRole[];
 }
 
-const THRESHOLD_DATA: Record<Threshold, ThresholdData> = {
+export const THRESHOLD_DATA: Record<Threshold, ThresholdData> = {
   'critical-low': {
     interpretation: 'The odds are starkly against you — patience is counseled above all.',
     themes: ['upheaval', 'conflict'],
@@ -77,5 +79,53 @@ export function rollD20(affinities: Record<string, number>): DiceResult {
     themes: data.themes,
     dimensions: data.dimensions,
     modifierRoles: data.modifierRoles,
+  };
+}
+
+// Interpretation text for a resolved check. Criticals override; otherwise the
+// line names the DC the reading set so success/failure reads as relative.
+function checkInterpretation(b: DiceCheckBreakdown): string {
+  if (b.critical === 'triumph') {
+    return 'A natural 20 — fate breaks open in your favor, past anything the bar demanded.';
+  }
+  if (b.critical === 'fumble') {
+    return 'A natural 1 — the cast collapses; even a low bar goes unmet.';
+  }
+  switch (b.tier) {
+    case 'critical-high':
+      return `The reading set the bar at ${b.dc}; your cast clears it commandingly — momentum is yours.`;
+    case 'high':
+      return `The reading set the bar at ${b.dc}; your cast meets it — the path holds.`;
+    case 'neutral':
+      return `The reading set the bar at ${b.dc}; your cast falls just short — the question stays open.`;
+    case 'low':
+      return `The reading set the bar at ${b.dc}; your cast misses — the trend resists you.`;
+    case 'critical-low':
+      return `The reading set the bar at ${b.dc}; your cast fails badly — fate counsels another way.`;
+  }
+}
+
+// Assemble the committed DiceResult from a resolved check breakdown. Tier supplies
+// themes/dimensions/modifierRoles; the natural d20 stays in `result`.
+export function buildDiceResult(breakdown: DiceCheckBreakdown): DiceResult {
+  const data = THRESHOLD_DATA[breakdown.tier];
+  const polarity = breakdown.tier.includes('low')
+    ? 'low'
+    : breakdown.tier.includes('high')
+      ? 'high'
+      : 'neutral';
+  const tags: Tag[] = ['roll', 'random', 'numeric', 'threshold', polarity];
+  if (breakdown.critical === 'triumph') tags.push('triumph');
+  if (breakdown.critical === 'fumble') tags.push('fumble');
+  return {
+    type: 'd20',
+    result: breakdown.d20,
+    threshold: breakdown.tier,
+    interpretation: checkInterpretation(breakdown),
+    tags,
+    themes: data.themes,
+    dimensions: data.dimensions,
+    modifierRoles: data.modifierRoles,
+    check: breakdown,
   };
 }
