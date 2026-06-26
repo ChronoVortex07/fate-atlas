@@ -3,7 +3,7 @@ import * as CANNON from 'cannon-es';
 import type { RollMode } from '../../../engine/types';
 import { castTuning } from '../../../engine/astralPhysics';
 import { BOARD_RADIUS, WALL_RADIUS } from '../../../engine/astralGeometry';
-import { createD20, createD4, snapToFace, readTopFace, faceIndexOfId, type DiceDie } from './die';
+import { createD20, createD4, snapToFace, faceIndexOfId, type DiceDie } from './die';
 
 const DIE_R = 0.6;
 const D4_R = 0.4;
@@ -106,6 +106,7 @@ export function createDiceScene(opts: {
   let targets: number[] = [];
   let active: DiceDie[] = [];        // the d20(s) in play this throw
   let kept: DiceDie | null = null;
+  let keptTargetValue = 0;
   let smashT = 0; const smashFrom = new THREE.Vector3(); const smashOver = new THREE.Vector3();
 
   const syncMesh = (d: DiceDie) => {
@@ -147,6 +148,7 @@ export function createDiceScene(opts: {
     // advantage / disadvantage: choose kept, begin the smash.
     const keepFirst = mode === 'advantage' ? targets[0] >= targets[1] : targets[0] <= targets[1];
     kept = keepFirst ? active[0] : active[1];
+    keptTargetValue = keepFirst ? targets[0] : targets[1];
     const loser = keepFirst ? active[1] : active[0];
     smashOver.set(loser.body.position.x, DIE_R, loser.body.position.z);
     smashFrom.copy(kept.object.position);
@@ -188,19 +190,19 @@ export function createDiceScene(opts: {
       kept.body.type = CANNON.Body.DYNAMIC;
       kept.body.position.set(0, DIE_R, 0);
       kept.body.velocity.set(0, 0, 0);
-      snapToFace(kept, faceIndexOfId(kept, String(readTopFaceValue(kept))));
+      snapToFace(kept, faceIndexOfId(kept, String(keptTargetValue)));
       syncMesh(kept);
       loser.object.visible = false;
-      const keptValue = readTopFaceValue(kept);
       phase = 'done';
-      onResolved(keptValue);
+      onResolved(keptTargetValue);
     }
   };
 
-  const readTopFaceValue = (d: DiceDie) => Number(readTopFace(d));
-
   // Drop the physical Bless/Bane d4s in to their values.
   const startModifiers = (blessValues: number[], baneValues: number[]) => {
+    [...blessDice, ...baneDice].forEach((d) => { scene.remove(d.object); world.removeBody(d.body); });
+    blessDice.length = 0;
+    baneDice.length = 0;
     const make = (vals: number[], tint: string, arr: DiceDie[], sideSign: number) => {
       vals.forEach((v, i) => {
         const d = mkDie(createD4(world, D4_R, tint));
