@@ -25,3 +25,33 @@ describe('strings weave — start', () => {
     expect(s.candidateIds.length).toBeGreaterThanOrEqual(1);
   });
 });
+
+describe('strings weave — stepping', () => {
+  it('stepTo advances the path, recomputes candidates, and feeds Fate on a hinted accept', () => {
+    const e = startWeaveWith(HI());
+    const fateBefore = e.getState().affinities.fate;
+    const cand = weave(e).candidateIds[0];
+    e.stepTo(cand);
+    const s = weave(e);
+    expect(s.visitedPath).toContain(cand);
+    expect(s.activeId).toBe(cand);
+    expect(e.getState().affinities.fate).toBeGreaterThan(fateBefore);
+  });
+
+  it('reaching a destination flips the phase to arrived', () => {
+    const e = startWeaveWith(HI());
+    let guard = 0;
+    while (weave(e).phase === 'drawing' && guard++ < 12) {
+      e.stepTo(weave(e).candidateIds[0]);
+    }
+    expect(weave(e).phase).toBe('arrived');
+    expect(weave(e).candidateIds).toHaveLength(0);
+  });
+
+  it('a blind (Shadow silhouette) accept feeds Shadow instead of Fate', () => {
+    const e = startWeaveWith(HI({ shadow: 70 })); // clarity 'silhouette'
+    const shadowBefore = e.getState().affinities.shadow;
+    e.stepTo(weave(e).candidateIds[0]);
+    expect(e.getState().affinities.shadow).toBeGreaterThan(shadowBefore);
+  });
+});

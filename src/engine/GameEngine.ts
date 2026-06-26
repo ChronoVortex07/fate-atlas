@@ -773,6 +773,61 @@ export class GameEngine {
     this.notify();
   }
 
+  stepTo(nodeId: string): void {
+    const w = this.state.minigameState;
+    if (!w || w.method !== 'strings') throw new Error('No active weave');
+    if (w.phase !== 'drawing') throw new Error('Weave already arrived');
+    if (!w.candidateIds.includes(nodeId)) throw new Error(`Node ${nodeId} is not a current candidate`);
+
+    const byId = new Map(w.graph.nodes.map((n) => [n.id, n]));
+    const hasForwardAfter = byId.get(nodeId)!.band < w.graph.bandCount - 1;
+
+    // strings:pick — Chaos/Fate may redirect (OVERRIDE); Fate may add a foregone step (SPAWN).
+    const { draft } = this.dispatchAt('strings:pick', {
+      chosenId: nodeId,
+      candidateIds: [...w.candidateIds],
+      hasForwardAfter,
+    });
+    const finalId = typeof draft.redirectTo === 'string' && w.candidateIds.includes(draft.redirectTo)
+      ? draft.redirectTo : nodeId;
+
+    const usedForesight = w.foresightId !== null;
+    this.advanceWeave(w, finalId);
+
+    // Affinity feed for accepting the step.
+    if (!usedForesight) {
+      if (w.plan.clarity === 'silhouette') this.affinityEngine.applyAction('embrace-mystery'); // blind → Shadow
+      else this.affinityEngine.applyAction('reveal-as-drawn');                                  // hinted → Fate
+    }
+    w.foresightId = null;
+
+    // Fate foregone step: weave one more automatically along a candidate edge.
+    if (draft.foregoneStep === true && w.phase === 'drawing' && w.candidateIds.length > 0) {
+      const auto = w.candidateIds[Math.floor(Math.random() * w.candidateIds.length)];
+      this.advanceWeave(w, auto);
+    }
+
+    this.notify();
+  }
+
+  private advanceWeave(w: StringsMinigameState, nodeId: string): void {
+    const byId = new Map(w.graph.nodes.map((n) => [n.id, n]));
+    w.visitedPath = [...w.visitedPath, nodeId];
+    w.activeId = nodeId;
+    if (byId.get(nodeId)!.band === w.graph.bandCount - 1) {
+      w.phase = 'arrived';
+      w.candidateIds = [];
+      w.veiledCandidateIds = [];
+      w.lookAheadIds = [];
+      return;
+    }
+    const r = revealFrom(w.graph, w.plan, nodeId);
+    w.candidateIds = r.candidateIds;
+    w.veiledCandidateIds = r.veiledCandidateIds;
+    w.lookAheadIds = r.lookAheadIds;
+    w.revealedIds = [...new Set([...w.revealedIds, nodeId, ...r.candidateIds, ...r.veiledCandidateIds, ...r.lookAheadIds])];
+  }
+
   pickForHand(handIndex: number, tableIndex: number): void {
     const draft = this.state.minigameState as TarotDraftState | null;
     if (!draft || draft.method !== 'tarot') throw new Error('No active tarot draft');
