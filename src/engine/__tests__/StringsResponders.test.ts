@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { dispatch } from '../events/EventDispatcher';
 import { buildStringsResponders } from '../responders/strings';
-import { CONCEPTS } from '../../data/strings';
+import { consolidatePath, CONCEPTS } from '../../data/strings';
 import type { PhaseContext, PhaseDraft } from '../events/types';
 import type { AffinityId, WovenNode, SlotResult } from '../types';
 
@@ -35,5 +35,49 @@ describe('strings pick-time responders', () => {
     const c = ctx('strings:pick', { chosenId: 'b1-0', candidateIds: ['b1-0', 'b1-1'], hasForwardAfter: true });
     dispatch('strings:pick', c, rs, { forced: ['fate-foregone-step'], isolate: true });
     expect(c.draft.foregoneStep).toBe(true);
+  });
+});
+
+const dom = (d: SlotResult['dimensions']) =>
+  (['favorability', 'certainty', 'volatility'] as const).reduce((m, a) => (Math.abs(d[a]) > Math.abs(d[m]) ? a : m), 'favorability' as 'favorability' | 'certainty' | 'volatility');
+
+describe('strings commit-time responders', () => {
+  it('coherent-weave amplifies the dominant dimension on a single-theme path', () => {
+    // all share 'renewal'
+    const outcome = consolidatePath([node('a-rising-tide', 0), node('the-blossom', 1), node('the-dawn', 3)]);
+    const before = outcome.dimensions[dom(outcome.dimensions)];
+    const c = ctx('strings:commit', { outcome });
+    dispatch('strings:commit', c, rs, { forced: ['coherent-weave'], isolate: true });
+    const after = (c.draft.outcome as typeof outcome).dimensions[dom(outcome.dimensions)];
+    expect(Math.abs(after)).toBeGreaterThan(Math.abs(before));
+  });
+
+  it('tangled-weave raises volatility on an opposed-theme path', () => {
+    // conflict (the-severance) vs surrender (the-parting) → opposed pair
+    const outcome = consolidatePath([node('the-self', 0), node('the-severance', 1), node('the-parting', 3)]);
+    const before = outcome.dimensions.volatility;
+    const c = ctx('strings:commit', { outcome });
+    dispatch('strings:commit', c, rs, { forced: ['tangled-weave'], isolate: true });
+    expect((c.draft.outcome as typeof outcome).dimensions.volatility).toBeGreaterThan(before);
+  });
+
+  it('order-true-weave tempers the most extreme dimension', () => {
+    const outcome = consolidatePath([node('the-self', 0), node('the-fracture', 1), node('the-turning', 3)]);
+    const before = Math.abs(outcome.dimensions[dom(outcome.dimensions)]);
+    const c = ctx('strings:commit', { outcome }, { affinities: { order: 80 } });
+    dispatch('strings:commit', c, rs, { forced: ['order-true-weave'], isolate: true });
+    const after = Math.abs((c.draft.outcome as typeof outcome).dimensions[dom(outcome.dimensions)]);
+    expect(after).toBeLessThan(before);
+  });
+
+  it('woven-echo fires when another slot shares the destination theme', () => {
+    const outcome = consolidatePath([node('the-self', 0), node('a-rising-tide', 1), node('the-dawn', 3)]); // dominant 'renewal'
+    const sharer: SlotResult = {
+      type: 'd20', result: 10, threshold: 'neutral', interpretation: '',
+      tags: [], themes: ['renewal'], dimensions: { favorability: 0, certainty: 0, volatility: 0 }, modifierRoles: [],
+    } as SlotResult;
+    const c = ctx('strings:commit', { outcome }, { slots: [sharer, outcome] });
+    const { reports } = dispatch('strings:commit', c, rs, { forced: ['woven-echo'], isolate: true });
+    expect(reports.some((r) => r.responderId === 'woven-echo')).toBe(true);
   });
 });
