@@ -6,7 +6,7 @@ import { METHOD_FRONTS } from '../../data/method-cards';
 import type { DivinationType } from '../../engine/types';
 
 export type MethodCardVisual = 'face-down' | 'face-up' | 'shrouded';
-export type MethodCardMotion = 'idle' | 'selected' | 'rejected' | 'fated';
+export type MethodCardMotion = 'idle' | 'selected' | 'rejected' | 'fated' | 'pressed';
 
 export interface MethodCardProps {
   method: DivinationType;
@@ -15,46 +15,70 @@ export interface MethodCardProps {
   interactive: boolean;
   onClick?: () => void;
   index: number;
+  appeared?: boolean;     // deal-in gate: false → off-screen, true → dealt into place
+  appearDelay?: number;   // stagger (seconds) for the deal-in
+  dissolving?: boolean;   // Fate-thin: the card dissolves into gold motes and is removed
+  phantom?: boolean;      // a placeholder card (the closing path) — never revealed, aria-hidden
 }
+
+// Deal-in entrance: the card drops in from below, faded and small, with a slight
+// tilt — played on the initial deal, on a refresh/swap (re-keyed by nonce), and
+// when a Will-widened card arrives at its banner.
+const DEAL_HIDDEN = { opacity: 0, y: 56, scale: 0.82, rotateZ: -5 };
+const DEAL_SHOWN = { opacity: 1, y: 0, scale: 1, rotateZ: 0 };
+// Fate-thin: the card brightens and shrinks away as it sheds motes.
+const DISSOLVE = { opacity: 0, scale: 0.84, filter: 'brightness(1.6)' };
 
 export default function MethodCard({
   method, visual, motion: emphasis = 'idle', interactive, onClick, index,
+  appeared = true, appearDelay = 0, dissolving = false, phantom = false,
 }: MethodCardProps) {
   const flipped = visual !== 'face-down'; // face-up OR shrouded → rotated to front
 
   const motionState =
     emphasis === 'selected' ? { y: -22, scale: 1.06, boxShadow: '0 0 26px rgba(212,168,84,0.55)' }
     : emphasis === 'fated' ? { y: -14, scale: 1.04, boxShadow: '0 0 30px rgba(212,168,84,0.7)' }
-    : emphasis === 'rejected' ? { y: 0, scale: 0.97, opacity: 0.4, filter: 'grayscale(0.4)' }
+    // pressed: the hand of fate forces the chosen card down before it is rejected.
+    : emphasis === 'pressed' ? { y: 20, scale: 0.95, filter: 'brightness(0.6)', boxShadow: '0 10px 20px rgba(0,0,0,0.55)' }
+    : emphasis === 'rejected' ? { y: 0, scale: 0.97, opacity: 0.4, filter: 'grayscale(0.5)' }
     : { y: 0, scale: 1, opacity: 1, boxShadow: '0 0 0 rgba(0,0,0,0)' };
 
   return (
-    <motion.button
-      type="button"
-      aria-label={METHOD_FRONTS[method].title}
-      disabled={!interactive}
-      onClick={interactive ? onClick : undefined}
-      style={cardBoxStyle}
-      animate={motionState}
-      transition={{ type: 'spring', stiffness: 320, damping: 26 }}
-      whileHover={interactive ? { y: -8, scale: 1.03 } : undefined}
-      whileTap={interactive ? { scale: 0.99 } : undefined}
+    <motion.div
+      style={dealWrapStyle}
+      initial={DEAL_HIDDEN}
+      animate={appeared ? DEAL_SHOWN : DEAL_HIDDEN}
+      transition={{ duration: 0.5, ease: [0.16, 0.84, 0.36, 1], delay: appeared ? appearDelay : 0 }}
     >
-      <motion.div
-        style={flipInnerStyle}
-        animate={{ rotateY: flipped ? 180 : 0 }}
-        transition={{ duration: 0.4, ease: 'easeInOut', delay: flipped ? index * 0.05 : 0 }}
+      <motion.button
+        type="button"
+        aria-label={phantom ? undefined : METHOD_FRONTS[method].title}
+        aria-hidden={phantom || undefined}
+        disabled={!interactive}
+        onClick={interactive ? onClick : undefined}
+        style={cardBoxStyle}
+        animate={dissolving ? DISSOLVE : motionState}
+        transition={dissolving ? { duration: 0.55, ease: 'easeIn' } : { type: 'spring', stiffness: 320, damping: 26 }}
+        whileHover={interactive ? { y: -8, scale: 1.03 } : undefined}
+        whileTap={interactive ? { scale: 0.99 } : undefined}
       >
-        {/* back */}
-        <div style={faceStyle}>
-          <CelestialVeilBack />
-        </div>
-        {/* front (rotated 180 so it reads correctly when flipped) */}
-        <div style={{ ...faceStyle, transform: 'rotateY(180deg)' }}>
-          {visual === 'shrouded' ? <ShroudedFront /> : <MethodCardFront method={method} />}
-        </div>
-      </motion.div>
-    </motion.button>
+        <motion.div
+          style={flipInnerStyle}
+          animate={{ rotateY: flipped ? 180 : 0 }}
+          transition={{ duration: 0.4, ease: 'easeInOut', delay: flipped ? index * 0.05 : 0 }}
+        >
+          {/* back */}
+          <div style={faceStyle}>
+            <CelestialVeilBack />
+          </div>
+          {/* front (rotated 180 so it reads correctly when flipped) */}
+          <div style={{ ...faceStyle, transform: 'rotateY(180deg)' }}>
+            {visual === 'shrouded' ? <ShroudedFront /> : <MethodCardFront method={method} />}
+          </div>
+        </motion.div>
+      </motion.button>
+      {dissolving && <DissolveMotes />}
+    </motion.div>
   );
 }
 
@@ -144,8 +168,44 @@ function VeiledEye() {
   );
 }
 
+// Gold motes shed when a Fate-thinned card dissolves — small embers that drift
+// up and outward from the card and wink out.
+function DissolveMotes() {
+  return (
+    <div style={moteLayerStyle} aria-hidden>
+      {Array.from({ length: 9 }, (_, i) => {
+        const ang = (i / 9) * Math.PI * 2;
+        const dx = Math.cos(ang) * (16 + (i % 3) * 9);
+        const dy = -36 - (i % 4) * 12; // bias the drift upward
+        return (
+          <motion.span
+            key={i}
+            style={moteStyle}
+            initial={{ opacity: 0, x: 0, y: 0, scale: 0.4 }}
+            animate={{ opacity: [0, 1, 0], x: dx, y: dy, scale: [0.4, 1, 0.2] }}
+            transition={{ duration: 0.75, delay: (i % 5) * 0.04, ease: 'easeOut' }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+const dealWrapStyle: React.CSSProperties = {
+  position: 'relative', width: 'var(--card-w)', height: 'var(--card-h)', flex: '0 0 auto',
+};
+
+const moteLayerStyle: React.CSSProperties = {
+  position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 3,
+};
+
+const moteStyle: React.CSSProperties = {
+  position: 'absolute', left: '50%', top: '45%', width: 5, height: 5, borderRadius: '50%',
+  background: 'radial-gradient(circle, #f6e3a8, #d4a854)', boxShadow: '0 0 7px 2px rgba(212,168,84,0.7)',
+};
+
 const cardBoxStyle: React.CSSProperties = {
-  width: 'var(--card-w)', height: 'var(--card-h)', flex: '0 0 auto',
+  display: 'block', width: '100%', height: '100%',
   padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
   perspective: '900px', borderRadius: '8px', outline: 'none',
 };
