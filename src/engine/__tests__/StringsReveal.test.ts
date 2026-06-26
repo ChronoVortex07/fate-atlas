@@ -92,4 +92,19 @@ describe('strings weave — commit', () => {
     const slot = e.getState().turnResults[e.getState().turnResults.length - 1];
     expect(slot.type).toBe('strings');
   });
+
+  it('repeated commitWeave() calls only produce one result (no double-commit)', () => {
+    const e = startWeaveWith(HI());
+    let guard = 0;
+    while (weave(e).phase === 'drawing' && guard++ < 12) {
+      e.stepTo(weave(e).candidateIds[0]);
+    }
+    expect(weave(e).phase).toBe('arrived');
+    const before = e.getState().turnResults.length;
+    e.commitWeave();
+    e.commitWeave();
+    e.commitWeave();
+    expect(e.getState().turnResults.length).toBe(before + 1);
+    expect(e.getState().minigamesCompleted).toBe(1);
+  });
 });

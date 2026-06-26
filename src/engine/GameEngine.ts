@@ -777,6 +777,7 @@ export class GameEngine {
       backtracksRemaining: plan.backtracks,
       redrawUsed: false,
       phase: 'drawing',
+      committed: false,
     };
     this.state.minigameState = weave;
     this.dispatchAt('strings:start', {});
@@ -884,6 +885,8 @@ export class GameEngine {
     const w = this.state.minigameState;
     if (!w || w.method !== 'strings') throw new Error('No active weave');
     if (w.phase !== 'arrived') throw new Error('Weave has not reached a destination');
+    if (w.committed) return; // idempotent: a repeated click must not commit a second copy
+    w.committed = true;
     const byId = new Map(w.graph.nodes.map((n) => [n.id, n]));
     const path = w.visitedPath.map((id) => byId.get(id)!);
     this.completeMinigame(consolidatePath(path));

@@ -268,6 +268,12 @@ export class NarrativeAssembler {
         return `The dice settle on ${slot.result} (${slot.threshold.replace('-', ' ')})`;
       case 'iching':
         return `Hexagram ${slot.hexagramNumber} "${slot.name}"`;
+      case 'strings': {
+        const parts = slot.name.split(' · ');
+        const origin = parts[0];
+        const dest = parts[parts.length - 1];
+        return parts.length > 1 ? `the thread drawn from ${origin} to ${dest}` : `the thread at ${origin}`;
+      }
       case 'happening':
         return `A happening: ${slot.scene}`;
       default:
@@ -355,6 +361,16 @@ export class NarrativeAssembler {
         return `The dice settle on ${slot.result} (${slot.threshold.replace('-', ' ')}) — ${slot.interpretation} [themes: ${slot.themes.join(', ')}] [favorability: ${slot.dimensions.favorability}]`;
       case 'iching':
         return `Hexagram ${slot.hexagramNumber} "${slot.name}" ${slot.symbol} — ${slot.judgment}${slot.changingLines.length ? ` Changing lines at ${slot.changingLines.join(', ')}.` : ''} [themes: ${slot.themes.join(', ')}] [favorability: ${slot.dimensions.favorability}]`;
+      case 'strings': {
+        const parts = slot.name.split(' · ');
+        const origin = parts[0];
+        const dest = parts[parts.length - 1];
+        const middle = parts.slice(1, -1);
+        const route = middle.length > 0
+          ? `From ${origin}, the thread weaves through ${middle.join(', ')} to ${dest}`
+          : `The thread runs from ${origin} to ${dest}`;
+        return `${route} — ${slot.interpretation} [themes: ${slot.themes.join(', ')}] [favorability: ${slot.dimensions.favorability}]`;
+      }
       case 'happening':
         return `An event unfolds: ${slot.scene} [themes: ${slot.themes.join(', ')}]`;
       default:

@@ -330,6 +330,7 @@ export interface StringsMinigameState {
   backtracksRemaining: number;
   redrawUsed: boolean;
   phase: 'drawing' | 'arrived';
+  committed: boolean;           // true once commitWeave() has consolidated the path (guards re-commit)
 }
 
 export interface StringsResult extends ThematicData {
