@@ -251,12 +251,16 @@ export class GameEngine {
     this.notify();
   }
 
-  selectMethod(index: number): void {
+  // Stage a selection: resolve Fate-force, stash a pendingSelection, but do NOT
+  // transition — the card-draw UI plays the ascend / hand-of-fate / reveal, then
+  // calls confirmSelection(). The fate-force report is diverted off eventQueue
+  // (the FateForceOverlay narrates it) but stays in turnEffects for the record.
+  beginSelection(index: number): void {
     if (!this.state.availableMethods[index]) {
       throw new Error(`Method index ${index} out of bounds`);
     }
-    // Fate (OVERRIDE) may redirect the chosen method.
-    const { draft } = this.dispatchAt('select:pick', {
+    const queueBefore = this.state.eventQueue.length;
+    const { draft, reports } = this.dispatchAt('select:pick', {
       methodIndex: index,
       methodPool: this.state.availableMethods,
     });
@@ -265,16 +269,45 @@ export class GameEngine {
     if (!methodType) {
       throw new Error(`Method index ${finalIndex} out of bounds`);
     }
-    this.state.selectedMethod = methodType;
+    const forceReport = reports.find((r) => r.responderId === 'fate-force-method') ?? null;
+    this.state.eventQueue = this.state.eventQueue.slice(0, queueBefore);
+
+    const pending: import('./types').PendingSelection = {
+      chosenIndex: index,
+      finalIndex,
+      method: methodType,
+      wasForced: finalIndex !== index,
+      shrouded: this.state.shroudedMethods.includes(finalIndex),
+      forceReport,
+    };
+    this.state.drawPhase = {
+      nonce: this.state.drawPhase?.nonce ?? 0,
+      effectReports: this.state.drawPhase?.effectReports ?? [],
+      pendingSelection: pending,
+    };
+    this.notify();
+  }
+
+  // Complete a staged selection: transition to the minigame for the (possibly
+  // Fate-redirected) method. No-op without a pendingSelection.
+  confirmSelection(): void {
+    const pending = this.state.drawPhase?.pendingSelection;
+    if (!pending) return;
+    this.state.selectedMethod = pending.method;
     this.state.activeSlotIndex = null;
     this.state.screen = 'minigame';
-
-    // Start draft state for tarot
-    if (methodType === 'tarot') {
-      this.startTarotDraft();
+    this.state.drawPhase = null;
+    if (pending.method === 'tarot') {
+      this.startTarotDraft(); // notifies
     }
-
     this.notify();
+  }
+
+  // Synchronous convenience used by tests and any non-animated caller. Preserves
+  // the original contract: after this returns, screen === 'minigame'.
+  selectMethod(index: number): void {
+    this.beginSelection(index);
+    this.confirmSelection();
   }
 
   completeMinigame(result: SlotResult, meta?: MinigameMeta): void {

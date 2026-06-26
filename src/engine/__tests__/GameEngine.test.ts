@@ -75,6 +75,40 @@ describe('GameEngine — new lifecycle', () => {
     expect(s.eventQueue.map((r) => r.responderId)).not.toContain('shadow-shroud');
   });
 
+  it('beginSelection stages a pendingSelection without leaving method-select', () => {
+    const engine = new GameEngine();
+    engine.startTurn('self');
+    engine.beginSelection(0);
+    const s = engine.getState();
+    expect(s.screen).toBe('method-select');           // not transitioned yet
+    expect(s.selectedMethod).toBeNull();
+    expect(s.drawPhase?.pendingSelection).not.toBeNull();
+    expect(s.drawPhase?.pendingSelection?.finalIndex).toBe(0); // no Fate force at baseline
+    expect(s.drawPhase?.pendingSelection?.wasForced).toBe(false);
+  });
+
+  it('confirmSelection transitions to the staged method and clears drawPhase', () => {
+    const engine = new GameEngine();
+    engine.startTurn('self');
+    const method = engine.getState().availableMethods[0];
+    engine.beginSelection(0);
+    engine.confirmSelection();
+    const s = engine.getState();
+    expect(s.screen).toBe('minigame');
+    expect(s.selectedMethod).toBe(method);
+    expect(s.drawPhase).toBeNull();
+  });
+
+  it('selectMethod still transitions synchronously and validates the index', () => {
+    const engine = new GameEngine();
+    engine.startTurn('self');
+    const method = engine.getState().availableMethods[0];
+    engine.selectMethod(0);
+    expect(engine.getState().screen).toBe('minigame');
+    expect(engine.getState().selectedMethod).toBe(method);
+    expect(() => engine.selectMethod(99)).toThrow('out of bounds');
+  });
+
   it('selectMethod with valid index goes to minigame screen', () => {
     engine.startTurn('self');
     const idx = engine.getState().availableMethods.findIndex((m) => m !== 'happening');

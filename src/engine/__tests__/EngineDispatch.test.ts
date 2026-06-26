@@ -113,11 +113,15 @@ describe('engine dispatch wiring', () => {
     // ensure at least two distinct methods in availableMethods, else the redirect is a no-op
     engine.forceEffects(['fate-force-method'], true);
     const chosen = 0;
-    engine.selectMethod(chosen);
-    const s = engine.getState();
-    // selectedMethod should match availableMethods at the (possibly redirected) index,
-    // and an override report should be queued.
-    expect(s.eventQueue.some((r) => r.responderId === 'fate-force-method')).toBe(true);
+    // beginSelection stages the (redirected) pick; the fate-force report is diverted
+    // off eventQueue onto pendingSelection.forceReport for the FateForceOverlay.
+    engine.beginSelection(chosen);
+    const pending = engine.getState().drawPhase!.pendingSelection!;
+    expect(pending.wasForced).toBe(true);
+    expect(pending.finalIndex).not.toBe(chosen);
+    expect(pending.forceReport?.responderId).toBe('fate-force-method');
+    // The redirected method matches availableMethods at the final index.
+    expect(pending.method).toBe(engine.getState().availableMethods[pending.finalIndex]);
   });
 
   it('chaos-second-result spawns a slot and points its report at the new index', () => {
