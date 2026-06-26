@@ -23,6 +23,26 @@ describe('TurnOrchestrator', () => {
     expect(pool.length).toBe(2);
   });
 
+  it('generatePool widens up to the number of available methods (Will-widen)', () => {
+    const orchestrator = new TurnOrchestrator(bus);
+    const pool = orchestrator.generatePool('self', affinities, 5);
+    expect(pool.length).toBe(5);
+    expect(new Set(pool).size).toBe(5); // all distinct
+  });
+
+  it('generatePool clamps a request above the available methods to that many', () => {
+    const orchestrator = new TurnOrchestrator(bus);
+    const pool = orchestrator.generatePool('self', affinities, 99);
+    expect(pool.length).toBe(5); // never more than POOL_TYPES.length
+  });
+
+  it('generatePool clamps below 1 up to a single method', () => {
+    const orchestrator = new TurnOrchestrator(bus);
+    expect(orchestrator.generatePool('self', affinities, 1).length).toBe(1);
+    expect(orchestrator.generatePool('self', affinities, 0).length).toBe(1);
+    expect(orchestrator.generatePool('self', affinities, -3).length).toBe(1);
+  });
+
   it('generatePool terminates under a constant Math.random (no infinite loop)', () => {
     const orig = Math.random;
     Math.random = () => 0.5;

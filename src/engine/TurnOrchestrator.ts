@@ -6,7 +6,18 @@ import { castHexagram } from '../data/iching';
 import { consolidateCast, drawAstralCast } from '../data/astromancy';
 import { consolidateScatter, drawRuneScatter } from '../data/runes';
 
-const POOL_SIZE = 3;
+// Every divination type that has a playable minigame — the single source of
+// truth for what can be dealt. Adding a new minigame here (and its GameTable
+// route) automatically raises the pool ceiling.
+const POOL_TYPES: DivinationType[] = ['tarot', 'd20', 'iching', 'astral', 'rune'];
+
+// Default pool size. Draw-phase effects widen/thin from here: Will can widen up
+// to the number of available minigames (POOL_TYPES.length), Fate can thin down
+// to POOL_MIN. POOL_DEFAULT is the baseline, NOT the ceiling — those are
+// separate so a widen above the default is honoured rather than clamped away.
+const POOL_DEFAULT = 3;
+const POOL_MIN = 1;
+const poolMax = () => POOL_TYPES.length;
 
 const QUESTION_WEIGHTS: Record<QuestionType, Partial<Record<DivinationType, number>>> = {
   decision: { d20: 3, tarot: 1, iching: 1, astral: 2, rune: 1 },
@@ -14,8 +25,6 @@ const QUESTION_WEIGHTS: Record<QuestionType, Partial<Record<DivinationType, numb
   future: { iching: 3, tarot: 1, d20: 1, astral: 2, rune: 2 },
   self: { tarot: 2, iching: 2, d20: 1, astral: 1, rune: 2 },
 };
-
-const POOL_TYPES: DivinationType[] = ['tarot', 'd20', 'iching', 'astral', 'rune'];
 
 export class TurnOrchestrator {
   private availableMethods: DivinationType[] = [];
@@ -51,11 +60,11 @@ export class TurnOrchestrator {
   generatePool(
     question: QuestionType,
     _affinities: Record<string, number>,
-    count: number = POOL_SIZE,
+    count: number = POOL_DEFAULT,
   ): DivinationType[] {
     this.availableMethods = [];
     this.usedThisTurn = [];
-    const target = Math.max(1, Math.min(POOL_SIZE, count));
+    const target = Math.max(POOL_MIN, Math.min(poolMax(), count));
     const weights = QUESTION_WEIGHTS[question];
 
     this.fillPool(target, (t) => weights[t] ?? 1);
@@ -119,11 +128,11 @@ export class TurnOrchestrator {
     question: QuestionType,
     _affinities: Record<string, number>,
     bias: Partial<Record<DivinationType, number>> = {},
-    count: number = POOL_SIZE,
+    count: number = POOL_DEFAULT,
   ): DivinationType[] {
     // Keep remaining methods, draw new ones to fill back up to `target`.
     const baseWeights = QUESTION_WEIGHTS[question];
-    const target = Math.max(1, Math.min(POOL_SIZE, count));
+    const target = Math.max(POOL_MIN, Math.min(poolMax(), count));
 
     this.fillPool(target, (t) => (baseWeights[t] ?? 1) + (bias[t] ?? 0));
 
