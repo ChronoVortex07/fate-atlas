@@ -3,7 +3,8 @@ import { defaultAffinityState } from '../../data/affinities';
 import { consolidateSpread, buildFace, DECK_BY_ID } from '../../data/tarot';
 import { consolidateCast } from '../../data/astromancy';
 import { consolidateScatter } from '../../data/runes';
-import type { RuneId, RuneOmenTag, LandedRune } from '../types';
+import { consolidatePath, CONCEPTS as STRINGS_CONCEPTS } from '../../data/strings';
+import type { RuneId, RuneOmenTag, LandedRune, WovenNode } from '../types';
 
 export interface ScenarioStage {
   affinities: Record<AffinityId, number>;
@@ -32,6 +33,12 @@ const runeStone = (rune: RuneId, faceUp = true, orientation: LandedRune['orienta
   ({ rune, faceUp, orientation, ring, x: 0, y: 0 });
 const runeSlot = (governing: RuneId, omens: RuneOmenTag[] = [], extra: LandedRune[] = []): SlotResult =>
   consolidateScatter({ stones: [runeStone(governing), ...extra], governingIndex: 0, omens }) as SlotResult;
+
+const atStrings = (s: ScenarioStage) => { s.screen = 'minigame'; s.selectedMethod = 'strings'; };
+const wovenNode = (conceptId: string, band: number): WovenNode =>
+  ({ id: `b${band}`, conceptId, band, family: STRINGS_CONCEPTS[conceptId].family, x: 0, y: 0 });
+const stringsSlot = (ids: string[]): SlotResult =>
+  consolidatePath(ids.map((id, i) => wovenNode(id, i))) as SlotResult;
 
 const criticalHighDie: SlotResult = {
   type: 'd20', result: 20, threshold: 'critical-high', interpretation: '',
@@ -173,6 +180,25 @@ export const DEBUG_SCENARIOS: DebugScenario[] = [
     setup: (s) => { atRune(s); s.slots = [runeSlot('isa')]; } },
   { id: 'rune-tiwaz-victory', label: "Rune: Tiwaz's Victory", group: 'Rune', forced: ['rune-tiwaz-victory'], isolate: true,
     setup: (s) => { atRune(s); s.slots = [runeSlot('tiwaz'), criticalHighDie]; } },
+  // ── Strings of Fate ──
+  { id: 'chaos-stray-thread', label: 'Strings: Chaos strays the thread', group: 'Strings', forced: ['chaos-stray-thread'], isolate: true,
+    setup: (s) => { atStrings(s); set(s, { chaos: 80 }); } },
+  { id: 'fate-pull-thread', label: 'Strings: Fate pulls the thread', group: 'Strings', forced: ['fate-pull-thread'], isolate: true,
+    setup: (s) => { atStrings(s); set(s, { fate: 90 }); } },
+  { id: 'fate-foregone-step', label: 'Strings: Fate weaves a foregone step', group: 'Strings', forced: ['fate-foregone-step'], isolate: true,
+    setup: (s) => { atStrings(s); set(s, { fate: 90 }); } },
+  { id: 'order-true-weave', label: 'Strings: Order straightens the weave', group: 'Strings', forced: ['order-true-weave'], isolate: true,
+    setup: (s) => { atStrings(s); set(s, { order: 80 }); s.slots = [stringsSlot(['the-self', 'the-fracture', 'the-turning'])]; } },
+  { id: 'coherent-weave', label: 'Strings: Coherent Weave', group: 'Strings', forced: ['coherent-weave'], isolate: true,
+    setup: (s) => { atStrings(s); s.slots = [stringsSlot(['a-rising-tide', 'the-blossom', 'the-dawn'])]; } },
+  { id: 'tangled-weave', label: 'Strings: Tangled Weave', group: 'Strings', forced: ['tangled-weave'], isolate: true,
+    setup: (s) => { atStrings(s); s.slots = [stringsSlot(['the-self', 'the-severance', 'the-parting'])]; } },
+  { id: 'luminous-path', label: 'Strings: Luminous Path', group: 'Strings', forced: ['luminous-path'], isolate: true,
+    setup: (s) => { atStrings(s); s.slots = [stringsSlot(['a-rising-tide', 'the-blossom', 'the-dawn'])]; } },
+  { id: 'shrouded-path', label: 'Strings: Shrouded Path', group: 'Strings', forced: ['shrouded-path'], isolate: true,
+    setup: (s) => { atStrings(s); s.slots = [stringsSlot(['the-undertow', 'the-fracture', 'the-long-night'])]; } },
+  { id: 'woven-echo', label: 'Strings: Woven Echo', group: 'Strings', forced: ['woven-echo'], isolate: true,
+    setup: (s) => { atStrings(s); s.slots = [stringsSlot(['the-self', 'a-rising-tide', 'the-dawn']), stringsSlot(['the-hearth', 'the-blossom', 'the-dawn'])]; } },
 ];
 
 export function findScenario(id: string): DebugScenario | undefined {

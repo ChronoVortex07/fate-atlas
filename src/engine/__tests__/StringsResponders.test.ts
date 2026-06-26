@@ -93,3 +93,17 @@ describe('chaos-second-result on strings', () => {
     expect(c.draft.spawnSecond).toBe('strings');
   });
 });
+
+import { GameEngine } from '../GameEngine';
+
+describe('strings debug scenarios', () => {
+  const ids = ['order-true-weave', 'coherent-weave', 'tangled-weave', 'luminous-path', 'shrouded-path', 'woven-echo',
+    'chaos-stray-thread', 'fate-pull-thread', 'fate-foregone-step'];
+  it('every strings scenario loads and stages its forced responder', () => {
+    const e = new GameEngine();
+    for (const id of ids) {
+      expect(e.loadScenarioById(id)).toBe(true);
+      expect(e.getState().debugConfig.forced).toContain(id);
+    }
+  });
+});
