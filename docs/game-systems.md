@@ -30,6 +30,7 @@ the **meta-interactions** between divination results, and the **happenings**.
 > | Strings plan/generate/reveal/draw | [`src/engine/strings.ts`](../src/engine/strings.ts) |
 > | Strings responders (pick + commit + path-internal + Woven Echo) | [`src/engine/responders/strings.ts`](../src/engine/responders/strings.ts) |
 > | Weave combine reducer | [`src/engine/events/reducers.ts`](../src/engine/events/reducers.ts) |
+> | Dice skill-check (DC, Bless/Bane, tier resolution, criticals) | [`src/engine/dice.ts`](../src/engine/dice.ts) |
 
 ---
 
@@ -477,7 +478,7 @@ comes to rest in decides the house. The angle between the two houses produces an
 The reading is **Planet-in-Sign-in-House** plus the aspect between them — four signals
 combined into a single `AstralResult`.
 
-The legacy d20 method coexists with astromancy in the pool; both are available.
+The d20 skill-check method coexists with astromancy in the pool; both are available. See §12 for the skill-check model (DC, Bless/Bane, criticals).
 
 Sources of truth: [`src/data/astromancy.ts`](../src/data/astromancy.ts),
 [`src/engine/astral.ts`](../src/engine/astral.ts),
@@ -1000,3 +1001,104 @@ Change by design. `ReadingPlanner` expands the path into one atomic signal per c
 > `strings:pick` draft, so they don't fire from a cold scenario load (like the
 > iching/astral pick-dependent scenarios); they are validated by the engine test suite.
 > The commit-time strings scenarios fire normally.
+
+---
+
+## 12. d20 Skill-Check Minigame
+
+The d20 method (`type: 'd20'`) is the second divination method. The player **flicks a 3D d20
+into a stone bowl**; the engine resolves the natural roll against a reading-relative
+**Difficulty Class** to determine the tier. Unlike fixed thresholds, the DC is set by the
+rest of the reading — favorable earlier results raise the bar, grim ones lower it.
+
+Source of truth: [`src/engine/dice.ts`](../src/engine/dice.ts) (`planDiceCheck`,
+`resolveCheck`, `tierFromMargin`). The raw d20 draw with affinity bias lives in
+[`src/data/dice.ts`](../src/data/dice.ts) (`rollD20`), which is unchanged by the
+skill-check layer.
+
+### 12a. The check loop
+
+1. **Plan** — before the player throws, `planDiceCheck` reads the slots already committed
+   this turn and computes the **DC** and the **Bless/Bane** d4 pool.
+2. **Throw** — the player flicks the 3D die into the bowl. The engine-chosen natural d20 is
+   the result; the 3D scene shows it settling on that face.
+3. **Resolve** — `resolveCheck` rolls any Bless/Bane d4s, sums the total, checks for
+   criticals, and maps the margin to a tier.
+4. **Commit** — the tier (`Threshold`) enters the spread and dispatches `dice:commit` exactly
+   as before, so all existing dice meta-interactions fire unchanged.
+
+### 12b. Difficulty Class
+
+The DC is derived from the **magnitude-weighted mean favorability** of the reading so far:
+
+```
+priorFav = Σ(f · |f|) / Σ|f|       (0 when there are no prior slots)
+DC = clamp(round(11 + 2.5 × priorFav), 5, 17)
+```
+
+Happening slots are excluded from the calculation. The formula implements **balance /
+rising stakes**: a favorable reading raises the DC (making high tiers harder to reach),
+while a grim reading lowers it. With no prior slots the DC is 11 — exactly median on a
+d20.
+
+> Magnitude-weighting (squaring then restoring sign) gives stronger poles more influence
+> than a flat average would, matching the same weighting used in `ReadingPlanner.aggregate`.
+
+### 12c. Bless and Bane
+
+After the DC is set, `planDiceCheck` scans the committed slots for modifiers:
+
+- A prior slot with **favorability ≥ +1.0** grants **+1d4** (**Bless**).
+- A prior slot with **favorability ≤ −1.0** imposes **−1d4** (**Bane**).
+
+At most one Bless and one Bane are applied (the first qualifying slot of each kind wins).
+The d4s are rolled at resolve time and their values are added to / subtracted from the
+natural d20 before comparing to the DC.
+
+### 12d. Relative tiers
+
+The margin `= total − DC` (where `total = d20 + Bless d4s − Bane d4s`) maps to one of the
+five standard tiers:
+
+| Margin | Tier |
+|--------|------|
+| ≥ +5 | `critical-high` |
+| 0 … +4 | `high` |
+| −1 … −4 | `neutral` |
+| −5 … −9 | `low` |
+| ≤ −10 | `critical-low` |
+
+These are the same five `Threshold` values used throughout the system. Existing responders
+that key off `critical-high`, `high`, `neutral`, `low`, or `critical-low` dice results fire
+as before — the committed tier is now relative to the DC rather than absolute, but the
+tag contract is unchanged.
+
+### 12e. Criticals (natural 20 and natural 1)
+
+Natural rolls override the DC entirely:
+
+- **Natural 20 → Triumph** (`critical-high`): the die face overrides any margin calculation.
+  The result also emits the `triumph` tag.
+- **Natural 1 → Fumble** (`critical-low`): same override. The result emits the `fumble` tag.
+
+Criticals are checked in `resolveCheck` from the raw natural d20 *before* the Bless/Bane
+d4s are rolled; the d4s still resolve and are shown in the breakdown for narrative texture,
+but they do not affect the tier when a critical is present.
+
+### 12f. Roll modes (affinity-gated, unchanged)
+
+The roll-mode system is unchanged. Responders gate on the same affinities and fire at the
+same `dice:roll` trigger before the player throws:
+
+| Mode | Responder | Affinity gate | Effect |
+|------|-----------|--------------|--------|
+| Advantage | `light-advantage` | Light ascendant · ambient | Roll two d20s; the higher natural resolves |
+| Disadvantage | `shadow-disadvantage` | Shadow ascendant · ambient | Roll two d20s; the lower natural resolves |
+| Choice | `will-choice` | Will dominant · major | Roll two d20s; player picks which natural resolves |
+| Reroll offer | `will-offer-reroll` | Will stirring · notable | After seeing the natural, player may reroll once |
+
+In **advantage** and **disadvantage** modes the 3D scene shows both dice smashing down into
+the bowl simultaneously; the unfavored die is visually suppressed after settling. In
+**choice** mode the player selects via on-screen value buttons (no raycasting). The
+combine reducer in `reducers.ts` is unchanged: `choice` wins and suppresses `offer-reroll`;
+advantage/disadvantage net by count (a tie cancels to a single roll).
