@@ -15,5 +15,6 @@ export const METHOD_FRONTS: Record<DivinationType, MethodFrontConfig> = {
   iching:    { title: 'I Ching',      flavor: 'The hexagram illuminates the path.',  color: '#5b8c5a', symbol: '䷀' },
   astral:    { title: 'Astral',       flavor: 'The heavens disclose their wisdom.',  color: '#5b7ec7', symbol: '★' },
   rune:      { title: 'Rune Casting', flavor: 'The staves speak as they fall.',      color: '#c8a86a', symbol: 'ᚠ' },
+  strings:   { title: 'Strings of Fate', flavor: 'Follow the red thread through the dark.', color: '#c33b5e', symbol: '✶' },
   happening: { title: 'Happening',    flavor: 'Something stirs in the weave.',       color: '#d4a854', symbol: '✦' },
 };
