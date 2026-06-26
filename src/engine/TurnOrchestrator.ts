@@ -5,11 +5,12 @@ import { rollD20 } from '../data/dice';
 import { castHexagram } from '../data/iching';
 import { consolidateCast, drawAstralCast } from '../data/astromancy';
 import { consolidateScatter, drawRuneScatter } from '../data/runes';
+import { drawWeave } from './strings';
 
 // Every divination type that has a playable minigame — the single source of
 // truth for what can be dealt. Adding a new minigame here (and its GameTable
 // route) automatically raises the pool ceiling.
-const POOL_TYPES: DivinationType[] = ['tarot', 'd20', 'iching', 'astral', 'rune'];
+const POOL_TYPES: DivinationType[] = ['tarot', 'd20', 'iching', 'astral', 'rune', 'strings'];
 
 // Default pool size. Draw-phase effects widen/thin from here: Will can widen up
 // to the number of available minigames (POOL_TYPES.length), Fate can thin down
@@ -20,10 +21,10 @@ const POOL_MIN = 1;
 const poolMax = () => POOL_TYPES.length;
 
 const QUESTION_WEIGHTS: Record<QuestionType, Partial<Record<DivinationType, number>>> = {
-  decision: { d20: 3, tarot: 1, iching: 1, astral: 2, rune: 1 },
-  relationship: { tarot: 3, d20: 1, iching: 1, astral: 1, rune: 1 },
-  future: { iching: 3, tarot: 1, d20: 1, astral: 2, rune: 2 },
-  self: { tarot: 2, iching: 2, d20: 1, astral: 1, rune: 2 },
+  decision: { d20: 3, tarot: 1, iching: 1, astral: 2, rune: 1, strings: 1 },
+  relationship: { tarot: 3, d20: 1, iching: 1, astral: 1, rune: 1, strings: 3 },
+  future: { iching: 3, tarot: 1, d20: 1, astral: 2, rune: 2, strings: 2 },
+  self: { tarot: 2, iching: 2, d20: 1, astral: 1, rune: 2, strings: 2 },
 };
 
 export class TurnOrchestrator {
@@ -80,6 +81,7 @@ export class TurnOrchestrator {
   drawSingleResult(
     method: DivinationType,
     affinities: Record<string, number>,
+    question?: QuestionType,
   ): SlotResult {
     let result: SlotResult;
 
@@ -99,6 +101,9 @@ export class TurnOrchestrator {
       case 'rune':
         result = consolidateScatter(drawRuneScatter(affinities));
         break;
+      case 'strings':
+        result = drawWeave(affinities, Math.random, question);
+        break;
       case 'happening':
         throw new Error('Happening has no drawSingleResult — use triggerHappening instead');
       default:
@@ -115,7 +120,7 @@ export class TurnOrchestrator {
 
   private usedThisTurn: DivinationType[] = [];
 
-  removeUsedMethod(method: 'tarot' | 'd20' | 'iching' | 'astral' | 'rune'): void {
+  removeUsedMethod(method: 'tarot' | 'd20' | 'iching' | 'astral' | 'rune' | 'strings'): void {
     this.usedThisTurn.push(method);
     // Remove the used method from availableMethods (it'll be refilled)
     const idx = this.availableMethods.indexOf(method);

@@ -26,6 +26,10 @@ the **meta-interactions** between divination results, and the **happenings**.
 > | Rune dataset, scatter fall, consolidation | [`src/data/runes.ts`](../src/data/runes.ts) |
 > | Rune plan modes, drift, governing resolution | [`src/engine/runes.ts`](../src/engine/runes.ts) |
 > | Rune scatter-omen + cross-type responders | [`src/engine/responders/runes.ts`](../src/engine/responders/runes.ts) |
+> | Strings concept library, consolidation, coherence | [`src/data/strings.ts`](../src/data/strings.ts) |
+> | Strings plan/generate/reveal/draw | [`src/engine/strings.ts`](../src/engine/strings.ts) |
+> | Strings responders (pick + commit + path-internal + Woven Echo) | [`src/engine/responders/strings.ts`](../src/engine/responders/strings.ts) |
+> | Weave combine reducer | [`src/engine/events/reducers.ts`](../src/engine/events/reducers.ts) |
 
 ---
 
@@ -905,3 +909,94 @@ when a Tiwaz rune and a critical-high d20 are both in the spread, favorability +
 committed result. Because rune results emit `reversible` and `reversed`, they also **automatically
 participate** in the existing `mirror` and `iching-resonant-change` interactions (§6) with no extra
 code. Each responder has a matching `rune-*` entry in `DEBUG_SCENARIOS`.
+
+---
+
+## 11. Strings of Fate
+
+Strings of Fate (`type: 'strings'`) is the sixth divination method. The seeker draws a
+crimson **thread of fate** through a fog-shrouded radial web of authored
+**concept-stars**. From a fixed **origin** ("the self") only adjacent stars are
+un-veiled — each a **surface hint** (a Sigil-Gem + one mood word). Picking one pulls the
+thread taut, disperses the fog along it, and reveals the next ring. On reaching a
+question-tailored **destination**, the whole traversed path consolidates
+**destination-governed** into one `StringsResult`.
+
+Sources of truth: [`src/data/strings.ts`](../src/data/strings.ts),
+[`src/engine/strings.ts`](../src/engine/strings.ts),
+[`src/engine/responders/strings.ts`](../src/engine/responders/strings.ts).
+
+### 11a. The weave (layered DAG under a radial bloom)
+
+`generateWeave` builds a layered DAG: band 0 = a single origin, the middle **crossing**
+bands (4 nodes each), and the final **destination** band (3 nodes drawn from the concepts
+that answer the current question). Edges connect adjacent bands only; every node has ≥1
+forward edge and a path origin→destination always exists. Nodes are placed in a radial
+bloom (origin centre, bands as orbit-rings). Base path length is **4 nodes / 3 picks**.
+
+### 11b. Surface-hint reveal (Light/Shadow is the core lever)
+
+`revealFrom` exposes up to `plan.width` pickable candidates from the active node. Clarity
+ladders **silhouette → mood → themes → laid-bare** (Shadow … Light). Shadow additionally
+**veils** candidates (shown but unpickable); Light adds **look-ahead** silhouettes and
+**foresight** (fully un-veil one candidate). The mood word is the only hint at baseline;
+full identity resolves on arrival.
+
+### 11c. Plan levers (`planWeave`, by affinity band)
+
+| Lever | Driven by |
+|---|---|
+| `bandCount` (path length) | Chaos dominant → 5, else 4 |
+| `width` (pickable candidates) | Will ascendant+ → 4 · Fate ascendant+ → 2 · else 3 |
+| `veil` (unpickable shown) | Shadow ascendant 1 · dominant 2 |
+| `clarity` | Shadow ascendant → silhouette · Light ascendant → themes · dominant → laid-bare · else mood |
+| `lookAhead` | Light ascendant 1 · dominant 2 |
+| `backtracks` / `allowRedraw` | Will ascendant 1 · dominant 2 + redraw |
+| `foresight` | Light ascendant+ |
+| `extremeBias` / `crossingDensity` | Chaos widens (extreme concepts, more crossings) · Order narrows (mild concepts, reconvergence) |
+
+### 11d. Affinity feeds
+
+Per-step player choices feed via `applyAction`: accept a hinted step → **Fate**
+(`reveal-as-drawn`); a blind silhouette accept → **Shadow** (`embrace-mystery`);
+backtrack / re-draw → **Will** (`take-reroll`); foresight → **Light** (`use-peek`). At
+commit, **path coherence** mirrors the tarot rule: a coherent thread → **Order +6**, a
+tangled (opposed-theme) thread → **Chaos +6**. The result's `random` tag also feeds Chaos.
+
+### 11e. Consolidation (`consolidatePath`)
+
+Destination-governed: destination weight ×2, origin & crossings ×1. Dimensions are the
+weighted average (clamped ±2 @ 0.5); themes are weighted-frequency with the destination's
+themes forced in (cap 2); modifier roles union (origin `subject` → crossings `action` →
+destination `effect`). Tags: `draw random strings weave` + each concept's
+`concept-<id>` / `family-<family>` / theme tags. **No `reversible` tag is emitted** — a
+path has no orientation, so Strings stays out of Mirror / Critical Resonance / Resonant
+Change by design. `ReadingPlanner` expands the path into one atomic signal per concept.
+
+### 11f. Event triggers & responders
+
+| Trigger | Fires when |
+|---|---|
+| `strings:start` | the weave is generated (reserved) |
+| `strings:pick` | a candidate is chosen |
+| `strings:commit` | the destination is committed |
+
+| Responder | Trigger | Band group | Min band / tier | Effect |
+|---|---|---|---|---|
+| `chaos-stray-thread` | `strings:pick` | OVERRIDE | Chaos ascendant · notable | the pick jumps to a different revealed neighbor |
+| `fate-pull-thread` | `strings:pick` | OVERRIDE | Fate ascendant · major | redirects the pick to a fated neighbor |
+| `fate-foregone-step` | `strings:pick` | SPAWN | Fate dominant · major | after the pick, one further step weaves itself |
+| `order-true-weave` | `strings:commit` | MUTATE | Order ascendant · notable | tempers the most extreme dimension (×0.5) |
+| `coherent-weave` | `strings:commit` | combine `weave` | deterministic | all nodes share a theme → amplify dominant dim ×1.5 |
+| `tangled-weave` | `strings:commit` | combine `weave` | deterministic | opposed-theme pair → volatility +1.0 |
+| `luminous-path` | `strings:commit` | combine `weave` | deterministic | all benevolent → favorability +0.5 |
+| `shrouded-path` | `strings:commit` | combine `weave` | deterministic | all challenging → favorability −0.5, force `mystery` |
+| `woven-echo` | `strings:commit` | combine `weave` | deterministic | destination theme matches another slot → amplify dominant dim ×1.25 |
+| `chaos-second-result` | `strings:commit` (added) | SPAWN | Chaos dominant · major | spawns a second weave (reused) |
+
+`chaos-happening-interrupt` (`minigame:end`) already covers Strings.
+
+> **Known limitation:** the three **pick-time** strings debug scenarios require a live
+> `strings:pick` draft, so they don't fire from a cold scenario load (like the
+> iching/astral pick-dependent scenarios); they are validated by the engine test suite.
+> The commit-time strings scenarios fire normally.

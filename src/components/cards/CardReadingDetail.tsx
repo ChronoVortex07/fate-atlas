@@ -2,7 +2,9 @@ import type { SlotResult, TarotCardFace, TarotResult } from '../../engine/types'
 import CardSigil from './CardSigil';
 import AstralSigil from './AstralSigil';
 import RuneSigil from './RuneSigil';
+import StringSigil from './StringSigil';
 import { HOUSES } from '../../data/astromancy';
+import { CONCEPTS } from '../../data/strings';
 
 function getResultDisplay(result: SlotResult): {
   symbol: string;
@@ -60,6 +62,12 @@ function getResultDisplay(result: SlotResult): {
         name: result.name,
         subtitle: `in the ${result.ring[0].toUpperCase() + result.ring.slice(1)} — ${result.interpretation.slice(0, 100)}`,
       };
+    case 'strings':
+      return {
+        symbol: result.symbol,
+        name: result.name,
+        subtitle: result.interpretation.slice(0, 100),
+      };
     case 'happening':
       return {
         symbol: String.fromCodePoint(0x2726),
@@ -89,9 +97,20 @@ export default function CardReadingDetail({ result, index }: { result: SlotResul
             ? <RuneSigil rune={result.rune} orientation={result.orientation} size={32} />
             : result.type === 'tarot'
               ? <CardSigil card={result} size={28} color="#d4a854" />
-              : d.symbol}
+              : result.type === 'strings'
+                ? <StringSigil glyph={result.symbol} state="lit" size={30} />
+                : d.symbol}
       </div>
       <div style={resultNameStyle}>{d.name}</div>
+      {/* Strings: the traversed path as a row of mini sigil-gems. */}
+      {result.type === 'strings' && (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.1rem' }}>
+          {result.path.map((n, i) => (
+            <StringSigil key={n.id} glyph={CONCEPTS[n.conceptId].glyph}
+              state={i === result.path.length - 1 ? 'lit' : 'candidate'} size={22} />
+          ))}
+        </div>
+      )}
       {result.type === 'astral' ? (
         <>
           <div style={resultSubtitleStyle}>

@@ -69,7 +69,7 @@ export type RollMode = 'single' | 'advantage' | 'disadvantage' | 'choice';
 export type QuestionType = 'decision' | 'relationship' | 'future' | 'self';
 
 // ── Divination Methods ──
-export type DivinationType = 'tarot' | 'd20' | 'iching' | 'astral' | 'rune' | 'happening';
+export type DivinationType = 'tarot' | 'd20' | 'iching' | 'astral' | 'rune' | 'strings' | 'happening';
 
 // ── Thematic Data Layer ──
 
@@ -279,6 +279,70 @@ export interface RuneResult extends ThematicData {
   scatter: RuneScatter;
 }
 
+// ── Strings of Fate ──
+export type ConceptBandKind = 'origin' | 'crossing' | 'destination';
+export type ConceptFamily = 'benevolent' | 'challenging' | 'neutral';
+
+/** A node placed in a generated weave. */
+export interface WovenNode {
+  id: string;          // unique within a weave, e.g. 'b1-2'
+  conceptId: string;   // key into CONCEPTS
+  band: number;        // 0 = origin … bandCount-1 = destination
+  family: ConceptFamily;
+  x: number; y: number; // normalized radial-bloom coords for render
+}
+export interface WovenEdge { from: string; to: string; } // adjacent bands only
+
+export interface WeaveGraph {
+  nodes: WovenNode[];
+  edges: WovenEdge[];
+  originId: string;
+  bandCount: number;
+}
+
+/** Affinity-derived levers, resolved once by planWeave(). */
+export interface WeavePlan {
+  bandCount: number;     // 4 base; Chaos dominant → 5
+  width: number;         // pickable candidates per step (base 3; Fate −1 floor 2; Will +1)
+  veil: number;          // candidates shown but unpickable (Shadow ascendant 1, dominant 2)
+  clarity: 'silhouette' | 'mood' | 'themes' | 'laid-bare';
+  lookAhead: number;     // bands of silhouette look-ahead (Light)
+  backtracks: number;    // Will: ascendant 1, dominant 2
+  allowRedraw: boolean;  // Will dominant
+  offerRethread: boolean;// Will stirring+ (UI surfaces a one-time prompt)
+  extremeBias: number;   // signed chaosIdx − orderIdx (−3..+3)
+  crossingDensity: number; // forward edges per node (2..4)
+  foresight: boolean;    // Light ascendant+ — fully un-veil one candidate
+  sources: string[];     // human-readable active levers (debug/flavor)
+}
+
+export interface StringsMinigameState {
+  method: 'strings';
+  graph: WeaveGraph;
+  plan: WeavePlan;
+  visitedPath: string[];        // ordered node ids, [originId, …]
+  activeId: string;             // last of visitedPath
+  candidateIds: string[];       // pickable revealed neighbors of active
+  veiledCandidateIds: string[]; // revealed-but-veiled (Shadow) — visible, unpickable
+  lookAheadIds: string[];       // silhouettes one+ band beyond (Light)
+  revealedIds: string[];        // every node ever un-fogged
+  foresightId: string | null;   // candidate fully un-veiled this step (Light)
+  backtracksRemaining: number;
+  redrawUsed: boolean;
+  phase: 'drawing' | 'arrived';
+}
+
+export interface StringsResult extends ThematicData {
+  type: 'strings';
+  id: string;            // `strings:<destinationConceptId>`
+  name: string;          // path name, joined ' · '
+  symbol: string;        // destination glyph
+  interpretation: string;
+  path: WovenNode[];     // ordered origin→destination
+  destinationId: string;
+  tags: Tag[];
+}
+
 export interface HappeningResult extends ThematicData {
   type: 'happening';
   id: string;
@@ -292,7 +356,7 @@ export interface HappeningChoice {
   affinityChanges: Partial<Record<AffinityId, number>>;
 }
 
-export type DivinationResult = TarotResult | DiceResult | IChingResult | AstralResult | RuneResult;
+export type DivinationResult = TarotResult | DiceResult | IChingResult | AstralResult | RuneResult | StringsResult;
 
 export type SlotResult = DivinationResult | HappeningResult;
 
@@ -386,7 +450,8 @@ export interface IChingMinigameState {
 export type MinigameState =
   | TarotDraftState
   | DiceMinigameState
-  | IChingMinigameState;
+  | IChingMinigameState
+  | StringsMinigameState;
 
 // ── Draw Phase (card-draw method selection) ──
 

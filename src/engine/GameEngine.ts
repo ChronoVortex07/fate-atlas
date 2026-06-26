@@ -13,6 +13,7 @@ import { buildInteractionResponders } from './responders/interactions';
 import { buildAstralResponders } from './responders/astral';
 import { buildIChingResponders } from './responders/iching';
 import { buildRuneResponders } from './responders/runes';
+import { buildStringsResponders } from './responders/strings';
 import { findScenario, freshStage, DEBUG_SCENARIOS } from './events/scenarios';
 import type { Responder, PhaseContext, PhaseDraft, EffectReport } from './events/types';
 import { planAstralCast as planAstralCastPure, resolveCastSelection as resolveCastSelectionPure, shouldOfferRecast } from './astral';
@@ -22,6 +23,9 @@ import type { RuneCastMode } from './runes';
 import type { RuneScatter } from './types';
 import { deriveMandate, hexagramNudge, planHexagramResolution } from './iching';
 import type { HexagramMode } from './iching';
+import { planWeave, generateWeave, revealFrom } from './strings';
+import { consolidatePath, pathCoherence } from '../data/strings';
+import type { StringsMinigameState, StringsResult } from './types';
 
 const STORAGE_KEY = 'fate-atlas-save';
 
@@ -49,7 +53,7 @@ export class GameEngine {
     this.orchestrator = new TurnOrchestrator(this.bus);
     this.readingPlanner = new ReadingPlanner();
     this.narrativeAssembler = new NarrativeAssembler();
-    this.responders = [...buildAffinityResponders(), ...buildInteractionResponders(), ...buildAstralResponders(), ...buildIChingResponders(), ...buildRuneResponders()];
+    this.responders = [...buildAffinityResponders(), ...buildInteractionResponders(), ...buildAstralResponders(), ...buildIChingResponders(), ...buildRuneResponders(), ...buildStringsResponders()];
     this.state = this.defaultState();
     this.cachedSnapshot = JSON.parse(JSON.stringify(this.state)) as GameState;
   }
@@ -299,6 +303,8 @@ export class GameEngine {
     this.state.drawPhase = null;
     if (pending.method === 'tarot') {
       this.startTarotDraft(); // notifies
+    } else if (pending.method === 'strings') {
+      this.startWeave(); // notifies
     }
     this.notify();
   }
@@ -328,6 +334,13 @@ export class GameEngine {
       const faces = (result as TarotResult).spread!.map((s) => s.card);
       if (faces.every((f) => f.orientation === 'upright')) this.affinityEngine.shift('order', 6, 'spread-aligned');
       else if (faces.every((f) => f.orientation === 'reversed')) this.affinityEngine.shift('chaos', 6, 'spread-cascade');
+    }
+
+    // Strings coherence feeds (mirrors the tarot spread-coherence rule).
+    if (result.type === 'strings') {
+      const coh = pathCoherence((result as StringsResult).path);
+      if (coh === 'coherent') this.affinityEngine.shift('order', 6, 'strings-coherent');
+      else if (coh === 'tangled') this.affinityEngine.shift('chaos', 6, 'strings-tangled');
     }
 
     // Player-action feeds derived from how this result was reached.
@@ -379,8 +392,9 @@ export class GameEngine {
     if (typeof draft.spawnSecond === 'string') {
       const affinities = this.affinityEngine.getState();
       const second = this.orchestrator.drawSingleResult(
-        draft.spawnSecond as 'tarot' | 'd20' | 'iching' | 'astral' | 'rune',
+        draft.spawnSecond as 'tarot' | 'd20' | 'iching' | 'astral' | 'rune' | 'strings',
         affinities,
+        this.state.questionType ?? undefined,
       );
       this.state.turnResults = [...this.state.turnResults, second];
       const newIndex = this.state.turnResults.length - 1;
@@ -418,7 +432,7 @@ export class GameEngine {
 
     // Between-minigame transition. Ask the minigame:end trigger whether a
     // happening interrupts the flow.
-    this.orchestrator.removeUsedMethod(result.type as 'tarot' | 'd20' | 'iching' | 'astral' | 'rune');
+    this.orchestrator.removeUsedMethod(result.type as 'tarot' | 'd20' | 'iching' | 'astral' | 'rune' | 'strings');
     const { draft: endDraft } = this.dispatchAt('minigame:end', {
       lastReading: completed >= this.minigamesPerTurn,
     });
@@ -739,6 +753,140 @@ export class GameEngine {
     this.state.minigameState = draft;
     this.dispatchAt('tarot:draft:started', {});
     this.notify();
+  }
+
+  // ── Strings of Fate Minigame ──
+
+  startWeave(): void {
+    const affinities = this.affinityEngine.getState();
+    const plan = planWeave(affinities);
+    const graph = generateWeave(this.state.questionType ?? 'self', plan, Math.random);
+    const originId = graph.originId;
+    const { candidateIds, veiledCandidateIds, lookAheadIds } = revealFrom(graph, plan, originId);
+    const weave: StringsMinigameState = {
+      method: 'strings',
+      graph,
+      plan,
+      visitedPath: [originId],
+      activeId: originId,
+      candidateIds,
+      veiledCandidateIds,
+      lookAheadIds,
+      revealedIds: [...new Set([originId, ...candidateIds, ...veiledCandidateIds, ...lookAheadIds])],
+      foresightId: null,
+      backtracksRemaining: plan.backtracks,
+      redrawUsed: false,
+      phase: 'drawing',
+    };
+    this.state.minigameState = weave;
+    this.dispatchAt('strings:start', {});
+    this.notify();
+  }
+
+  stepTo(nodeId: string): void {
+    const w = this.state.minigameState;
+    if (!w || w.method !== 'strings') throw new Error('No active weave');
+    if (w.phase !== 'drawing') throw new Error('Weave already arrived');
+    if (!w.candidateIds.includes(nodeId)) throw new Error(`Node ${nodeId} is not a current candidate`);
+
+    const byId = new Map(w.graph.nodes.map((n) => [n.id, n]));
+    const hasForwardAfter = byId.get(nodeId)!.band < w.graph.bandCount - 1;
+
+    // strings:pick — Chaos/Fate may redirect (OVERRIDE); Fate may add a foregone step (SPAWN).
+    const { draft } = this.dispatchAt('strings:pick', {
+      chosenId: nodeId,
+      candidateIds: [...w.candidateIds],
+      hasForwardAfter,
+    });
+    const finalId = typeof draft.redirectTo === 'string' && w.candidateIds.includes(draft.redirectTo)
+      ? draft.redirectTo : nodeId;
+
+    const usedForesight = w.foresightId !== null;
+    this.advanceWeave(w, finalId);
+
+    // Affinity feed for accepting the step.
+    if (!usedForesight) {
+      if (w.plan.clarity === 'silhouette') this.affinityEngine.applyAction('embrace-mystery'); // blind → Shadow
+      else this.affinityEngine.applyAction('reveal-as-drawn');                                  // hinted → Fate
+    }
+    w.foresightId = null;
+
+    // Fate foregone step: weave one more automatically along a candidate edge.
+    if (draft.foregoneStep === true && w.phase === 'drawing' && w.candidateIds.length > 0) {
+      const auto = w.candidateIds[Math.floor(Math.random() * w.candidateIds.length)];
+      this.advanceWeave(w, auto);
+    }
+
+    this.notify();
+  }
+
+  private advanceWeave(w: StringsMinigameState, nodeId: string): void {
+    const byId = new Map(w.graph.nodes.map((n) => [n.id, n]));
+    w.visitedPath = [...w.visitedPath, nodeId];
+    w.activeId = nodeId;
+    if (byId.get(nodeId)!.band === w.graph.bandCount - 1) {
+      w.phase = 'arrived';
+      w.candidateIds = [];
+      w.veiledCandidateIds = [];
+      w.lookAheadIds = [];
+      return;
+    }
+    const r = revealFrom(w.graph, w.plan, nodeId);
+    w.candidateIds = r.candidateIds;
+    w.veiledCandidateIds = r.veiledCandidateIds;
+    w.lookAheadIds = r.lookAheadIds;
+    w.revealedIds = [...new Set([...w.revealedIds, nodeId, ...r.candidateIds, ...r.veiledCandidateIds, ...r.lookAheadIds])];
+  }
+
+  backtrack(): void {
+    const w = this.state.minigameState;
+    if (!w || w.method !== 'strings') throw new Error('No active weave');
+    if (w.phase !== 'drawing') throw new Error('Cannot backtrack after arrival');
+    if (w.backtracksRemaining <= 0 || w.visitedPath.length <= 1) throw new Error('No backtrack available');
+    const prev = w.visitedPath[w.visitedPath.length - 2];
+    w.visitedPath = w.visitedPath.slice(0, -1);
+    w.activeId = prev;
+    const r = revealFrom(w.graph, w.plan, prev);
+    w.candidateIds = r.candidateIds;
+    w.veiledCandidateIds = r.veiledCandidateIds;
+    w.lookAheadIds = r.lookAheadIds;
+    w.backtracksRemaining -= 1;
+    this.affinityEngine.applyAction('take-reroll'); // Will
+    this.notify();
+  }
+
+  redrawCandidates(): void {
+    const w = this.state.minigameState;
+    if (!w || w.method !== 'strings') throw new Error('No active weave');
+    if (w.phase !== 'drawing') throw new Error('Cannot redraw after arrival');
+    if (!w.plan.allowRedraw || w.redrawUsed) throw new Error('No redraw available');
+    const r = revealFrom(w.graph, w.plan, w.activeId, Math.random); // rng → reshuffled subset
+    w.candidateIds = r.candidateIds;
+    w.veiledCandidateIds = r.veiledCandidateIds;
+    w.lookAheadIds = r.lookAheadIds;
+    w.revealedIds = [...new Set([...w.revealedIds, ...r.candidateIds, ...r.veiledCandidateIds, ...r.lookAheadIds])];
+    w.redrawUsed = true;
+    this.affinityEngine.applyAction('take-reroll'); // Will
+    this.notify();
+  }
+
+  useForesight(nodeId: string): void {
+    const w = this.state.minigameState;
+    if (!w || w.method !== 'strings') throw new Error('No active weave');
+    if (!w.plan.foresight) throw new Error('Foresight unavailable');
+    if (!w.candidateIds.includes(nodeId)) throw new Error('Not a candidate');
+    w.foresightId = nodeId;
+    this.affinityEngine.applyAction('use-peek'); // Light
+    this.notify();
+  }
+
+  commitWeave(): void {
+    const w = this.state.minigameState;
+    if (!w || w.method !== 'strings') throw new Error('No active weave');
+    if (w.phase !== 'arrived') throw new Error('Weave has not reached a destination');
+    const byId = new Map(w.graph.nodes.map((n) => [n.id, n]));
+    const path = w.visitedPath.map((id) => byId.get(id)!);
+    this.completeMinigame(consolidatePath(path));
   }
 
   pickForHand(handIndex: number, tableIndex: number): void {

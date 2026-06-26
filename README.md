@@ -41,6 +41,7 @@ npm run dev        # → http://localhost:5173
 | **I Ching** | 64 hexagrams (King Wen), authentic 3-coin casting per line. Changing lines (old yang/yin) transform the **primary hexagram** into a **relating hexagram**. Affinities gate whether the player chooses which to commit (Will ascendant), fate chooses (Fate ascendant), or a re-cast is offered (unaligned). The committed hexagram sets a lingering **Mandate of Change** (per-affinity multiplier on all future shift magnitude) that decays 40%/commit toward ×1.0. | `draw` `random` `binary` `governing-primary\|relating` · `changing-lines` `reversible` *(only when changing lines exist)* |
 | **Astromancy** | Two 3D d12 dice (planet + sign) thrown onto a 12-house zodiac board (board visible before cast) | `draw` `random` `astral` `planet-<id>` `sign-<id>` `house-<N>` ... |
 | **Rune Casting** | A handful of 6 Elder Futhark stones flung onto a concentric cloth (Heart / Field / Margin). Each lands upright, reversed (**merkstave**), or face-down (**silent**). The **governing** stone (nearest the Heart) is read, modified by supporting and crossing stones. **Will** lets you claim/turn a stone; **Fate** drifts the throw and reads it as-fallen; **Light/Shadow** reveal/veil; **Chaos/Order** widen/tighten the scatter and bias merkstave. | `draw` `random` `rune` `rune-<id>` `aett-<x>` `ring-<heart\|field\|margin>` `orientation-<upright\|merkstave>` `upright\|reversed` `reversible\|non-reversible` + omen tags |
+| **Strings of Fate** | Trace the red thread through a fog-shrouded web of concepts to a destination that answers your question. From a fixed origin only adjacent concept-stars un-veil (a Sigil-Gem + one mood word); picking one disperses the fog along the thread and reveals the next ring. The full traversed path consolidates **destination-governed** into one result. **Light/Shadow** set clarity + veil; **Will** widens picks and grants backtrack/redraw; **Fate** narrows and may pull the thread; **Chaos/Order** lengthen/straighten the weave. | `draw` `random` `strings` `weave` `concept-<id>` `family-<benevolent\|challenging\|neutral>` + theme tags |
 | **Happenings** | 8 authored cryptic scenes with 2-3 choices each | `event` `choice` `affinity-shift` |
 
 ### Astromancy: Planet-in-Sign-in-House
@@ -204,6 +205,7 @@ Add `?debug` to the URL (e.g. `http://localhost:5173/fate-atlas/?debug`) or pres
 - **Inject** — paste a JSON state blob to force exact scenarios
 - **Steps** — resolve interactions one at a time or all at once
 - **Events** — timestamped event log
+- **Scenarios** — one-click presets that stage and force a single responder, grouped by family (Affinity, Interaction, Combination, Astral, Rune, **Strings**)
 
 Example injection:
 

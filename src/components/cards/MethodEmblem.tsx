@@ -62,6 +62,18 @@ export default function MethodEmblem({ method, size = 64 }: { method: Divination
           <path d="M32 22 V44 M32 28 L25 20 M32 28 L39 20" strokeWidth="2" />
         </svg>
       );
+    case 'strings':
+      return (
+        <svg {...common} role="img" aria-label="Strings of Fate">
+          {/* a knotted thread threading three nodes */}
+          <path d="M12 50 C 24 30, 30 30, 40 40 C 50 50, 54 22, 52 14" opacity="0.9" />
+          <path d="M40 40 C 50 56, 30 58, 24 50" opacity="0.6" />
+          <circle cx="12" cy="50" r="3" fill="currentColor" />
+          <circle cx="40" cy="40" r="3.4" fill="currentColor" />
+          <circle cx="52" cy="14" r="3" fill="currentColor" />
+          <path d="M40 36 L44 40 L40 44 L36 40 Z" fill="none" />
+        </svg>
+      );
     case 'happening':
     default:
       return (
