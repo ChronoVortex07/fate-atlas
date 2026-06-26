@@ -4,6 +4,7 @@ import { useGameEngine } from '../../hooks/useGameEngine';
 import CardSpread from '../cards/CardSpread';
 import WillSwapButton from './WillSwapButton';
 import EventBanner, { type BannerMessage } from '../overlays/EventBanner';
+import FateForceOverlay from '../overlays/FateForceOverlay';
 import type { MethodCardVisual, MethodCardMotion } from '../cards/MethodCard';
 
 // Local lifecycle of one draw: deal the cards face-down, auto-play any draw
@@ -22,6 +23,8 @@ export default function MethodSelect() {
 
   const [phase, setPhase] = useState<Phase>('dealing');
   const [effectIndex, setEffectIndex] = useState(-1); // -1 = no active effect
+  const [showFateOverlay, setShowFateOverlay] = useState(false);
+  const [revealShrouded, setRevealShrouded] = useState(false);
   const confirmedRef = useRef(false);
 
   // Deal, then auto-play each draw effect, then flip.
@@ -57,14 +60,34 @@ export default function MethodSelect() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, effectIndex]);
 
-  // When a selection is staged, ascend the chosen card, then confirm.
+  // When a selection is staged, play the dramatic sequence, then confirm.
   useEffect(() => {
-    if (!pending) return;
+    if (!pending) { setShowFateOverlay(false); setRevealShrouded(false); return; }
     setPhase('selecting');
     if (confirmedRef.current) return;
     confirmedRef.current = true;
-    const t = setTimeout(() => engine.confirmSelection(), 600);
-    return () => clearTimeout(t);
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    let t = 0;
+
+    // Chosen card ascends (always). Fate force: freeze + hand, reject + re-rise.
+    if (pending.wasForced) {
+      timers.push(setTimeout(() => setShowFateOverlay(true), (t += 450)));
+      t += 2000; // overlay duration
+      timers.push(setTimeout(() => setShowFateOverlay(false), t));
+    } else {
+      t += 600; // simple ascend
+    }
+
+    // Shrouded reveal: flip the veil to the real front before leaving.
+    if (pending.shrouded) {
+      timers.push(setTimeout(() => setRevealShrouded(true), t));
+      t += 650;
+    }
+
+    timers.push(setTimeout(() => engine.confirmSelection(), t));
+    return () => timers.forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending, engine]);
 
   // A shroud report targeting `i` has already been sequenced this effects pass.
@@ -81,7 +104,12 @@ export default function MethodSelect() {
       // During effects the spread is still face-down; a shroud lands as the veil.
       return state.shroudedMethods.includes(i) && hasShroudPlayed(i) ? 'shrouded' : 'face-down';
     }
-    return state.shroudedMethods.includes(i) ? 'shrouded' : 'face-up';
+    // ready/selecting: a picked shrouded card un-veils to its real front.
+    if (state.shroudedMethods.includes(i)) {
+      const isPicked = pending && (i === pending.finalIndex);
+      return isPicked && revealShrouded ? 'face-up' : 'shrouded';
+    }
+    return 'face-up';
   };
 
   const activeReport = phase === 'effects' && effectIndex >= 0 && effectIndex < reports.length
@@ -108,6 +136,9 @@ export default function MethodSelect() {
   return (
     <motion.div style={containerStyle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }}>
       <EventBanner message={bannerMessage} />
+      {showFateOverlay && (
+        <FateForceOverlay text={pending?.forceReport?.description ?? 'Fate has marked another path.'} />
+      )}
       <div style={contentStyle}>
         <h1 style={headingStyle}>Choose your divination</h1>
         <p style={subtitleStyle}>
