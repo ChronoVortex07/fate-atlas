@@ -37,12 +37,46 @@ npm run dev        # → http://localhost:5173
 | Method | Mechanic | Tags |
 |--------|----------|------|
 | **Tarot** | 78 cards (22 Major Arcana + 56 Minor Arcana by suit×rank), three-card Past/Present/Future spread consolidated into one result, upright or reversed per face. Complete standardized geometric **sigil system** — 22 bespoke major line-art sigils + composed minors (suit emblem + rank cartouche, court crowns) — with a constellation-crest card back, replacing the old emoji/rune placeholders | `major-arcana` `minor-arcana` `reversible` `fool-archetype` `suit-*` `element-*` ... |
-| **d20 Dice** | 1d20 roll, 5-tier thresholds (critical-low → critical-high) | `roll` `numeric` `threshold` |
+| **d20 Dice** | Flick a 3D d20 into the bowl; the rest of your reading sets a **Difficulty Class**; favorable earlier results grant **Bless d4s**, grim ones impose **Bane d4s**; natural 20 is **Triumph** (critical-high), natural 1 is **Fumble** (critical-low). Five relative tiers: critical-low → critical-high | `roll` `numeric` `threshold` `triumph` *(nat 20)* `fumble` *(nat 1)* |
 | **I Ching** | 64 hexagrams (King Wen), authentic 3-coin casting per line. Changing lines (old yang/yin) transform the **primary hexagram** into a **relating hexagram**. Affinities gate whether the player chooses which to commit (Will ascendant), fate chooses (Fate ascendant), or a re-cast is offered (unaligned). The committed hexagram sets a lingering **Mandate of Change** (per-affinity multiplier on all future shift magnitude) that decays 40%/commit toward ×1.0. | `draw` `random` `binary` `governing-primary\|relating` · `changing-lines` `reversible` *(only when changing lines exist)* |
 | **Astromancy** | Two 3D d12 dice (planet + sign) thrown onto a 12-house zodiac board (board visible before cast) | `draw` `random` `astral` `planet-<id>` `sign-<id>` `house-<N>` ... |
 | **Rune Casting** | A handful of 6 Elder Futhark stones flung onto a concentric cloth (Heart / Field / Margin). Each lands upright, reversed (**merkstave**), or face-down (**silent**). The **governing** stone (nearest the Heart) is read, modified by supporting and crossing stones. **Will** lets you claim/turn a stone; **Fate** drifts the throw and reads it as-fallen; **Light/Shadow** reveal/veil; **Chaos/Order** widen/tighten the scatter and bias merkstave. | `draw` `random` `rune` `rune-<id>` `aett-<x>` `ring-<heart\|field\|margin>` `orientation-<upright\|merkstave>` `upright\|reversed` `reversible\|non-reversible` + omen tags |
 | **Strings of Fate** | Trace the red thread through a fog-shrouded web of concepts to a destination that answers your question. From a fixed origin only adjacent concept-stars un-veil (a Sigil-Gem + one mood word); picking one disperses the fog along the thread and reveals the next ring. The full traversed path consolidates **destination-governed** into one result. **Light/Shadow** set clarity + veil; **Will** widens picks and grants backtrack/redraw; **Fate** narrows and may pull the thread; **Chaos/Order** lengthen/straighten the weave. | `draw` `random` `strings` `weave` `concept-<id>` `family-<benevolent\|challenging\|neutral>` + theme tags |
 | **Happenings** | 8 authored cryptic scenes with 2-3 choices each | `event` `choice` `affinity-shift` |
+
+### d20 Skill-Check: The Cast
+
+A **3D d20** is flicked into a stone bowl. Before you throw, the reading you have built so
+far sets a **Difficulty Class**: favorable earlier divinations raise the bar, grim ones
+lower it. The DC formula is `clamp(round(11 + 2.5 × priorFav), 5, 17)` — at baseline
+(no prior slots) the DC is 11, exactly median on a d20.
+
+Prior slots with strong favorability also modify the throw. A committed slot with
+**favorability ≥ +1.0** grants **Bless (+1d4)** added to your natural roll; one with
+**favorability ≤ −1.0** imposes **Bane (−1d4)** subtracted from it. The total (d20 ±
+modifiers) is compared to the DC, and the margin determines your tier:
+
+| Margin (total − DC) | Tier |
+|:-------------------:|------|
+| ≥ +5 | Critical High |
+| 0 … +4 | High |
+| −1 … −4 | Neutral |
+| −5 … −9 | Low |
+| ≤ −10 | Critical Low |
+
+**Natural 20** is always **Triumph** (critical-high), regardless of the DC. **Natural 1**
+is always **Fumble** (critical-low). These override the margin and emit the `triumph` /
+`fumble` tags for meta-interactions.
+
+**Advantage** (**Light** ascendant) and **disadvantage** (**Shadow** ascendant) now show
+as a **physical smash-down**: two d20s crash into the bowl simultaneously, the unfavored
+die settling visually suppressed. **Will dominant** grants **choice** — both dice settle
+and you pick which result stands.
+
+See [`docs/game-systems.md §12`](docs/game-systems.md) for the full DC formula, Bless/Bane
+rules, and affinity responder details.
+
+---
 
 ### Astromancy: Planet-in-Sign-in-House
 

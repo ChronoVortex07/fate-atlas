@@ -182,12 +182,37 @@ export interface TarotResult extends ThematicData {
   spread?: { position: SpreadPosition; card: TarotCardFace }[];
 }
 
+// Five outcome tiers shared by the dice dataset and the skill-check breakdown.
+export type Threshold = 'critical-low' | 'low' | 'neutral' | 'high' | 'critical-high';
+
+// Skill-check plan: the Difficulty Class and Bless/Bane d4 counts derived from
+// the prior reading. Produced by planDiceCheck, threaded to resolveDiceCheck.
+export interface DiceCheckPlan {
+  dc: number;          // clamped [5, 17]
+  bless: number;       // count of +d4 (0..1 in v1)
+  bane: number;        // count of -d4 (0..1 in v1)
+  sources: string[];   // human-readable reasons (UI marquee)
+}
+
+// Resolved check: the rolled d4 values, the total, and the relative tier.
+export interface DiceCheckBreakdown {
+  d20: number;                          // the kept natural d20 (1..20)
+  bless: number[];                      // rolled d4 values added (each 1..4)
+  bane: number[];                       // rolled d4 values subtracted (each 1..4)
+  dc: number;
+  total: number;                        // d20 + sum(bless) - sum(bane)
+  margin: number;                       // total - dc
+  tier: Threshold;                      // RELATIVE tier (one of the five)
+  critical: 'triumph' | 'fumble' | null;
+}
+
 export interface DiceResult extends ThematicData {
   type: 'd20';
-  result: number; // 1-20
-  threshold: 'critical-low' | 'low' | 'neutral' | 'high' | 'critical-high';
+  result: number; // 1-20 (the natural kept d20)
+  threshold: Threshold;
   interpretation: string;
   tags: Tag[];
+  check?: DiceCheckBreakdown; // present for skill-check results
 }
 
 export type LineValue = 6 | 7 | 8 | 9; // 6 old-yin, 7 young-yang, 8 young-yin, 9 old-yang

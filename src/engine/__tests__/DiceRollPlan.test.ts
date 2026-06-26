@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { GameEngine } from '../GameEngine';
+import { resolveCheck as _resolveCheck } from '../dice';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -98,5 +99,30 @@ describe('planDiceRoll (dispatch-driven roll-mode)', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     const plan = e.planDiceRoll();
     expect(plan.reports.some((r) => r.responderId === 'roll-mode')).toBe(true);
+  });
+});
+
+describe('planDiceRoll — check context', () => {
+  it('returns baseline DC 11 and no bless/bane with no prior slots', () => {
+    const e = new GameEngine();
+    e.startTurn('self');
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const plan = e.planDiceRoll();
+    expect(plan.dc).toBe(11);
+    expect(plan.bless).toBe(0);
+    expect(plan.bane).toBe(0);
+    expect(Array.isArray(plan.sources)).toBe(true);
+    expect(typeof _resolveCheck).toBe('function');
+  });
+});
+
+describe('resolveDiceCheck', () => {
+  it('produces a committed-shaped DiceResult carrying the breakdown', () => {
+    const e = new GameEngine();
+    const { result, breakdown } = e.resolveDiceCheck(15, { dc: 12, bless: 0, bane: 0, sources: [] });
+    expect(result.type).toBe('d20');
+    expect(result.result).toBe(15);
+    expect(result.check).toEqual(breakdown);
+    expect(breakdown.tier).toBe('high');
   });
 });

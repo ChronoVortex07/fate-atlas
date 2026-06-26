@@ -1,303 +1,258 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
 import { rollD20 } from '../../data/dice';
-import type { DiceResult, MinigameMeta, RollMode } from '../../engine/types';
+import DiceCast, { canUse3D, type DiceCastHandle, type FlickVector } from './dice3d/DiceCast';
+import DiceTally from './dice3d/DiceTally';
 import DiceThrowAnimation, { THRESHOLD_COLORS } from './DiceThrowAnimation';
+import type { DiceResult, DiceCheckPlan, DiceCheckBreakdown, MinigameMeta, RollMode } from '../../engine/types';
 
-// Beat that lets a thrown die's reveal animation finish before completeMinigame
-// transitions the screen. Matches the auto-commit delay so a reroll's replayed
-// throw gets the same time on screen as the first one.
-const REVEAL_DELAY_MS = 1500;
-// Beat the two advantage/disadvantage dice spend on screen before they collapse
-// to the kept die.
-const MERGE_DELAY_MS = 1300;
+type Phase = 'idle' | 'throwing' | 'choice' | 'tally' | 'reading' | 'done';
+type Plan = DiceCheckPlan & { mode: RollMode; offerReroll: boolean };
+
+const REVEAL_DELAY_MS = 1200;
 
 export default function DiceMinigame() {
   const { state, engine } = useGameEngine();
-  const [thrown, setThrown] = useState(false);
-  const [mode, setMode] = useState<RollMode>('single');
-  const [pair, setPair] = useState<[DiceResult, DiceResult] | null>(null);
-  const [keptIndex, setKeptIndex] = useState<0 | 1 | null>(null);
-  const [merged, setMerged] = useState(false);
-  const [localResult, setLocalResult] = useState<DiceResult | null>(null);
-  const [offered, setOffered] = useState(false);
-  const [chose, setChose] = useState(false);
+  const use3D = useRef(canUse3D()).current;
+  const castRef = useRef<DiceCastHandle | null>(null);
   const committedRef = useRef(false);
+
+  const [phase, setPhase] = useState<Phase>('idle');
+  const [plan, setPlan] = useState<Plan | null>(null);
+  const [choiceValues, setChoiceValues] = useState<[number, number] | null>(null);
+  const [breakdown, setBreakdown] = useState<DiceCheckBreakdown | null>(null);
+  const [result, setResult] = useState<DiceResult | null>(null);
+  const [chose, setChose] = useState(false);
+
   const veiled = state.affinityEffects.poolPreview === 'hidden';
 
-  const commit = useCallback((result: DiceResult, meta: MinigameMeta) => {
+  const commit = useCallback((r: DiceResult, meta: MinigameMeta) => {
     if (committedRef.current) return;
     committedRef.current = true;
-    engine.completeMinigame(result, meta);
+    engine.completeMinigame(r, meta);
   }, [engine]);
 
-  const handleThrow = useCallback(() => {
-    const plan = engine.planDiceRoll();
-    setMode(plan.mode);
-    setThrown(true);
-    if (plan.mode === 'single') {
-      setLocalResult(rollD20(state.affinities));
-      setOffered(plan.offerReroll);
+  // After the d20 is resolved, run the check + drop the modifier d4s.
+  const resolveAndTally = useCallback((keptD20: number, p: DiceCheckPlan) => {
+    const { result: r, breakdown: b } = engine.resolveDiceCheck(keptD20, p);
+    setResult(r);
+    setBreakdown(b);
+    setPhase('tally');
+    if (use3D) castRef.current?.rollModifiers(b.bless, b.bane);
+  }, [engine, use3D]);
+
+  const onResolved = useCallback((keptD20: number) => {
+    if (!plan) return;
+    resolveAndTally(keptD20, plan);
+  }, [plan, resolveAndTally]);
+
+  const onChoiceReady = useCallback((values: [number, number]) => {
+    setChoiceValues(values);
+    setPhase('choice');
+  }, []);
+
+  // For 3D, modifiers settle then DiceTally plays; for the fallback we skip straight in.
+  const onModifiersResolved = useCallback(() => {/* DiceTally drives its own timing */}, []);
+
+  // Invoked by the canvas flick (3D) or the tap button (fallback). `flick` is
+  // undefined on the fallback path; the scene randomizes the throw then.
+  const handleThrow = useCallback((flick?: FlickVector) => {
+    if (phase !== 'idle') return;
+    const p = engine.planDiceRoll();
+    const checkPlan: DiceCheckPlan = { dc: p.dc, bless: p.bless, bane: p.bane, sources: p.sources };
+    setPlan({ ...checkPlan, mode: p.mode, offerReroll: p.offerReroll });
+    setPhase('throwing');
+
+    if (p.mode === 'single') {
+      const value = rollD20(state.affinities).result;
+      if (use3D) castRef.current?.rollCheck([value], 'single', flick);
+      else { resolveAndTally(value, checkPlan); }
     } else {
-      const { dice, keptIndex: kept } = engine.rollDicePair(plan.mode);
-      setPair(dice);
-      setKeptIndex(kept);
-      setOffered(plan.offerReroll); // suppressed in choice mode (plan.offerReroll === false)
+      const { dice } = engine.rollDicePair(p.mode);
+      const targets = [dice[0].result, dice[1].result];
+      if (use3D) castRef.current?.rollCheck(targets, p.mode, flick);
+      else if (p.mode === 'choice') onChoiceReady([targets[0], targets[1]]);
+      else {
+        const keep = p.mode === 'advantage' ? Math.max(targets[0], targets[1]) : Math.min(targets[0], targets[1]);
+        resolveAndTally(keep, checkPlan);
+      }
     }
-  }, [engine, state.affinities]);
+  }, [phase, engine, state.affinities, use3D, resolveAndTally, onChoiceReady]);
 
-  // Advantage/disadvantage: after the merge beat, collapse to the kept die and
-  // fold into the single-result flow.
-  useEffect(() => {
-    if (mode !== 'advantage' && mode !== 'disadvantage') return;
-    if (!pair || keptIndex === null || merged) return;
-    const timer = setTimeout(() => {
-      setLocalResult(pair[keptIndex]);
-      setMerged(true);
-    }, MERGE_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [mode, pair, keptIndex, merged]);
+  const handlePick = useCallback((index: 0 | 1) => {
+    if (!choiceValues || !plan) return;
+    setChose(true);
+    resolveAndTally(choiceValues[index], plan);
+  }, [choiceValues, plan, resolveAndTally]);
 
-  // Auto-commit (Fate) once a single result is settled and no reroll is offered.
-  // Covers single mode and the merged advantage/disadvantage result.
+  // Tally finished → show the reading, then auto-commit unless a reroll is offered.
+  const onTallyDone = useCallback(() => setPhase('reading'), []);
+
   useEffect(() => {
-    if (!localResult || offered) return;
-    if (mode === 'choice') return;
-    if ((mode === 'advantage' || mode === 'disadvantage') && !merged) return;
-    const timer = setTimeout(() => commit(localResult, { revealedAsDrawn: true }), REVEAL_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [localResult, offered, mode, merged, commit]);
+    if (phase !== 'reading' || !result || !plan) return;
+    if (plan.offerReroll && !chose) return; // wait for keep/reroll
+    const meta: MinigameMeta = chose ? { viaReroll: true } : { revealedAsDrawn: true };
+    const t = setTimeout(() => { commit(result, meta); setPhase('done'); }, REVEAL_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [phase, result, plan, chose, commit]);
 
   const handleKeep = useCallback(() => {
-    setChose(true);
-    if (localResult) commit(localResult, { revealedAsDrawn: true }); // accept → Fate
-  }, [localResult, commit]);
+    if (result) { setChose(true); commit(result, { revealedAsDrawn: true }); setPhase('done'); }
+  }, [result, commit]);
 
   const handleReroll = useCallback(() => {
-    if (!localResult) return;
-    const { result: next } = engine.resolveReroll(localResult); // Fate may make it hollow
+    if (!result || !plan) return;
     setChose(true);
-    setLocalResult(next);
-    setTimeout(() => commit(next, { viaReroll: true }), REVEAL_DELAY_MS); // assert control → Will
-  }, [localResult, engine, commit]);
+    const { result: fresh } = engine.resolveReroll(result); // Fool's reroll may apply
+    const keptValue = fresh.result;
+    setPhase('throwing');
+    // Re-throw a single die; for 3D the scene's onResolved drives the single
+    // resolveAndTally. For the fallback, resolve directly (no scene).
+    if (use3D) castRef.current?.rollCheck([keptValue], 'single');
+    else resolveAndTally(keptValue, plan);
+  }, [result, plan, engine, use3D, resolveAndTally]);
 
-  // Choice mode: the player keeps one of the two dice (Will).
-  const handlePick = useCallback((index: 0 | 1) => {
-    if (!pair) return;
-    setKeptIndex(index);
-    setLocalResult(pair[index]);
-    setChose(true);
-    setTimeout(() => commit(pair[index], { viaReroll: true }), REVEAL_DELAY_MS);
-  }, [pair, commit]);
-
-  // Once committed, prefer the engine's slot so interaction effects (e.g. Fool's
-  // Reroll) are reflected. Before commit, use the local result.
   const committedSlot =
     state.activeSlotIndex !== null ? state.turnResults[state.activeSlotIndex] : undefined;
-  const displayResult: DiceResult | null =
-    committedSlot && committedSlot.type === 'd20' ? committedSlot : localResult;
-
-  // Two dice are on screen while a pair is unresolved: advantage/disadvantage
-  // before the merge beat, or choice before the player picks.
-  const showingPair = !!pair && (
-    ((mode === 'advantage' || mode === 'disadvantage') && !merged) ||
-    (mode === 'choice' && !chose)
-  );
+  const display: DiceResult | null =
+    (committedSlot && committedSlot.type === 'd20' ? committedSlot : null) ?? result;
 
   const modeLabel =
-    mode === 'advantage' ? 'Advantage — the higher die holds'
-    : mode === 'disadvantage' ? 'Disadvantage — the lower die holds'
-    : mode === 'choice' ? 'Keep one — your will decides'
+    plan?.mode === 'advantage' ? 'Advantage — the higher die holds'
+    : plan?.mode === 'disadvantage' ? 'Disadvantage — the lower die holds'
+    : plan?.mode === 'choice' ? 'Keep one — your will decides'
     : null;
 
   return (
-    <motion.div
-      style={containerStyle}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.4 }}
-    >
+    <motion.div style={containerStyle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }}>
       <div style={contentStyle}>
-        <h1 style={headingStyle}>{thrown ? 'The die is cast' : 'Cast the die'}</h1>
+        <h1 style={headingStyle}>{phase === 'idle' ? 'Cast the die' : phase === 'done' ? 'The die is cast' : 'The check'}</h1>
+        {modeLabel && phase !== 'idle' && <p style={interpStyle}>{modeLabel}</p>}
+        {plan && plan.sources.length > 0 && phase !== 'idle' && (
+          <p style={sourceStyle}>{plan.sources.join(' · ')}</p>
+        )}
 
-        {!thrown ? (
-          <motion.button
-            style={dieButtonStyle}
-            animate={{ rotate: 360 }}
-            transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={handleThrow}
-          >
-            <span style={dieFaceStyle}>{String.fromCodePoint(0x2685)}</span>
-            <span style={tapHintStyle}>Tap to throw</span>
-          </motion.button>
-        ) : showingPair && pair ? (
-          <motion.div style={resultContainerStyle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
-            {modeLabel && <p style={interpretationStyle}>{modeLabel}</p>}
-            <div style={pairRowStyle}>
-              {pair.map((die, i) => {
-                const isHeld = keptIndex === i;
-                const interactive = mode === 'choice';
-                return (
-                  <motion.button
-                    key={i}
-                    style={{
-                      ...pairDieStyle,
-                      cursor: interactive ? 'pointer' : 'default',
-                      borderColor: isHeld ? THRESHOLD_COLORS[die.threshold] : '#1a2440',
-                      opacity: keptIndex !== null && !isHeld ? 0.4 : 1,
-                    }}
-                    whileHover={interactive ? { scale: 1.05, borderColor: '#c75b4a' } : undefined}
-                    whileTap={interactive ? { scale: 0.96 } : undefined}
-                    onClick={interactive ? () => handlePick(i as 0 | 1) : undefined}
-                    disabled={!interactive}
-                  >
-                    <DiceThrowAnimation key={die.result} value={die.result} threshold={die.threshold} />
-                  </motion.button>
-                );
-              })}
-            </div>
-          </motion.div>
+        {/* 3D board (or fallback reveal) */}
+        {use3D ? (
+          <div style={{ position: 'relative' }}>
+            <DiceCast
+              ref={castRef}
+              affinities={state.affinities}
+              idle={phase === 'idle'}
+              onFlick={handleThrow}
+              onResolved={onResolved}
+              onChoiceReady={onChoiceReady}
+              onModifiersResolved={onModifiersResolved}
+            />
+            {/* Non-interactive hint — the flick is captured on the canvas itself. */}
+            {phase === 'idle' && (
+              <div style={flickHintStyle}>
+                <span style={{ fontSize: '1.6rem' }}>{String.fromCodePoint(0x2685)}</span>
+                <span style={tapHintStyle}>Drag back &amp; release to flick</span>
+              </div>
+            )}
+          </div>
         ) : (
-          displayResult && (
-            <motion.div style={resultContainerStyle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
-              {/* key on the value so a reroll remounts and replays the throw */}
-              <DiceThrowAnimation key={displayResult.result} value={displayResult.result} threshold={displayResult.threshold} />
-              {/* Shadow (veiled): the threshold/meaning stays hidden until commit. */}
-              {veiled && !committedRef.current ? (
-                <p style={interpretationStyle}>The die rests, its meaning shrouded...</p>
-              ) : (
-                <motion.div style={thresholdStyle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
-                  <span style={{ ...thresholdBadgeStyle, color: THRESHOLD_COLORS[displayResult.threshold], borderColor: THRESHOLD_COLORS[displayResult.threshold] }}>
-                    {displayResult.threshold.replace(/-/g, ' ').toUpperCase()}
-                  </span>
-                  <p style={interpretationStyle}>{displayResult.interpretation}</p>
-                </motion.div>
-              )}
-              {offered && !chose && (
-                <div style={rerollRowStyle}>
-                  <motion.button style={rerollBtnStyle} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={handleReroll}>
-                    ↺ Reroll?
-                  </motion.button>
-                  <motion.button style={rerollBtnStyle} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={handleKeep}>
-                    Keep it
-                  </motion.button>
-                </div>
-              )}
-            </motion.div>
+          phase === 'idle' ? (
+            <motion.button style={throwBtnStyle} whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.92 }} onClick={() => handleThrow()}>
+              <span style={{ fontSize: '2rem' }}>{String.fromCodePoint(0x2685)}</span>
+              <span style={tapHintStyle}>Tap to throw</span>
+            </motion.button>
+          ) : display && (
+            <DiceThrowAnimation
+              key={display.result}
+              value={display.result}
+              threshold={display.threshold}
+              dc={breakdown?.dc}
+              total={breakdown?.total}
+            />
           )
+        )}
+
+        {/* Choice: tap a value (Will) */}
+        {phase === 'choice' && choiceValues && (
+          <div style={choiceRowStyle}>
+            {choiceValues.map((v, i) => (
+              <motion.button key={i} style={choiceBtnStyle} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }} onClick={() => handlePick(i as 0 | 1)}>
+                {v}
+              </motion.button>
+            ))}
+          </div>
+        )}
+
+        {/* BG3 tally */}
+        {(phase === 'tally' || phase === 'reading') && plan && (
+          <DiceTally dc={plan.dc} breakdown={breakdown} veiled={veiled} onDone={onTallyDone} />
+        )}
+
+        {/* Reading */}
+        {phase === 'reading' && display && (
+          <motion.div style={readingStyle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+            {veiled && !committedRef.current ? (
+              <p style={interpStyle}>The die rests, its meaning shrouded…</p>
+            ) : (
+              <>
+                <span style={{ ...badgeStyle, color: THRESHOLD_COLORS[display.threshold], borderColor: THRESHOLD_COLORS[display.threshold] }}>
+                  {(display.check?.critical ?? display.threshold.replace(/-/g, ' ')).toUpperCase()}
+                </span>
+                <p style={interpStyle}>{display.interpretation}</p>
+              </>
+            )}
+            {plan?.offerReroll && !chose && (
+              <div style={rerollRowStyle}>
+                <motion.button style={rerollBtnStyle} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={handleReroll}>↺ Reroll?</motion.button>
+                <motion.button style={rerollBtnStyle} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={handleKeep}>Keep it</motion.button>
+              </div>
+            )}
+          </motion.div>
         )}
       </div>
     </motion.div>
   );
 }
 
-const containerStyle: React.CSSProperties = {
-  width: '100%',
-  maxWidth: '500px',
-  padding: '2rem',
-};
-
-const contentStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  gap: '2rem',
-};
-
+const containerStyle: React.CSSProperties = { width: '100%', maxWidth: '560px', padding: '2rem' };
+const contentStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' };
 const headingStyle: React.CSSProperties = {
-  fontFamily: "'Cormorant Garamond', serif",
-  fontWeight: 700,
-  fontSize: 'clamp(1.5rem, 4vw, 2rem)',
-  color: '#c8d8f0',
-  letterSpacing: '0.12em',
-  margin: 0,
-  textAlign: 'center',
+  fontFamily: "'Cormorant Garamond', serif", fontWeight: 700, fontSize: 'clamp(1.5rem, 4vw, 2rem)',
+  color: '#c8d8f0', letterSpacing: '0.12em', margin: 0, textAlign: 'center',
 };
-
-const dieButtonStyle: React.CSSProperties = {
-  width: '120px',
-  height: '120px',
-  background: '#0d1220',
-  border: '2px solid #c75b4a',
-  borderRadius: '12px',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: '0.5rem',
-  cursor: 'pointer',
-  outline: 'none',
-  fontFamily: 'inherit',
+const throwBtnStyle: React.CSSProperties = {
+  width: 130, height: 130,
+  background: 'rgba(13,18,32,0.72)', border: '2px solid #c75b4a', borderRadius: '14px',
+  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+  gap: '0.4rem', cursor: 'pointer', outline: 'none', fontFamily: 'inherit', color: '#c8d8f0',
 };
-
-const dieFaceStyle: React.CSSProperties = {
-  fontSize: '2.5rem',
-  lineHeight: 1,
+// 3D idle overlay hint — non-interactive so the canvas underneath receives the flick.
+const flickHintStyle: React.CSSProperties = {
+  position: 'absolute', inset: 0, margin: 'auto', width: 200, height: 80,
+  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+  gap: '0.4rem', color: '#c8d8f0', pointerEvents: 'none',
 };
-
 const tapHintStyle: React.CSSProperties = {
-  fontFamily: "'Inter', sans-serif",
-  fontWeight: 300,
-  fontSize: '0.6rem',
-  color: '#5b7290',
-  letterSpacing: '0.1em',
+  fontFamily: "'Inter', sans-serif", fontWeight: 300, fontSize: '0.6rem', color: '#5b7290', letterSpacing: '0.1em',
 };
-
-const resultContainerStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  gap: '1.5rem',
+const sourceStyle: React.CSSProperties = {
+  fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', color: '#7b9ec7', letterSpacing: '0.06em', textAlign: 'center', margin: 0,
 };
-
-const thresholdStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  gap: '0.5rem',
+const choiceRowStyle: React.CSSProperties = { display: 'flex', gap: '1.25rem' };
+const choiceBtnStyle: React.CSSProperties = {
+  width: 72, height: 72, borderRadius: '12px', background: '#0d1220', border: '2px solid #1a2440',
+  color: '#c8d8f0', fontFamily: "'Cormorant Garamond', serif", fontWeight: 700, fontSize: '1.8rem', cursor: 'pointer', outline: 'none',
 };
-
-const thresholdBadgeStyle: React.CSSProperties = {
-  fontFamily: "'Inter', sans-serif",
-  fontWeight: 600,
-  fontSize: '0.7rem',
-  letterSpacing: '0.15em',
-  padding: '0.3rem 0.8rem',
-  border: '1px solid',
-  borderRadius: '3px',
+const readingStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' };
+const badgeStyle: React.CSSProperties = {
+  fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.15em',
+  padding: '0.3rem 0.8rem', border: '1px solid', borderRadius: '3px',
 };
-
-const interpretationStyle: React.CSSProperties = {
-  fontFamily: "'Cormorant Garamond', serif",
-  fontWeight: 400,
-  fontSize: 'clamp(0.8rem, 1.5vw, 0.95rem)',
-  color: '#7b9ec7',
-  fontStyle: 'italic',
-  textAlign: 'center',
-  margin: 0,
-  maxWidth: '300px',
+const interpStyle: React.CSSProperties = {
+  fontFamily: "'Cormorant Garamond', serif", fontWeight: 400, fontSize: 'clamp(0.8rem, 1.5vw, 0.95rem)',
+  color: '#7b9ec7', fontStyle: 'italic', textAlign: 'center', margin: 0, maxWidth: '320px',
 };
-
-const rerollRowStyle: React.CSSProperties = {
-  display: 'flex', gap: '0.6rem', marginTop: '0.25rem',
-};
-
+const rerollRowStyle: React.CSSProperties = { display: 'flex', gap: '0.6rem', marginTop: '0.25rem' };
 const rerollBtnStyle: React.CSSProperties = {
-  fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontSize: '0.85rem',
-  letterSpacing: '0.08em', color: '#c8d8f0', background: '#0d1220',
-  border: '1px solid #1a2440', padding: '0.45rem 1.1rem', borderRadius: '4px',
+  fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontSize: '0.85rem', letterSpacing: '0.08em',
+  color: '#c8d8f0', background: '#0d1220', border: '1px solid #1a2440', padding: '0.45rem 1.1rem', borderRadius: '4px',
   cursor: 'pointer', outline: 'none',
-};
-
-const pairRowStyle: React.CSSProperties = {
-  display: 'flex', gap: '1.5rem', justifyContent: 'center', alignItems: 'center',
-};
-
-const pairDieStyle: React.CSSProperties = {
-  background: 'transparent', border: '2px solid #1a2440', borderRadius: '12px',
-  padding: '0.25rem', outline: 'none', transition: 'border-color 0.3s, opacity 0.4s',
 };
