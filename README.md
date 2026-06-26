@@ -26,7 +26,7 @@ npm run dev        # → http://localhost:5173
 
 1. **Title** — click **CONSULT THE STARS**
 2. **Question** — pick one of four question types *(Decision, Relationship, Future/Forecast, Self-Analysis)*
-3. **Method Select** — choose one of 3 divination methods dealt by the stars
+3. **Method Select** — the stars deal 3 cards face-down. Affinity effects animate in with a banner before the reveal (Will *widens* the spread with a fourth card, Fate *thins* it, Shadow *shrouds* a card behind a veil), then the cards flip face-up. Draw one to begin — though at high Fate the weave may force your hand, an unseen hand descending to choose a different card for you.
 4. **Minigame** — play a short interactive experience (pick a tarot card, roll the dice, cast coins). After it commits, the result is held on a **review beat** showing the face-up outcome; play advances only when you click **Continue**.
 5. **Result** — read the interpretation. Balanced readings now **name their opposing forces** (the strongest favorable and adverse signals) and read **per position** rather than re-listing the spread. Happenings may appear as cryptic events between turns. **Share as Image** or **Copy LLM Prompt**
 

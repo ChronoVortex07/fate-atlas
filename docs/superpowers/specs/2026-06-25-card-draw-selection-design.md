@@ -1,7 +1,7 @@
 # Card-Draw Method Selection — Design Spec
 
 **Date:** 2026-06-25
-**Status:** Design approved, pending implementation plan
+**Status:** Implemented (plan: docs/superpowers/plans/2026-06-26-card-draw-selection.md)
 
 ## Overview
 
