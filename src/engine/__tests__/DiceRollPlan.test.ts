@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { GameEngine } from '../GameEngine';
+import { resolveCheck as _resolveCheck } from '../dice';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -100,8 +101,6 @@ describe('planDiceRoll (dispatch-driven roll-mode)', () => {
     expect(plan.reports.some((r) => r.responderId === 'roll-mode')).toBe(true);
   });
 });
-
-import { resolveCheck as _resolveCheck } from '../dice'; // ensures module resolves
 
 describe('planDiceRoll — check context', () => {
   it('returns baseline DC 11 and no bless/bane with no prior slots', () => {
