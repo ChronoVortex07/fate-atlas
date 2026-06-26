@@ -1081,9 +1081,9 @@ Natural rolls override the DC entirely:
   The result also emits the `triumph` tag.
 - **Natural 1 → Fumble** (`critical-low`): same override. The result emits the `fumble` tag.
 
-Criticals are checked in `resolveCheck` from the raw natural d20 *before* the Bless/Bane
-d4s are rolled; the d4s still resolve and are shown in the breakdown for narrative texture,
-but they do not affect the tier when a critical is present.
+Criticals are determined from the raw natural d20; the Bless/Bane d4s still resolve and
+are shown in the breakdown for narrative texture, but they do not affect the tier when a
+critical fires.
 
 ### 12f. Roll modes (affinity-gated, unchanged)
 
