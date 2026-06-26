@@ -29,6 +29,7 @@ export interface PhaseDraft {
   offerReroll?: boolean;      // 'roll-mode' result
   shrouded?: number[];        // indices of shrouded pool items
   spreadReports?: EffectReport[]; // reports from spread-channel combine responders
+  weaveReports?: EffectReport[];  // reports from weave-channel combine responders
   [key: string]: unknown;     // extensible per trigger family
 }
 
