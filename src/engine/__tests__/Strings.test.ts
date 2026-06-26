@@ -59,3 +59,34 @@ describe('pathCoherence', () => {
     expect(pathCoherence(coherent)).toBe('coherent');
   });
 });
+
+import { planWeave } from '../strings';
+
+const baseAff = { chaos: 50, order: 50, fate: 50, will: 50, light: 50, shadow: 50 };
+
+describe('planWeave', () => {
+  it('defaults at baseline: 4 bands, width 3, mood clarity, no agency extras', () => {
+    const p = planWeave(baseAff);
+    expect(p.bandCount).toBe(4);
+    expect(p.width).toBe(3);
+    expect(p.veil).toBe(0);
+    expect(p.clarity).toBe('mood');
+    expect(p.backtracks).toBe(0);
+    expect(p.foresight).toBe(false);
+  });
+
+  it('Fate ascendant thins width; Will ascendant widens + grants a backtrack', () => {
+    expect(planWeave({ ...baseAff, fate: 70 }).width).toBe(2);
+    const will = planWeave({ ...baseAff, will: 70 });
+    expect(will.width).toBe(4);
+    expect(will.backtracks).toBe(1);
+  });
+
+  it('Light raises clarity + foresight; Shadow lowers clarity + veils; Chaos lengthens', () => {
+    expect(planWeave({ ...baseAff, light: 70 }).clarity).toBe('themes');
+    expect(planWeave({ ...baseAff, light: 70 }).foresight).toBe(true);
+    expect(planWeave({ ...baseAff, shadow: 70 }).clarity).toBe('silhouette');
+    expect(planWeave({ ...baseAff, shadow: 70 }).veil).toBe(1);
+    expect(planWeave({ ...baseAff, chaos: 90 }).bandCount).toBe(5);
+  });
+});
