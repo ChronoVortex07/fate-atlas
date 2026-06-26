@@ -56,6 +56,25 @@ describe('GameEngine — new lifecycle', () => {
     expect(state.questionType).toBe('self');
   });
 
+  it('diverts draw-phase effect reports onto state.drawPhase, not the eventQueue', () => {
+    const engine = new GameEngine();
+    // Force the two draw-phase responders to fire on the next pool build.
+    engine.forceEffects(['will-widen-pool', 'shadow-shroud'], true);
+    // Stage affinities so their conditions are satisfiable, then start a turn.
+    engine.loadState({ affinities: { chaos: 50, order: 50, fate: 50, will: 75, light: 50, shadow: 75 } });
+    engine.startTurn('self');
+
+    const s = engine.getState();
+    expect(s.drawPhase).not.toBeNull();
+    // Draw-phase reports were captured on drawPhase…
+    const ids = s.drawPhase!.effectReports.map((r) => r.responderId);
+    expect(ids).toContain('will-widen-pool');
+    expect(ids).toContain('shadow-shroud');
+    // …and are NOT sitting in the generic interaction queue.
+    expect(s.eventQueue.map((r) => r.responderId)).not.toContain('will-widen-pool');
+    expect(s.eventQueue.map((r) => r.responderId)).not.toContain('shadow-shroud');
+  });
+
   it('selectMethod with valid index goes to minigame screen', () => {
     engine.startTurn('self');
     const idx = engine.getState().availableMethods.findIndex((m) => m !== 'happening');

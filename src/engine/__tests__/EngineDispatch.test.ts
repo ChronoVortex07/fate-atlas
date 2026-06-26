@@ -43,13 +43,14 @@ describe('engine dispatch wiring', () => {
     expect(['single', 'advantage', 'disadvantage', 'choice']).toContain(plan.mode);
   });
 
-  it('forced shadow-shroud effect lands in the event queue on its trigger', () => {
+  it('forced shadow-shroud effect lands in drawPhase.effectReports on its trigger', () => {
     const e = new GameEngine();
     e.loadScenarioById('shadow-shroud'); // forces shadow-shroud, isolate, on method-select
     e.startTurn('self'); // select:draw:start / select:draw:end fire in the pool path
-    // shadow-shroud fires on select:draw:end — the forced responder must appear in the queue.
-    const queue = e.getState().eventQueue;
-    expect(queue.some((r) => r.responderId === 'shadow-shroud')).toBe(true);
+    // shadow-shroud fires on select:draw:end — the draw-phase report is diverted off
+    // the generic eventQueue onto drawPhase for MethodSelect to narrate in-spread.
+    const reports = e.getState().drawPhase!.effectReports;
+    expect(reports.some((r) => r.responderId === 'shadow-shroud')).toBe(true);
   });
 
   it('shadow-shroud (forced) populates shroudedMethods after startTurn', () => {

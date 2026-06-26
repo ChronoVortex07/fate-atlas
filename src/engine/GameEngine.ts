@@ -63,6 +63,7 @@ export class GameEngine {
       questionType: null,
       availableMethods: [],
       shroudedMethods: [],
+      drawPhase: null,
       selectedMethod: null,
       turnResults: [],
       minigamesCompleted: 0,
@@ -191,8 +192,10 @@ export class GameEngine {
   // pool-shaping (will-widen/fate-thin) and shrouding effects participate.
   private buildPool(bias: Partial<Record<DivinationType, number>> = {}, refill = false): void {
     const baseCount = this.affinityEngine.getEffects().methodCount;
+    const queueBefore = this.state.eventQueue.length;
+
     const startDraft: PhaseDraft = { poolTarget: baseCount };
-    this.dispatchAt('select:draw:start', startDraft);
+    const { reports: startReports } = this.dispatchAt('select:draw:start', startDraft);
     const target = (startDraft.poolTarget as number) ?? baseCount;
 
     const affinities = this.affinityEngine.getState();
@@ -203,11 +206,22 @@ export class GameEngine {
 
     // Render the drawn pool through the end-of-draw trigger (shrouding, etc.).
     const poolResults = pool.map((m) => ({ tags: [], type: m } as unknown as SlotResult));
-    const { draft: endDraftPool } = this.dispatchAt('select:draw:end', { pool: poolResults });
-    // Persist any shrouded indices from the shadow-shroud responder.
+    const { draft: endDraftPool, reports: endReports } = this.dispatchAt('select:draw:end', { pool: poolResults });
     this.state.shroudedMethods = Array.isArray(endDraftPool.shrouded)
       ? (endDraftPool.shrouded as number[])
       : [];
+
+    // The draw-phase effects (widen/thin/shroud) are narrated INSIDE the card
+    // spread by MethodSelect (EventBanner + in-spread animation), not by the
+    // generic InteractionSequencer. Pull them back off the queue — they remain
+    // in turnEffects (added by dispatchAt) for the RunRecord — and stash them,
+    // ordered, on drawPhase for the UI to sequence.
+    this.state.eventQueue = this.state.eventQueue.slice(0, queueBefore);
+    this.state.drawPhase = {
+      nonce: (this.state.drawPhase?.nonce ?? 0) + 1,
+      effectReports: [...startReports, ...endReports],
+      pendingSelection: null,
+    };
   }
 
   // ---------- Turn lifecycle ----------
@@ -1035,6 +1049,7 @@ export class GameEngine {
     this.state.questionType = null;
     this.state.availableMethods = [];
     this.state.shroudedMethods = [];
+    this.state.drawPhase = null;
     this.state.selectedMethod = null;
     this.state.turnResults = [];
     this.state.minigamesCompleted = 0;
