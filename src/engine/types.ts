@@ -152,22 +152,6 @@ export interface AggregatedReading {
   strongestAdverse: { label: string; value: number } | null;
 }
 
-// ── Narrative Template Types ──
-
-export interface NarrativeTemplates {
-  openings: Record<string, string[]>;
-  dimensionBands: Record<string, string[]>;
-  modifierFrames: Record<string, string[]>;
-  closings: Record<string, string[]>;
-  tensionPatterns: Record<string, string[]>;
-  headlines: Record<string, string[]>;
-  fallbacks: {
-    noDominantTheme: string[];
-    missingModifier: Record<ModifierRole, string[]>;
-    singleResult: string[];
-  };
-}
-
 // ── Divination Results ──
 export interface TarotResult extends ThematicData {
   type: 'tarot';
