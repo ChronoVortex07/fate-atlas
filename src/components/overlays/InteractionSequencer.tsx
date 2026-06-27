@@ -13,7 +13,7 @@ import OverrideAnimation from './InteractionAnimations/OverrideAnimation';
 import ThinAnimation from './InteractionAnimations/ThinAnimation';
 import InterruptAnimation from './InteractionAnimations/InterruptAnimation';
 import { useAnchorResolver } from '../../context/AnchorRegistry';
-import { primitiveFor, themeFor, anchorKeyFor, type Primitive } from './anim/theme';
+import { primitiveFor, themeFor, anchorKeyFor, expandSlotFor, type Primitive } from './anim/theme';
 import type { PrimitiveProps } from './anim/AnchoredStage';
 import SpawnPrimitive from './anim/primitives/SpawnPrimitive';
 import RerollPrimitive from './anim/primitives/RerollPrimitive';
@@ -68,7 +68,10 @@ export default function InteractionSequencer() {
       return;
     }
     const report = queue[Math.min(i, queue.length - 1)];
-    const hasHand = typeof report.sourceSlot === 'number';
+    // Run the focus beat only when the animation plays on a fan card (so the fan
+    // expands and the card is large/centered). Outcome-anchored effects skip it,
+    // so the fan never expands to occlude the card they target.
+    const hasHand = expandSlotFor(report) !== null;
     let inner: ReturnType<typeof setTimeout> | undefined;
     let outer: ReturnType<typeof setTimeout>;
     if (hasHand) {

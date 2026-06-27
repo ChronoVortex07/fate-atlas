@@ -25,6 +25,7 @@ export function EngineProvider({ children }: { children: ReactNode }) {
     const params = new URLSearchParams(window.location.search);
     if (params.has('debug')) {
       engine.loadState({ debug: true });
+      (window as unknown as { __engine: GameEngine }).__engine = engine; // DEBUG: drive from Playwright
     }
 
     engine.loadFromStorage();

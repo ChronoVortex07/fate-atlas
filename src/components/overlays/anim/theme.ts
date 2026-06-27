@@ -33,6 +33,28 @@ export function primitiveFor(animation: string): Primitive {
   return PRIMITIVE_BY_ANIMATION[animation] ?? 'glow';
 }
 
+// Primitives that play ON the real card (anchored). Kept in sync with the
+// sequencer's ANCHORED map. Drives the fan-expansion venue decision below.
+const MIGRATED_SET = new Set<Primitive>(['spawn', 'reroll', 'veil']);
+export function isMigrated(p: Primitive): boolean {
+  return MIGRATED_SET.has(p);
+}
+
+/**
+ * The constellation slot the fan should expand to so the animation can play on a
+ * large, centered card — or `null` when the effect plays on the minigame
+ * outcome, in which case the fan must NOT expand (expanding would occlude the
+ * very card the animation targets). Migrated effects expand only when they
+ * actually anchor to a fan card; legacy centered effects keep their prior
+ * behavior of spotlighting the source/cause card during the focus beat.
+ */
+export function expandSlotFor(report: EffectReport): number | null {
+  if (isMigrated(primitiveFor(report.animation))) {
+    return typeof report.targetSlot === 'number' ? report.targetSlot : null;
+  }
+  return typeof report.sourceSlot === 'number' ? report.sourceSlot : null;
+}
+
 // Affinity palettes — core hex copied verbatim from EventBanner's AFFINITY_COLOR,
 // plus the accent + particle model from the design's theming bible.
 const AFFINITY: Record<string, Theme> = {

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import FanCard, { type FanCardState } from '../cards/FanCard';
 import CardDetailModal from './CardDetailModal';
 import { useInteractionFocus } from '../../context/InteractionFocusContext';
+import { expandSlotFor } from './anim/theme';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import type { SlotResult } from '../../engine/types';
 
@@ -47,7 +48,9 @@ export default function ConstellationFan({ results }: Props) {
   const { activeReport, phase } = useInteractionFocus();
 
   const N = results.length;
-  const focusSlot = activeReport?.sourceSlot ?? null;
+  // Expand/scroll to the slot the animation actually anchors on (target for
+  // migrated effects, source for legacy) — not raw sourceSlot.
+  const focusSlot = activeReport ? expandSlotFor(activeReport) : null;
   const targetSlot = activeReport?.targetSlot ?? null;
 
   // Slight fan for the collapsed mobile pile.
