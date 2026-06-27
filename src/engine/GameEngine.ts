@@ -676,25 +676,6 @@ export class GameEngine {
     return resolveCheck(d20, plan);
   }
 
-  // Fate (OVERRIDE) may swap one dealt position for a fresh single card before reveal.
-  resolveTarotDeal(faces: TarotCardFace[]): { faces: TarotCardFace[]; swappedIndex: number | null } {
-    const { draft } = this.dispatchAt('tarot:deal', { faces: [...faces] as unknown as SlotResult[] });
-    const outFaces = (draft.faces as unknown as TarotCardFace[]) ?? faces;
-    const swappedIndex = typeof draft.swappedIndex === 'number' ? draft.swappedIndex : null;
-    this.notify();
-    return { faces: outFaces, swappedIndex };
-  }
-
-  // Fate (OVERRIDE) may decide the spread-wide orientation for the player.
-  resolveSpreadOrientation(result: TarotResult): { result: TarotResult; auto: boolean; reversed: boolean } {
-    const originalOrientation = result.orientation;
-    const { draft } = this.dispatchAt('tarot:orient', { outcome: result });
-    const out = (draft.outcome as TarotResult) ?? result;
-    const auto = out.orientation !== originalOrientation;
-    this.notify();
-    return { result: out, auto, reversed: out.orientation === 'reversed' };
-  }
-
   // Pre-commit dice reroll. Fate (Ascendant+) may make it hollow (same face).
   resolveReroll(current: DiceResult): { result: DiceResult; hollow: boolean } {
     const fresh = this.orchestrator.drawSingleResult('d20', this.affinityEngine.getState()) as DiceResult;
@@ -714,12 +695,6 @@ export class GameEngine {
     this.affinityEngine.applyAction('take-reroll'); // agency → Will
     this.notify();
     return next;
-  }
-
-  // Will: the player exercises a free orientation choice.
-  setOrientation(_orientation: 'upright' | 'reversed'): void {
-    this.affinityEngine.applyAction('set-orientation');
-    this.notify();
   }
 
   // Rolls two d20s for a two-dice mode. advantage/disadvantage auto-keep the

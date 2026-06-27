@@ -322,30 +322,6 @@ function diceResult(): DiceResult {
   };
 }
 
-describe('tarot deal + spread orientation', () => {
-  it('resolveTarotDeal returns the same faces when Fate is dormant', () => {
-    const e = new GameEngine();
-    e.startTurn('self');
-    const faces = [buildFace(DECK_BY_ID['the-fool'], 'upright'), buildFace(DECK_BY_ID['cups-2'], 'upright'), buildFace(DECK_BY_ID['swords-3'], 'upright')];
-    const { faces: out, swappedIndex } = e.resolveTarotDeal(faces);
-    expect(out).toHaveLength(3);
-    expect(swappedIndex).toBeNull();
-  });
-
-  it('resolveSpreadOrientation passes through when Fate is dormant', () => {
-    const orig = Math.random; Math.random = () => 0.99; // suppress the probabilistic auto-orient roll
-    try {
-      const e = new GameEngine();
-      e.startTurn('self');
-      const r = consolidateSpread([buildFace(DECK_BY_ID['the-star'], 'upright'), buildFace(DECK_BY_ID['cups-2'], 'upright'), buildFace(DECK_BY_ID['swords-3'], 'upright')]);
-      const { auto } = e.resolveSpreadOrientation(r);
-      expect(auto).toBe(false);
-    } finally {
-      Math.random = orig;
-    }
-  });
-});
-
 describe('redrawSpreadPosition', () => {
   it('replaces one position with a different card and feeds Will', () => {
     const e = new GameEngine();

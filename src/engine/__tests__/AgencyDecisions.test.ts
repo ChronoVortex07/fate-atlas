@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { GameEngine } from '../GameEngine';
 import { buildFace, DECK_BY_ID } from '../../data/tarot';
-import type { TarotCardFace, TarotResult, DiceResult } from '../types';
+import type { TarotResult, DiceResult } from '../types';
 
 const tarot = (orientation: 'upright' | 'reversed'): TarotResult => {
   const face = buildFace(DECK_BY_ID['the-fool'], orientation);
@@ -75,23 +75,6 @@ describe('resolveReroll (pre-commit dice reroll)', () => {
   });
 });
 
-describe('resolveTarotDeal (Fate override)', () => {
-  const faces: TarotCardFace[] = [
-    buildFace(DECK_BY_ID['the-fool'], 'upright'),
-    buildFace(DECK_BY_ID['the-star'], 'reversed'),
-    buildFace(DECK_BY_ID['death'], 'upright'),
-  ];
-
-  it('returns the same faces when nothing fires', () => {
-    const e = new GameEngine();
-    startMinigame(e);
-    const { faces: out, swappedIndex } = e.resolveTarotDeal(faces);
-    expect(swappedIndex).toBeNull();
-    expect(out).toHaveLength(3);
-    expect(out.map((f) => f.id)).toEqual(['the-fool', 'the-star', 'death']);
-  });
-});
-
 describe('orientation', () => {
   it('planReveal preempts and returns an orientation when fate-auto-orient is forced', () => {
     const e = new GameEngine();
@@ -110,14 +93,6 @@ describe('orientation', () => {
     Math.random = orig;
     expect(preempt).toBe(false);
     expect(orientation).toBeNull();
-  });
-
-  it('setOrientation feeds Will', () => {
-    const e = new GameEngine();
-    startMinigame(e);
-    const before = e.getState().affinities.will;
-    noJitter(() => e.setOrientation('reversed'));
-    expect(e.getState().affinities.will).toBeGreaterThan(before);
   });
 });
 
