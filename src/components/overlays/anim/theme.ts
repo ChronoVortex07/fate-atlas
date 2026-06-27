@@ -35,7 +35,7 @@ export function primitiveFor(animation: string): Primitive {
 
 // Primitives that play ON the real card (anchored). Kept in sync with the
 // sequencer's ANCHORED map. Drives the fan-expansion venue decision below.
-const MIGRATED_SET = new Set<Primitive>(['spawn', 'reroll', 'veil', 'flip']);
+const MIGRATED_SET = new Set<Primitive>(['spawn', 'reroll', 'veil', 'flip', 'glow']);
 export function isMigrated(p: Primitive): boolean {
   return MIGRATED_SET.has(p);
 }
