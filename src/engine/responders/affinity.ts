@@ -2,7 +2,7 @@ import type { Responder, PhaseContext, EffectReport } from '../events/types';
 import type { AffinityId, SlotResult, RollModifier, TarotResult, TarotCardFace } from '../types';
 import { bandRoll } from '../events/eligibility';
 import { TIER_BASE_CHANCE, bandOf, BAND_ORDER } from '../../data/affinities';
-import { reverseSpread, buildFace, DECK_BY_ID, drawTarotCard, consolidateSpread, FULL_DECK } from '../../data/tarot';
+import { buildFace, DECK_BY_ID, drawTarotCard, consolidateSpread, FULL_DECK } from '../../data/tarot';
 
 const T = TIER_BASE_CHANCE;
 const SHROUD_STEP_CHANCE = 0.20; // flat per-step chance (not bandRoll-scaled — see A3 note)
@@ -136,14 +136,15 @@ export function buildAffinityResponders(): Responder[] {
       },
     },
     {
-      id: 'fate-auto-orient', source: 'affinity', triggers: ['tarot:orient'],
+      id: 'fate-auto-orient', source: 'affinity', triggers: ['tarot:reveal'],
       group: { kind: 'exclusive', band: 'OVERRIDE' }, weight: w('fate'),
-      condition: (c) => c.draft.outcome?.type === 'tarot',
-      roll: (c) => bandRoll(c, 'fate', 'stirring', T.notable),
+      condition: () => true,
+      roll: (c) => bandRoll(c, 'fate', 'ascendant', T.major),
       apply: (c) => {
-        const result = c.draft.outcome as TarotResult;
-        if (c.rng() < 0.5) c.draft.outcome = reverseSpread(result);
-        return report('fate-auto-orient', 'Fate', 'Fate turns the spread for you.', 'override');
+        // Fate seizes the orientation choice. Narrated by the god-hand overlay
+        // (component-driven), so this emits no sequencer report.
+        c.draft.fateOrientation = c.rng() < 0.5 ? 'reversed' : 'upright';
+        return null;
       },
     },
     {

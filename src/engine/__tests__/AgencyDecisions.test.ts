@@ -93,15 +93,23 @@ describe('resolveTarotDeal (Fate override)', () => {
 });
 
 describe('orientation', () => {
-  it('resolveSpreadOrientation auto-sets when fate-auto-orient is forced', () => {
+  it('planReveal preempts and returns an orientation when fate-auto-orient is forced', () => {
     const e = new GameEngine();
     startMinigame(e);
     e.forceEffects(['fate-auto-orient'], false);
-    const orig = Math.random; Math.random = () => 0.0; // force upright deterministically
-    const { auto, reversed } = e.resolveSpreadOrientation(tarot('reversed'));
+    const { preempt, orientation } = e.planReveal();
+    expect(preempt).toBe(true);
+    expect(orientation === 'upright' || orientation === 'reversed').toBe(true);
+  });
+
+  it('planReveal does not preempt at baseline Fate', () => {
+    const e = new GameEngine();
+    startMinigame(e);
+    const orig = Math.random; Math.random = () => 0.99; // below any gate
+    const { preempt, orientation } = e.planReveal();
     Math.random = orig;
-    expect(auto).toBe(true);
-    expect(reversed).toBe(false);
+    expect(preempt).toBe(false);
+    expect(orientation).toBeNull();
   });
 
   it('setOrientation feeds Will', () => {

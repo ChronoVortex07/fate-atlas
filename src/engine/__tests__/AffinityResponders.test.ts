@@ -90,17 +90,8 @@ describe('affinity responders via dispatch', () => {
     expect(c.draft.poolTarget).toBe(2);
   });
 
-  it('fate-auto-orient spreads the orientation via reverseSpread', () => {
-    const face = buildFace(DECK_BY_ID['the-fool'], 'upright');
-    const card = { type: 'tarot', id: 'the-fool', name: 'The Fool', number: 0, orientation: 'upright', symbol: '☉',
-      meaningUpright: 'x', meaningReversed: 'y', tags: ['major-arcana', 'reversible', 'upright'],
-      themes: ['renewal'], dimensions: { favorability: 0.5, certainty: -1.5, volatility: 1.5 },
-      modifierRoles: ['subject'], spread: [{ position: 'present', card: face }] } as any;
-    const c = ctx({ trigger: 'tarot:orient', draft: { outcome: card },
-      affinities: { ...defaultAffinityState(), fate: 75 }, rng: () => 0.0 });
-    dispatch('tarot:orient', c, buildAffinityResponders(), { forced: ['fate-auto-orient'], isolate: true });
-    expect((c.draft.outcome as any).orientation).toBe('reversed'); // rng 0.0 < 0.5 triggers reverseSpread
-  });
+  // moved to planReveal (Task 2): fate-auto-orient now triggers on tarot:reveal
+  // and sets draft.fateOrientation instead of mutating the outcome via reverseSpread.
 
   it('fate-hollow-reroll reverts to the previous die', () => {
     const prev = { type: 'd20', result: 3 } as any;
@@ -155,9 +146,10 @@ describe('spread-aware repurposed responders', () => {
     const swap = buildAffinityResponders().find((r) => r.id === 'fate-deal-swap')!;
     expect(swap.triggers).toContain('tarot:deal');
   });
-  it('fate-auto-orient now triggers on tarot:orient', () => {
+  // moved to planReveal (Task 2): fate-auto-orient now triggers on tarot:reveal, not tarot:orient.
+  it('fate-auto-orient now triggers on tarot:reveal', () => {
     const r = buildAffinityResponders().find((x) => x.id === 'fate-auto-orient')!;
-    expect(r.triggers).toContain('tarot:orient');
+    expect(r.triggers).toContain('tarot:reveal');
   });
 });
 

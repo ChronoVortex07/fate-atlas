@@ -640,6 +640,17 @@ export class GameEngine {
     return { result: (draft.outcome as IChingResult) ?? result, reports };
   }
 
+  // Fate may seize the spread-wide orientation before the player chooses. Rolled
+  // pre-commit so TarotMinigame can suppress the Reveal/Invert buttons and play
+  // the god-hand. Returns the decided orientation, or null when the player keeps
+  // the choice. fate-auto-orient emits no report, so nothing reaches the queue.
+  planReveal(): { preempt: boolean; orientation: 'upright' | 'reversed' | null } {
+    const { draft } = this.dispatchAt('tarot:reveal', {});
+    this.notify();
+    const orientation = (draft.fateOrientation as 'upright' | 'reversed' | undefined) ?? null;
+    return { preempt: orientation !== null, orientation };
+  }
+
   // Resolves every active roll modifier into one plan for the dice minigame.
   planDiceRoll(): {
     mode: RollMode; offerReroll: boolean;
