@@ -12,7 +12,7 @@ import WidenAnimation from './InteractionAnimations/WidenAnimation';
 import OverrideAnimation from './InteractionAnimations/OverrideAnimation';
 import ThinAnimation from './InteractionAnimations/ThinAnimation';
 import InterruptAnimation from './InteractionAnimations/InterruptAnimation';
-import { useAnchorResolver } from '../../context/AnchorRegistry';
+import { useAnchorResolver, constellationKey } from '../../context/AnchorRegistry';
 import { primitiveFor, themeFor, anchorKeyFor, expandSlotFor, type Primitive } from './anim/theme';
 import type { PrimitiveProps } from './anim/AnchoredStage';
 import SpawnPrimitive from './anim/primitives/SpawnPrimitive';
@@ -21,6 +21,7 @@ import VeilPrimitive from './anim/primitives/VeilPrimitive';
 import FlipPrimitive from './anim/primitives/FlipPrimitive';
 import GlowPrimitive from './anim/primitives/GlowPrimitive';
 import AmplifyPrimitive from './anim/primitives/AmplifyPrimitive';
+import MirrorPrimitive from './anim/primitives/MirrorPrimitive';
 import type { EffectReport, SlotResult } from '../../engine/types';
 
 // Primitives migrated to anchored rendering. Anything not here still plays its
@@ -32,6 +33,7 @@ const ANCHORED: Partial<Record<Primitive, React.FC<PrimitiveProps>>> = {
   flip: FlipPrimitive,
   glow: GlowPrimitive,
   amplify: AmplifyPrimitive,
+  mirror: MirrorPrimitive,
 };
 
 // Per-animation on-screen durations (ms). Animations with ripples/delays need
@@ -185,7 +187,12 @@ function renderAnimation(
     const rect = resolve(anchorKeyFor(report));
     const theme = themeFor(report, turnResults);
     const durationMs = DURATION[report.animation] ?? DEFAULT_DURATION;
-    return <Anchored rect={rect} theme={theme} durationMs={durationMs} />;
+    // Mirror reflects between two cards: resolve the source card's rect too.
+    const sourceRect =
+      primitive === 'mirror' && typeof report.sourceSlot === 'number'
+        ? resolve(constellationKey(report.sourceSlot))
+        : undefined;
+    return <Anchored rect={rect} theme={theme} durationMs={durationMs} sourceRect={sourceRect} />;
   }
 
   // Legacy centered animations (not yet migrated).

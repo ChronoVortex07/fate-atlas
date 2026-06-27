@@ -8,6 +8,8 @@ export interface PrimitiveProps {
   rect: DOMRect | null;
   theme: Theme;
   durationMs: number;
+  /** A second card rect (e.g. the mirror's source). Additive; most primitives ignore it. */
+  sourceRect?: DOMRect | null;
 }
 
 interface StageProps {
