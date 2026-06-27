@@ -71,7 +71,13 @@ const DiceCast = forwardRef<DiceCastHandle, Props>(function DiceCast(
     const dt = Math.max(16, performance.now() - drag.current.t);
     const power = Math.min(1, Math.hypot(dx, dy) / 200);
     // Screen drag → bowl plane. Pulling DOWN on screen (dy>0) throws AWAY (−z).
-    const flick: FlickVector = { vx: (dx / dt) * 8, vz: (dy / dt) * 8, power: Math.max(0.15, power) };
+    // Clamp each axis so a fast flick can't fling a die off the (invisible) ring.
+    const clamp = (n: number, m: number) => Math.max(-m, Math.min(m, n));
+    const flick: FlickVector = {
+      vx: clamp((dx / dt) * 6, 9),
+      vz: clamp((dy / dt) * 6, 9),
+      power: Math.max(0.15, power),
+    };
     drag.current = null;
     cbs.current.onFlick(flick);
   }, []);

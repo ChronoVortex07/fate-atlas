@@ -5,12 +5,13 @@ import { castTuning } from '../../../engine/astralPhysics';
 import { BOARD_RADIUS, WALL_RADIUS } from '../../../engine/astralGeometry';
 import { createD20, createD4, snapToFace, faceIndexOfId, type DiceDie } from './die';
 
-const DIE_R = 0.6;
-const D4_R = 0.4;
+const DIE_R = 0.95;
+const D4_R = 0.6;
 const SETTLE_FRAMES = 22;
 const SAFETY_CAP = 900;
-const CAM_TILT = new THREE.Vector3(0, 9.5, 13);
-const CAM_TOP = new THREE.Vector3(0, 18, 0.001);
+// Camera pulled in (vs. the old 13 / 18) so the larger dice read big and legible.
+const CAM_TILT = new THREE.Vector3(0, 8, 10.5);
+const CAM_TOP = new THREE.Vector3(0, 14.5, 0.001);
 
 export interface FlickVector { vx: number; vz: number; power: number }
 
@@ -66,20 +67,17 @@ export function createDiceScene(opts: {
     world.addBody(wall);
   }
 
-  // Visual bowl disc.
-  const disc = new THREE.Mesh(
-    new THREE.CircleGeometry(BOARD_RADIUS, 64),
-    new THREE.MeshStandardMaterial({ color: 0x0b0f1c, roughness: 0.9, metalness: 0.1 }),
+  // No visible board: the dice roll on an invisible surface (the canvas is
+  // alpha-transparent, so the app background shows through). A shadow-only plane
+  // catches the dice's soft contact shadow to give depth without a board.
+  const shadowPlane = new THREE.Mesh(
+    new THREE.PlaneGeometry(WALL_RADIUS * 2.4, WALL_RADIUS * 2.4),
+    new THREE.ShadowMaterial({ opacity: 0.32 }),
   );
-  disc.rotation.x = -Math.PI / 2;
-  disc.receiveShadow = true;
-  scene.add(disc);
-  const rim = new THREE.Mesh(
-    new THREE.TorusGeometry(BOARD_RADIUS, 0.12, 16, 80),
-    new THREE.MeshStandardMaterial({ color: 0xd4a854, roughness: 0.4, metalness: 0.8 }),
-  );
-  rim.rotation.x = -Math.PI / 2;
-  scene.add(rim);
+  shadowPlane.rotation.x = -Math.PI / 2;
+  shadowPlane.position.y = 0.001;
+  shadowPlane.receiveShadow = true;
+  scene.add(shadowPlane);
 
   // ── Dice ──
   const d20a = mkDie(createD20(world, DIE_R));
@@ -115,13 +113,19 @@ export function createDiceScene(opts: {
     d.object.quaternion.set(q.x, q.y, q.z, q.w);
   };
 
+  // Cap horizontal throw speed so even a hard flick can't launch a die past the
+  // (now invisible) wall ring or tunnel a thin collision plane in one step.
+  const MAX_H_SPEED = 9;
+  const clampH = (n: number) => Math.max(-MAX_H_SPEED, Math.min(MAX_H_SPEED, n));
+
   const throwDie = (d: DiceDie, dx: number, flick?: FlickVector) => {
     d.object.visible = true;
-    d.body.position.set(dx, 6 + Math.random() * 1.2, BOARD_RADIUS * 0.45);
+    // Spawn well inside the ring so dice settle in frame.
+    d.body.position.set(dx, 6 + Math.random() * 1.2, BOARD_RADIUS * 0.35);
     const s = tuning.scatter;
     const fx = flick ? flick.vx * (1 + flick.power) : (Math.random() - 0.5) * 3 * s;
     const fz = flick ? -2 - flick.power * 4 : -3 - Math.random() * 2 * s;
-    d.body.velocity.set(fx, -2 - Math.random() * 2, fz);
+    d.body.velocity.set(clampH(fx), -2 - Math.random() * 2, clampH(fz));
     d.body.angularVelocity.set((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12);
     d.body.quaternion.setFromEuler(Math.random() * 6, Math.random() * 6, Math.random() * 6);
   };
