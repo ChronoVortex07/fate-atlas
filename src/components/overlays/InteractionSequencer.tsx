@@ -20,6 +20,7 @@ import RerollPrimitive from './anim/primitives/RerollPrimitive';
 import VeilPrimitive from './anim/primitives/VeilPrimitive';
 import FlipPrimitive from './anim/primitives/FlipPrimitive';
 import GlowPrimitive from './anim/primitives/GlowPrimitive';
+import AmplifyPrimitive from './anim/primitives/AmplifyPrimitive';
 import type { EffectReport, SlotResult } from '../../engine/types';
 
 // Primitives migrated to anchored rendering. Anything not here still plays its
@@ -30,6 +31,7 @@ const ANCHORED: Partial<Record<Primitive, React.FC<PrimitiveProps>>> = {
   veil: VeilPrimitive,
   flip: FlipPrimitive,
   glow: GlowPrimitive,
+  amplify: AmplifyPrimitive,
 };
 
 // Per-animation on-screen durations (ms). Animations with ripples/delays need
