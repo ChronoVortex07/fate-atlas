@@ -116,7 +116,10 @@ export function buildInteractionResponders(): Responder[] {
       }),
     spreadEntry('major-convergence',
       (r) => facesOf(r).filter((f) => f.arcana === 'major').length >= 2,
-      (_r, push) => push(report('major-convergence', 'Convergence', 'Two great arcana align — a fated current runs through the spread.', 'second-result'))),
+      // `amplify`, not `second-result`: major-convergence spotlights the existing
+      // committed card (a fated current intensifies) — it does NOT add a card, so
+      // the spawn materialize would wrongly blank the real card.
+      (_r, push) => push(report('major-convergence', 'Convergence', 'Two great arcana align — a fated current runs through the spread.', 'amplify'))),
     spreadEntry('spread-aligned',
       (r) => facesOf(r).every((f) => f.orientation === 'upright'),
       (_r, push) => push(report('spread-aligned', 'Order', 'The spread stands wholly upright — clarity settles.', 'anchor'))),

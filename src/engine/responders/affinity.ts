@@ -153,7 +153,9 @@ export function buildAffinityResponders(): Responder[] {
       roll: (c) => bandRoll(c, 'fate', 'ascendant', T.major),
       apply: (c) => {
         c.draft.outcome = (c.event as { previous: SlotResult }).previous;
-        return report('fate-hollow-reroll', 'Fate', 'The reroll rings hollow — the same face returns.', 'override');
+        // `reroll`, not `override`: the die is recast but lands on the same face —
+        // the Reroll primitive's spinning recast reads this better than a card-swap.
+        return report('fate-hollow-reroll', 'Fate', 'The reroll rings hollow — the same face returns.', 'reroll');
       },
     },
     {

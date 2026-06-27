@@ -365,7 +365,7 @@ higher bands (§1).
 | `fate-auto-orient` | `tarot:orient` | OVERRIDE | Fate stirring · notable | Sets the spread-wide orientation for you (coin flip) | `override` |
 | `chaos-wild-card` | `tarot:orient` | MUTATE | Chaos ascendant · notable | Flips one random face in the spread to the opposite orientation | `flip` |
 | `order-anchor` | `tarot:orient` | MUTATE | Order ascendant · notable | Sets every reversed face upright — coerces the spread to full upright | `anchor` |
-| `fate-hollow-reroll` | `dice:reroll` | OVERRIDE | Fate ascendant · major | A reroll returns the previous die unchanged | `override` |
+| `fate-hollow-reroll` | `dice:reroll` | OVERRIDE | Fate ascendant · major | A reroll returns the previous die unchanged | `reroll` |
 | `chaos-second-result` | `dice/tarot/iching:commit` | SPAWN | Chaos dominant · major | Spawns a second result of the same type (targets the new fan slot) | `second-result` |
 | `chaos-line-cascade` | `iching:transform` | MUTATE | Chaos ascendant · notable | Adds one new changing line (chosen from the still lines) and recomputes the relating hexagram | `amplify` |
 | `order-still-hexagram` | `iching:transform` | MUTATE | Order ascendant · notable | Removes one changing line (chosen at random) and recomputes the relating hexagram | `anchor` |
@@ -417,7 +417,7 @@ automatically participates). All are deterministic (`roll → true`) except **Mi
 | **I Ching Resonant Change** (`iching-resonant-change`) | `iching:commit` | cross-slot | The committed I Ching has `changing-lines` **and** another `reversible` entity (non-I Ching) is in the spread | Report-only: narrates that the changing lines resonated outward through the spread | `mirror` |
 | **Suit Accord** (`suit-accord`) | `tarot:commit` (spread) | spread-internal | All faces share the same suit (Wands/Cups/Swords/Pentacles) | Amplifies the suit's primary dimension by ×1.5 | `amplify` |
 | **Elemental Clash** (`elemental-clash`) | `tarot:commit` (spread) | spread-internal | Two opposing elements are present (fire↔water, air↔earth) | Increases volatility dimension | `amplify` |
-| **Major Convergence** (`major-convergence`) | `tarot:commit` (spread) | spread-internal | Two or more Major Arcana faces in the spread | Emits a fated-current report | `second-result` |
+| **Major Convergence** (`major-convergence`) | `tarot:commit` (spread) | spread-internal | Two or more Major Arcana faces in the spread | Emits a fated-current report | `amplify` |
 | **Spread Aligned** (`spread-aligned`) | `tarot:commit` (spread) | spread-internal | Every face is upright | Emits a clarity/order report | `anchor` |
 | **Spread Cascade** (`spread-cascade`) | `tarot:commit` (spread) | spread-internal | Every face is reversed | Emits an upheaval/chaos report | `flip` |
 
