@@ -421,6 +421,21 @@ export class GameEngine {
       r.responderId === 'shadow-veil-position' ? { ...r, targetSlot: committedIndex } : r,
     );
 
+    // Commit/spread effects that act on the just-committed card → anchor to its
+    // fan slot so the fan expands and the animation plays on the real card.
+    // These responders fire at *:commit (interactions + spread-internal combine)
+    // and cannot know their own post-append fan index. (Leave `mirror` alone —
+    // it already carries target/source fan indices.)
+    const COMMIT_ANCHORED = new Set([
+      'critical-resonance', 'spread-cascade', 'spread-aligned',
+      'suit-accord', 'elemental-clash', 'major-convergence',
+      'iching-resonant-change',
+    ]);
+    this.state.eventQueue = this.state.eventQueue.map((r) =>
+      COMMIT_ANCHORED.has(r.responderId) && typeof r.targetSlot !== 'number'
+        ? { ...r, targetSlot: committedIndex } : r,
+    );
+
     this.bus.emit('minigame-complete', { result, completed });
 
     // Resolve-first, narrate-second, then hold a review beat: store the real
