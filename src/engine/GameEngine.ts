@@ -644,9 +644,12 @@ export class GameEngine {
   // pre-commit so TarotMinigame can suppress the Reveal/Invert buttons and play
   // the god-hand. Returns the decided orientation, or null when the player keeps
   // the choice. fate-auto-orient emits no report, so nothing reaches the queue.
+  // NOTE: no notify() here — planReveal mutates no persistent state; calling
+  // notify() would deep-clone state, giving minigameState a new object identity
+  // and re-running the preempt useEffect, which clears the still-pending timers
+  // (soft-lock: god-hand appears but commitDraft never fires).
   planReveal(): { preempt: boolean; orientation: 'upright' | 'reversed' | null } {
     const { draft } = this.dispatchAt('tarot:reveal', {});
-    this.notify();
     const orientation = (draft.fateOrientation as 'upright' | 'reversed' | undefined) ?? null;
     return { preempt: orientation !== null, orientation };
   }

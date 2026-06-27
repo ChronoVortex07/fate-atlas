@@ -78,6 +78,8 @@ export default function TarotMinigame() {
   const [handTarget, setHandTarget] = useState<HandTarget | null>(null);
   const [burnDone, setBurnDone] = useState(false);
   const planRequestedRef = useRef(false);
+  const godPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const commitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handRowRef = useRef<HTMLDivElement | null>(null);
 
   // Track container width for correct fan-out math
@@ -102,12 +104,20 @@ export default function TarotMinigame() {
     const plan = engine.planReveal();
     if (!plan.preempt || !plan.orientation) return;
     // Fate seizes the choice: measure the hand row, drop the god-hand, commit.
+    // Timers stored in refs so the cleanup below (which resets planRequestedRef)
+    // can clear them on dep-change without losing them to a no-op Strict Mode
+    // cleanup. planRequestedRef reset in cleanup allows Strict Mode re-arm.
     const rect = handRowRef.current?.getBoundingClientRect();
     if (rect) setHandTarget({ x: rect.left + rect.width / 2, topY: rect.top });
     setPreempt({ orientation: plan.orientation });
-    const t1 = setTimeout(() => setGodPressed(true), 650);
-    const t2 = setTimeout(() => engine.commitDraft(plan.orientation === 'reversed'), 1500);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
+    godPressTimerRef.current = setTimeout(() => setGodPressed(true), 650);
+    commitTimerRef.current = setTimeout(() => engine.commitDraft(plan.orientation === 'reversed'), 1500);
+    return () => {
+      // Reset guard so a re-run (Strict Mode remount or genuine dep change) can re-arm.
+      planRequestedRef.current = false;
+      if (godPressTimerRef.current != null) { clearTimeout(godPressTimerRef.current); godPressTimerRef.current = null; }
+      if (commitTimerRef.current != null) { clearTimeout(commitTimerRef.current); commitTimerRef.current = null; }
+    };
   }, [state.minigameState, engine]);
 
   // Reset planRequestedRef on a fresh draft so a new reading re-arms the check.
@@ -117,6 +127,7 @@ export default function TarotMinigame() {
       planRequestedRef.current = false;
       setPreempt(null);
       setGodPressed(false);
+      setHandTarget(null);
       setBurnDone(false);
     }
   }, [state.minigameState]);
@@ -503,6 +514,7 @@ export default function TarotMinigame() {
                         )}
                         {draft.revealWildCard === i && (
                           <motion.div
+                            aria-hidden
                             style={{ position: 'absolute', inset: -4, borderRadius: 8, border: '1.5px solid #ff7a4a', pointerEvents: 'none' }}
                             initial={{ opacity: 0, scale: 1.2 }}
                             animate={{ opacity: [0, 0.9, 0], scale: [1.2, 1, 1] }}
