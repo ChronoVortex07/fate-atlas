@@ -24,6 +24,7 @@ interface FanCardProps {
   wheelOpacity?: number;
   wheelZ?: number;
   glowing?: boolean;      // meta-interaction spotlight
+  dimmed?: boolean;       // affect signal: card is being veiled/shrouded by an effect
   instant?: boolean;      // disable the spring while actively dragging (1:1 follow)
   // Interaction — wired by the wheel container. Tap-to-inspect is resolved in
   // pointerup (drag-movement aware) rather than a separate click for reliability
@@ -134,6 +135,7 @@ export default function FanCard({
   wheelOpacity,
   wheelZ,
   glowing,
+  dimmed,
   instant,
   onPointerDown,
   onPointerMove,
@@ -243,6 +245,8 @@ export default function FanCard({
         transformOrigin: 'bottom center',
         zIndex,
         overflow: 'hidden',
+        filter: dimmed ? 'grayscale(0.85) brightness(0.5)' : undefined,
+        transition: 'filter 0.5s ease',
         boxShadow: glowing
           ? '0 0 28px rgba(212,168,84,0.85), 0 0 56px rgba(212,168,84,0.4)'
           : isRerollTarget

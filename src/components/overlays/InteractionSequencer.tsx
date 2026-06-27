@@ -12,7 +12,21 @@ import WidenAnimation from './InteractionAnimations/WidenAnimation';
 import OverrideAnimation from './InteractionAnimations/OverrideAnimation';
 import ThinAnimation from './InteractionAnimations/ThinAnimation';
 import InterruptAnimation from './InteractionAnimations/InterruptAnimation';
-import type { EffectReport } from '../../engine/types';
+import { useAnchorResolver } from '../../context/AnchorRegistry';
+import { primitiveFor, themeFor, anchorKeyFor, type Primitive } from './anim/theme';
+import type { PrimitiveProps } from './anim/AnchoredStage';
+import SpawnPrimitive from './anim/primitives/SpawnPrimitive';
+import RerollPrimitive from './anim/primitives/RerollPrimitive';
+import VeilPrimitive from './anim/primitives/VeilPrimitive';
+import type { EffectReport, SlotResult } from '../../engine/types';
+
+// Primitives migrated to anchored rendering. Anything not here still plays its
+// legacy centered animation, so the app stays fully working mid-rollout.
+const ANCHORED: Partial<Record<Primitive, React.FC<PrimitiveProps>>> = {
+  spawn: SpawnPrimitive,
+  reroll: RerollPrimitive,
+  veil: VeilPrimitive,
+};
 
 // Per-animation on-screen durations (ms). Animations with ripples/delays need
 // longer than the old flat 1400 so the reveal lands after the motion settles.
@@ -37,6 +51,7 @@ const FOCUS_BEAT = 750;
 export default function InteractionSequencer() {
   const { state, engine } = useGameEngine();
   const { setFocus } = useInteractionFocus();
+  const { resolve } = useAnchorResolver();
   const [i, setI] = useState(0);
   // Starts hidden ('focusing') so the effect decides per report whether to run a
   // focus beat (hand-involved) or go straight to the animation (field-only).
@@ -106,7 +121,7 @@ export default function InteractionSequencer() {
 
         {/* Animation layer */}
         <div style={animLayerStyle}>
-          {renderAnimation(report)}
+          {renderAnimation(report, resolve, state.turnResults)}
         </div>
 
         {/* Info banner */}
@@ -149,7 +164,22 @@ export default function InteractionSequencer() {
   );
 }
 
-function renderAnimation(report: EffectReport) {
+function renderAnimation(
+  report: EffectReport,
+  resolve: (key: string) => DOMRect | null,
+  turnResults: SlotResult[],
+) {
+  // Migrated effects play ON the real card via an anchored primitive.
+  const primitive = primitiveFor(report.animation);
+  const Anchored = ANCHORED[primitive];
+  if (Anchored) {
+    const rect = resolve(anchorKeyFor(report));
+    const theme = themeFor(report, turnResults);
+    const durationMs = DURATION[report.animation] ?? DEFAULT_DURATION;
+    return <Anchored rect={rect} theme={theme} durationMs={durationMs} />;
+  }
+
+  // Legacy centered animations (not yet migrated).
   const props = {
     description: report.description,
     sourceSlot: report.sourceSlot ?? null,

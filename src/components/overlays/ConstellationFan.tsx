@@ -176,6 +176,12 @@ export default function ConstellationFan({ results }: Props) {
     [phase, focusSlot, targetSlot],
   );
 
+  // Affect signal: a veil/shroud effect targeting this card dims it.
+  const isDimmed = useCallback(
+    (i: number) => phase === 'animating' && activeReport?.animation === 'shroud' && i === targetSlot,
+    [phase, activeReport, targetSlot],
+  );
+
   if (results.length === 0) return null;
 
   // Collapsed footprint — sized to the FULL visible stack so the whole pile is
@@ -291,6 +297,7 @@ export default function ConstellationFan({ results }: Props) {
               wheelOpacity={expanded ? slot.opacity : undefined}
               wheelZ={expanded ? slot.zIndex : undefined}
               glowing={expanded && isGlowing(i)}
+              dimmed={isDimmed(i)}
               instant={dragging}
               onPointerDown={onCardPointerDown}
               onPointerMove={onCardPointerMove}
