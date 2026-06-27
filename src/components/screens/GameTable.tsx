@@ -17,6 +17,7 @@ import ConstellationFan from '../overlays/ConstellationFan';
 import InteractionSequencer from '../overlays/InteractionSequencer';
 import { InteractionFocusProvider } from '../../context/InteractionFocusContext';
 import { AnchorProvider } from '../../context/AnchorRegistry';
+import ParticleField from '../overlays/ParticleField';
 
 export default function GameTable() {
   const { state } = useGameEngine();
@@ -100,6 +101,7 @@ export default function GameTable() {
       {state.screen === 'minigame' && state.awaitingContinue && state.eventQueue.length === 0 && (
         <ContinueBar />
       )}
+      <ParticleField />
     </div>
     </AnchorProvider>
   );
