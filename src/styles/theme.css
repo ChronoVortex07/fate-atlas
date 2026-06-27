@@ -29,3 +29,13 @@ h1, h2, h3 {
   font-family: var(--font-display);
   color: var(--color-heading-starlight);
 }
+
+/* The decorative rune band sheds its lower lines first when vertical space is
+   tight, so it never pushes the wordmark / actions off-screen on short or
+   mobile viewports. -webkit-line-clamp truncates from the bottom. */
+@media (max-height: 720px) {
+  .runic-band { --rune-lines: 2; }
+}
+@media (max-height: 560px) {
+  .runic-band { --rune-lines: 1; }
+}
