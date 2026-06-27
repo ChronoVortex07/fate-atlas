@@ -407,6 +407,14 @@ export class GameEngine {
       );
     }
 
+    // Shadow veil: the responder marked one spread position `veiled` on the
+    // committed card but cannot know that card's fan-slot index. Patch its queued
+    // report so the veil animation anchors to — and the fan expands to — the
+    // committed card, where the concealed sigil now renders.
+    this.state.eventQueue = this.state.eventQueue.map((r) =>
+      r.responderId === 'shadow-veil-position' ? { ...r, targetSlot: committedIndex } : r,
+    );
+
     this.bus.emit('minigame-complete', { result, completed });
 
     // Resolve-first, narrate-second, then hold a review beat: store the real

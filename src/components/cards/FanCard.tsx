@@ -340,23 +340,32 @@ export default function FanCard({
               position: 'absolute', display: 'flex', flexDirection: 'column',
               alignItems: 'center', gap: '0px', transform: 'translateX(-50%)',
             };
+            // A sub-card the Shadow veiled renders as a shrouded glyph with its
+            // name withheld, so the concealment persists after the animation.
+            const vertex = (idx: number, pos: React.CSSProperties) => {
+              const sub = display.subCards![idx];
+              const veiled = !!sub.face.veiled;
+              return (
+                <div style={{ ...groupStyle, ...pos }}>
+                  {veiled ? (
+                    <span style={{ fontSize: sigil, lineHeight: 1, color: '#9b6bb0', opacity: 0.85, textShadow: '0 0 6px rgba(155,107,176,0.8)' }}>◈</span>
+                  ) : (
+                    <CardSigil card={sub.face} size={sigil} color={sigilColor} />
+                  )}
+                  <span title={veiled ? 'Veiled' : sub.name} style={{ ...nameStyle, ...(veiled ? { color: '#9b6bb0', fontStyle: 'italic', opacity: 0.7 } : null) }}>
+                    {veiled ? '—' : sub.name}
+                  </span>
+                </div>
+              );
+            };
             return (
               <div style={{ position: 'relative', width: cw, height: ch, lineHeight: 1, marginBottom: isDesktop ? 6 : 4 }}>
                 {/* Top — Past (apex) */}
-                <div style={{ ...groupStyle, left: cw / 2, top: 0 }}>
-                  <CardSigil card={display.subCards[0].face} size={sigil} color={sigilColor} />
-                  <span title={display.subCards[0].name} style={nameStyle}>{display.subCards[0].name}</span>
-                </div>
+                {vertex(0, { left: cw / 2, top: 0 })}
                 {/* Bottom-left — Present */}
-                <div style={{ ...groupStyle, left: sigil / 2, top: h }}>
-                  <CardSigil card={display.subCards[1].face} size={sigil} color={sigilColor} />
-                  <span title={display.subCards[1].name} style={nameStyle}>{display.subCards[1].name}</span>
-                </div>
+                {vertex(1, { left: sigil / 2, top: h })}
                 {/* Bottom-right — Future */}
-                <div style={{ ...groupStyle, left: cw - sigil / 2, top: h }}>
-                  <CardSigil card={display.subCards[2].face} size={sigil} color={sigilColor} />
-                  <span title={display.subCards[2].name} style={nameStyle}>{display.subCards[2].name}</span>
-                </div>
+                {vertex(2, { left: cw - sigil / 2, top: h })}
               </div>
             );
           })()
