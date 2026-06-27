@@ -14,6 +14,7 @@ import ChainsOfFate from '../cards/ChainsOfFate';
 import { MAJOR_GLOW_FAMILY } from '../../data/tarot';
 import { bandOf } from '../../data/affinities';
 import type { MajorGlowFamily } from '../../data/tarot';
+import FateForceOverlay, { type HandTarget } from '../overlays/FateForceOverlay';
 
 const TABLE_CARD_WIDTH = 58;          // px per card face (max repulsion = side by side)
 const TABLE_REST_STEP = 42;           // center-to-center at rest (overlapped)
@@ -71,6 +72,11 @@ export default function TarotMinigame() {
   const [shuffleKey, setShuffleKey] = useState(0);
   const [animatingPick, setAnimatingPick] = useState<{ tableIndex: number; handIndex: number } | null>(null);
   const [animatingReturn, setAnimatingReturn] = useState<number | null>(null);
+  const [preempt, setPreempt] = useState<{ orientation: 'upright' | 'reversed' } | null>(null);
+  const [godPressed, setGodPressed] = useState(false);
+  const [handTarget, setHandTarget] = useState<HandTarget | null>(null);
+  const planRequestedRef = useRef(false);
+  const handRowRef = useRef<HTMLDivElement | null>(null);
 
   // Track container width for correct fan-out math
   useEffect(() => {
@@ -82,6 +88,35 @@ export default function TarotMinigame() {
 
   // Cancel any pending rAF on unmount
   useEffect(() => () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current); }, []);
+
+  // Preempt check: when the hand fills, ask the engine if Fate seizes the orientation.
+  useEffect(() => {
+    const d = state.minigameState as TarotDraftState | null;
+    if (!d || d.method !== 'tarot') return;
+    if (d.phase !== 'drafting') return;
+    if (!d.hand.every((h) => h !== null)) return;
+    if (planRequestedRef.current) return;
+    planRequestedRef.current = true;
+    const plan = engine.planReveal();
+    if (!plan.preempt || !plan.orientation) return;
+    // Fate seizes the choice: measure the hand row, drop the god-hand, commit.
+    const rect = handRowRef.current?.getBoundingClientRect();
+    if (rect) setHandTarget({ x: rect.left + rect.width / 2, topY: rect.top });
+    setPreempt({ orientation: plan.orientation });
+    const t1 = setTimeout(() => setGodPressed(true), 650);
+    const t2 = setTimeout(() => engine.commitDraft(plan.orientation === 'reversed'), 1500);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [state.minigameState, engine]);
+
+  // Reset planRequestedRef on a fresh draft so a new reading re-arms the check.
+  useEffect(() => {
+    const d = state.minigameState as TarotDraftState | null;
+    if (d && d.phase === 'drafting' && !d.hand.every((h) => h !== null)) {
+      planRequestedRef.current = false;
+      setPreempt(null);
+      setGodPressed(false);
+    }
+  }, [state.minigameState]);
 
   if (!draft) return null;
   const isDesktop = typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches;
@@ -400,7 +435,10 @@ export default function TarotMinigame() {
 
         {/* Hand — the committed spread row; effects target it as `outcome`. */}
         <div style={handAreaStyle}>
-          <div ref={setOutcomeAnchor} style={handSlotsStyle}>
+          <div
+            ref={(el) => { setOutcomeAnchor(el); handRowRef.current = el; }}
+            style={{ ...handSlotsStyle, position: 'relative' }}
+          >
             {SLOT_THEMES.map((theme, i) => {
               const label = theme.label;
               const card = draft.hand[i];
@@ -536,7 +574,7 @@ export default function TarotMinigame() {
 
         {/* Commit buttons */}
         <AnimatePresence>
-          {handFull && draft.phase === 'drafting' && (
+          {handFull && draft.phase === 'drafting' && !preempt && (
             <motion.div
               style={commitRowStyle}
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -568,6 +606,17 @@ export default function TarotMinigame() {
             >
               {peekResult.message}
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Fate god-hand overlay — descends when planReveal preempts the orientation choice */}
+        <AnimatePresence>
+          {preempt && (
+            <FateForceOverlay
+              text={preempt.orientation === 'reversed' ? 'Fate turns the spread' : 'Fate sets the spread'}
+              target={handTarget}
+              pressed={godPressed}
+            />
           )}
         </AnimatePresence>
       </div>
