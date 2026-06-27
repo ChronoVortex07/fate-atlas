@@ -16,6 +16,11 @@ function stableIndex(key: string, len: number): number {
   return Math.abs(h) % len;
 }
 
+/** Prefix "The " for a card name unless it already carries an article. */
+function withArticle(name: string): string {
+  return /^(the|a|an) /i.test(name) ? name : `The ${name}`;
+}
+
 /** Trim a flavor sentence to a short, lower-cased gloss phrase. */
 function gloss(text: string): string {
   const first = text.split(/[.;—]/)[0]?.trim() ?? '';
@@ -41,11 +46,11 @@ export function describeDraw(slot: SlotResult, role: ModifierRole): DrawVoice {
       if (slot.spread && slot.spread.length > 1) {
         const first = slot.spread[0].card;
         return {
-          subject: `The ${first.name}, ${first.orientation}`,
+          subject: `${withArticle(first.name)}, ${first.orientation}`,
           clause: verbPhrase(role, first.dimensions, first.name + first.orientation),
         };
       }
-      const subject = `The ${slot.name}, ${slot.orientation}`;
+      const subject = `${withArticle(slot.name)}, ${slot.orientation}`;
       const meaning = slot.orientation === 'upright' ? slot.meaningUpright : slot.meaningReversed;
       let clause = verbPhrase(role, slot.dimensions, slot.name + slot.orientation);
       if (meaning && stableIndex('gloss' + slot.name, 2) === 0) {

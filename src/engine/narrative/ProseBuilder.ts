@@ -97,10 +97,12 @@ export class ProseBuilder {
       push(this.stitch(body.slice(mid)));
     }
 
+    // Tension surfaces only through tensionNote (rendered in a dedicated box),
+    // never duplicated as a body paragraph.
     let tensionNote: string | undefined;
     if (tension.length > 0) {
       const t = this.stitch(tension);
-      if (t.trim()) { paragraphs.push(t); tensionNote = t; }
+      if (t.trim()) tensionNote = t;
     }
 
     const closeBeat = beats.find((b) => b.kind === 'close');
