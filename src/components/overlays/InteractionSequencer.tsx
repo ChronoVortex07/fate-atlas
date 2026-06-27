@@ -23,6 +23,7 @@ import GlowPrimitive from './anim/primitives/GlowPrimitive';
 import AmplifyPrimitive from './anim/primitives/AmplifyPrimitive';
 import MirrorPrimitive from './anim/primitives/MirrorPrimitive';
 import OverridePrimitive from './anim/primitives/OverridePrimitive';
+import InterruptPrimitive from './anim/primitives/InterruptPrimitive';
 import type { EffectReport, SlotResult } from '../../engine/types';
 
 // Primitives migrated to anchored rendering. Anything not here still plays its
@@ -36,6 +37,7 @@ const ANCHORED: Partial<Record<Primitive, React.FC<PrimitiveProps>>> = {
   amplify: AmplifyPrimitive,
   mirror: MirrorPrimitive,
   override: OverridePrimitive,
+  interrupt: InterruptPrimitive,
 };
 
 // Per-animation on-screen durations (ms). Animations with ripples/delays need
