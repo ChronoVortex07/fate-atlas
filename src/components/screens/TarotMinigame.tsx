@@ -11,6 +11,7 @@ import { restCenters, computeFanLayout } from '../../engine/fanLayout';
 import { useAnchorRegister, outcomeKey } from '../../context/AnchorRegistry';
 import { GiCardRandom, GiCardPickup, GiEyeball } from 'react-icons/gi';
 import ChainsOfFate from '../cards/ChainsOfFate';
+import BurnReveal from '../cards/BurnReveal';
 import { MAJOR_GLOW_FAMILY } from '../../data/tarot';
 import { bandOf } from '../../data/affinities';
 import type { MajorGlowFamily } from '../../data/tarot';
@@ -75,6 +76,7 @@ export default function TarotMinigame() {
   const [preempt, setPreempt] = useState<{ orientation: 'upright' | 'reversed' } | null>(null);
   const [godPressed, setGodPressed] = useState(false);
   const [handTarget, setHandTarget] = useState<HandTarget | null>(null);
+  const [burnDone, setBurnDone] = useState(false);
   const planRequestedRef = useRef(false);
   const handRowRef = useRef<HTMLDivElement | null>(null);
 
@@ -115,6 +117,7 @@ export default function TarotMinigame() {
       planRequestedRef.current = false;
       setPreempt(null);
       setGodPressed(false);
+      setBurnDone(false);
     }
   }, [state.minigameState]);
 
@@ -566,6 +569,11 @@ export default function TarotMinigame() {
                       </motion.div>
                     )}
                   </AnimatePresence>
+                  {draft.phase === 'committing' && draft.revealSwap?.index === i && !burnDone && (
+                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+                      <BurnReveal cardId={draft.revealSwap.fromCardId} accent={theme.accent} onDone={() => setBurnDone(true)} />
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -750,6 +758,7 @@ const handSlotsStyle: React.CSSProperties = {
 
 const handSlotColumnStyle: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem',
+  position: 'relative',
 };
 
 const handLabelStyle: React.CSSProperties = {
