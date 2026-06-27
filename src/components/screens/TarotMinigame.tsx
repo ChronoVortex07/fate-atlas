@@ -8,6 +8,7 @@ import CardBack from '../cards/CardBack';
 import OrnamentalBorder from '../shared/OrnamentalBorder';
 import RunicBand from '../shared/RunicBand';
 import { restCenters, computeFanLayout } from '../../engine/fanLayout';
+import { useAnchorRegister, outcomeKey } from '../../context/AnchorRegistry';
 import { GiCardRandom, GiCardPickup, GiEyeball } from 'react-icons/gi';
 import ChainsOfFate from '../cards/ChainsOfFate';
 import { MAJOR_GLOW_FAMILY } from '../../data/tarot';
@@ -57,6 +58,7 @@ function majorGlow(cardId: string, lightBand: string): string | undefined {
 
 export default function TarotMinigame() {
   const { state, engine } = useGameEngine();
+  const setOutcomeAnchor = useAnchorRegister(outcomeKey);
   const draft = state.minigameState as TarotDraftState | null;
   const tableRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
@@ -396,9 +398,9 @@ export default function TarotMinigame() {
           <GiCardRandom style={{ verticalAlign: '-2px' }} /> Shuffle ({draft.shufflesRemaining})
         </motion.button>
 
-        {/* Hand */}
+        {/* Hand — the committed spread row; effects target it as `outcome`. */}
         <div style={handAreaStyle}>
-          <div style={handSlotsStyle}>
+          <div ref={setOutcomeAnchor} style={handSlotsStyle}>
             {SLOT_THEMES.map((theme, i) => {
               const label = theme.label;
               const card = draft.hand[i];

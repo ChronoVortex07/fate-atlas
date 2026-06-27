@@ -5,6 +5,7 @@ import { rollD20 } from '../../data/dice';
 import DiceCast, { canUse3D, type DiceCastHandle, type FlickVector } from './dice3d/DiceCast';
 import DiceTally from './dice3d/DiceTally';
 import DiceThrowAnimation, { THRESHOLD_COLORS } from './DiceThrowAnimation';
+import { useAnchorRegister, outcomeKey } from '../../context/AnchorRegistry';
 import type { DiceResult, DiceCheckPlan, DiceCheckBreakdown, MinigameMeta, RollMode } from '../../engine/types';
 
 type Phase = 'idle' | 'throwing' | 'choice' | 'tally' | 'reading' | 'done';
@@ -15,6 +16,7 @@ const REVEAL_DELAY_MS = 1200;
 export default function DiceMinigame() {
   const { state, engine } = useGameEngine();
   const reduce = useReducedMotion();
+  const setOutcomeAnchor = useAnchorRegister(outcomeKey);
   const use3D = useRef(canUse3D()).current;
   const castRef = useRef<DiceCastHandle | null>(null);
   const committedRef = useRef(false);
@@ -134,7 +136,8 @@ export default function DiceMinigame() {
           <p style={sourceStyle}>{plan.sources.join(' · ')}</p>
         )}
 
-        {/* 3D board (or fallback reveal) */}
+        {/* 3D board (or fallback reveal) — the anchor effects target as `outcome`. */}
+        <div ref={setOutcomeAnchor} style={{ position: 'relative' }}>
         {use3D ? (
           <div style={{ position: 'relative' }}>
             <DiceCast
@@ -172,6 +175,7 @@ export default function DiceMinigame() {
             />
           )
         )}
+        </div>
 
         {/* Choice: tap a value (Will) */}
         {phase === 'choice' && choiceValues && (

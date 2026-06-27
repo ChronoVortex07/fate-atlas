@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import type { SlotResult } from '../../engine/types';
 import { SIGNS } from '../../data/astromancy';
 import { CONCEPTS } from '../../data/strings';
+import { useAnchorRegister, constellationKey } from '../../context/AnchorRegistry';
 import CardSigil from './CardSigil';
 
 export type FanCardState = 'idle' | 'source' | 'target' | 'animating' | 'reroll-target';
@@ -140,6 +141,8 @@ export default function FanCard({
   onWheelSpin,
 }: FanCardProps) {
   const isDesktop = isDesktopProp ?? false;
+  // Register this card's live position so anchored effects can play on it.
+  const setAnchor = useAnchorRegister(constellationKey(index));
 
   const isSource = slotState === 'source' || slotState === 'animating';
   const isTarget = slotState === 'target' || slotState === 'animating';
@@ -212,6 +215,7 @@ export default function FanCard({
 
   return (
     <motion.div
+      ref={setAnchor}
       onPointerDown={wheel ? onPointerDown : undefined}
       onPointerMove={wheel ? onPointerMove : undefined}
       onPointerUp={wheel ? onPointerUp : undefined}
