@@ -442,6 +442,17 @@ export default function TarotMinigame() {
             ref={(el) => { setOutcomeAnchor(el); handRowRef.current = el; }}
             style={{ ...handSlotsStyle, position: 'relative' }}
           >
+            {draft.phase === 'committing' && draft.revealOrderAnchored && (
+              <motion.div
+                aria-hidden
+                style={{ position: 'absolute', inset: '-6%', borderRadius: 8, pointerEvents: 'none',
+                  border: '1.5px solid #aac4ff',
+                  background: 'radial-gradient(circle, rgba(170,196,255,0.18) 0%, transparent 70%)' }}
+                initial={{ opacity: 0, scale: 1.3 }}
+                animate={{ opacity: [0, 0.9, 0], scale: [1.3, 1, 1] }}
+                transition={{ duration: 1.0, ease: 'easeOut' }}
+              />
+            )}
             {SLOT_THEMES.map((theme, i) => {
               const label = theme.label;
               const card = draft.hand[i];
@@ -465,8 +476,10 @@ export default function TarotMinigame() {
                         key={`revealed-${revealed.id}-${i}`}
                         style={{ ...slotCardStyle(theme.accent), cursor: 'default' }}
                         initial={{ opacity: 0, rotateY: 90 }}
-                        animate={{ opacity: 1, rotateY: 0 }}
-                        transition={{ type: 'spring', stiffness: 260, damping: 22, delay: i * 0.12 }}
+                        animate={{ opacity: 1, rotateY: draft.revealWildCard === i ? [90, 320, 360] : 0 }}
+                        transition={{ type: draft.revealWildCard === i ? 'tween' : 'spring',
+                          duration: draft.revealWildCard === i ? 0.9 : undefined,
+                          stiffness: 260, damping: 22, delay: i * 0.12 }}
                       >
                         <svg width="14" height="14" viewBox="0 0 22 22" aria-hidden
                           style={{ position: 'absolute', top: 4, left: 4, color: theme.accent, opacity: 0.6 }}>
@@ -487,6 +500,14 @@ export default function TarotMinigame() {
                               {revealed.orientation === 'upright' ? '▲ Upright' : '▼ Reversed'}
                             </div>
                           </>
+                        )}
+                        {draft.revealWildCard === i && (
+                          <motion.div
+                            style={{ position: 'absolute', inset: -4, borderRadius: 8, border: '1.5px solid #ff7a4a', pointerEvents: 'none' }}
+                            initial={{ opacity: 0, scale: 1.2 }}
+                            animate={{ opacity: [0, 0.9, 0], scale: [1.2, 1, 1] }}
+                            transition={{ duration: 0.9 }}
+                          />
                         )}
                       </motion.div>
                     ) : card ? (
