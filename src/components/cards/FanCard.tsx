@@ -25,6 +25,7 @@ interface FanCardProps {
   wheelZ?: number;
   glowing?: boolean;      // meta-interaction spotlight
   dimmed?: boolean;       // affect signal: card is being veiled/shrouded by an effect
+  appearing?: 'pending' | 'materializing' | null; // spawn: hold empty, then pop in
   instant?: boolean;      // disable the spring while actively dragging (1:1 follow)
   // Interaction — wired by the wheel container. Tap-to-inspect is resolved in
   // pointerup (drag-movement aware) rather than a separate click for reliability
@@ -136,6 +137,7 @@ export default function FanCard({
   wheelZ,
   glowing,
   dimmed,
+  appearing,
   instant,
   onPointerDown,
   onPointerMove,
@@ -207,6 +209,12 @@ export default function FanCard({
     animateOpacity = isTopCard ? 0.85 : 0.4 + index * 0.05;
   }
 
+  // Spawn lifecycle: held invisible/tiny in its slot, then springs to full size.
+  if (appearing === 'pending') {
+    animateOpacity = 0;
+    animateScale = 0.08;
+  }
+
   const zIndex = wheel
     ? (wheelZ ?? 1)
     : (isRerollTarget ? 5 : index);
@@ -268,7 +276,12 @@ export default function FanCard({
         scale: animateScale,
         opacity: animateOpacity,
       }}
-      transition={instant ? { duration: 0 } : { type: 'spring', stiffness: wheel ? 260 : 300, damping: 26 }}
+      transition={
+        instant ? { duration: 0 }
+        : appearing === 'pending' ? { duration: 0.12 }
+        : appearing === 'materializing' ? { type: 'spring', stiffness: 240, damping: 15 }
+        : { type: 'spring', stiffness: wheel ? 260 : 300, damping: 26 }
+      }
     >
       {/* Reroll pulse ring */}
       {isRerollTarget && (

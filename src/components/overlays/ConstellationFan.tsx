@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import FanCard, { type FanCardState } from '../cards/FanCard';
 import CardDetailModal from './CardDetailModal';
 import { useInteractionFocus } from '../../context/InteractionFocusContext';
-import { expandSlotFor } from './anim/theme';
+import { expandSlotFor, primitiveFor } from './anim/theme';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import type { SlotResult } from '../../engine/types';
 
@@ -185,6 +185,22 @@ export default function ConstellationFan({ results }: Props) {
     [phase, activeReport, targetSlot],
   );
 
+  // Spawn: the freshly-added card is held in an empty slot while the fan expands,
+  // then materializes once the animation begins — so it reads as a NEW card
+  // arriving, not an effect on the existing/active card.
+  const spawningSlot =
+    activeReport && primitiveFor(activeReport.animation) === 'spawn' && typeof targetSlot === 'number'
+      ? targetSlot : null;
+  const appearingState = useCallback(
+    (i: number): 'pending' | 'materializing' | null => {
+      if (i !== spawningSlot) return null;
+      if (phase === 'focusing') return 'pending';
+      if (phase === 'animating') return 'materializing';
+      return null;
+    },
+    [spawningSlot, phase],
+  );
+
   if (results.length === 0) return null;
 
   // Collapsed footprint — sized to the FULL visible stack so the whole pile is
@@ -301,6 +317,7 @@ export default function ConstellationFan({ results }: Props) {
               wheelZ={expanded ? slot.zIndex : undefined}
               glowing={expanded && isGlowing(i)}
               dimmed={isDimmed(i)}
+              appearing={appearingState(i)}
               instant={dragging}
               onPointerDown={onCardPointerDown}
               onPointerMove={onCardPointerMove}
