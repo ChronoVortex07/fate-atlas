@@ -1,11 +1,11 @@
 import { useId } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import MethodCardFront from './MethodCardFront';
 import FateMark from '../shared/FateMark';
 import { METHOD_FRONTS } from '../../data/method-cards';
 import type { DivinationType } from '../../engine/types';
 
-export type MethodCardVisual = 'face-down' | 'face-up' | 'shrouded';
+export type MethodCardVisual = 'face-down' | 'face-up' | 'shrouded' | 'revealing';
 export type MethodCardMotion = 'idle' | 'selected' | 'rejected' | 'fated' | 'pressed';
 
 export interface MethodCardProps {
@@ -73,7 +73,17 @@ export default function MethodCard({
           </div>
           {/* front (rotated 180 so it reads correctly when flipped) */}
           <div style={{ ...faceStyle, transform: 'rotateY(180deg)' }}>
-            {visual === 'shrouded' ? <ShroudedFront /> : <MethodCardFront method={method} />}
+            {visual === 'shrouded' ? (
+              <ShroudedFront />
+            ) : visual === 'revealing' ? (
+              // The real front beneath, with the fog dispersing over the top.
+              <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                <MethodCardFront method={method} />
+                <ShroudFog dispersing />
+              </div>
+            ) : (
+              <MethodCardFront method={method} />
+            )}
           </div>
         </motion.div>
       </motion.button>
@@ -116,30 +126,51 @@ function CelestialVeilBack() {
   );
 }
 
-// Shadow-veiled front — drifting purple mist, an intricate 12-tick eye, VEILED.
-function ShroudedFront() {
+// Drifting fractal-noise shroud cloud — violet-tinted dense mist (mirrors the
+// strings-minigame fog approach). When `dispersing`, it fades, swells, and blurs
+// away over ~0.6s to reveal whatever sits beneath it.
+function ShroudFog({ dispersing = false }: { dispersing?: boolean }) {
   const uid = useId();
+  const reduce = useReducedMotion();
   return (
-    <div style={shroudedStyle}>
+    <motion.div
+      style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
+      initial={dispersing ? { opacity: 1, scale: 1, filter: 'blur(0px)' } : false}
+      animate={
+        dispersing
+          ? { opacity: 0, scale: 1.18, filter: 'blur(8px)' }
+          : { opacity: 1, scale: 1, filter: 'blur(0px)' }
+      }
+      transition={dispersing ? { duration: 0.6, ease: 'easeOut' } : { duration: 0 }}
+    >
       <svg width="100%" height="100%" viewBox="0 0 140 210" preserveAspectRatio="none" aria-hidden
         style={{ position: 'absolute', inset: 0 }}>
         <defs>
-          <filter id={`${uid}-mist`} x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="7" /></filter>
+          <filter id={`${uid}-cloud`} x="-30%" y="-30%" width="160%" height="160%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.018 0.026" numOctaves={5} seed={7} stitchTiles="stitch" result="n" />
+            {/* violet shroud tint with a hard alpha ramp so the noise reads as dense mist */}
+            <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.11  0 0 0 0 0.07  0 0 0 0 0.20  0 0 0 1.2 -0.35" />
+          </filter>
           <radialGradient id={`${uid}-grad`} cx="50%" cy="46%" r="62%">
-            <stop offset="0%" stopColor="#2a1d40" stopOpacity="0.55" /><stop offset="100%" stopColor="#050308" stopOpacity="0" />
+            <stop offset="0%" stopColor="#2a1d40" stopOpacity="0.5" /><stop offset="100%" stopColor="#050308" stopOpacity="0" />
           </radialGradient>
         </defs>
-        <motion.g
-          filter={`url(#${uid}-mist)`} opacity={0.7}
-          animate={{ x: [0, 6, -4, 0], y: [0, -4, 3, 0] }}
-          transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut' }}
-        >
-          <ellipse cx="44" cy="70" rx="40" ry="26" fill="#1c1230" />
-          <ellipse cx="96" cy="120" rx="46" ry="30" fill="#140d24" />
-          <ellipse cx="60" cy="160" rx="50" ry="24" fill="#1a1030" />
-        </motion.g>
+        <motion.rect
+          x="-20" y="-20" width="180" height="250" filter={`url(#${uid}-cloud)`}
+          animate={reduce ? undefined : { x: [-20, -8, -28, -20], y: [-20, -32, -10, -20] }}
+          transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
+        />
         <rect x="0" y="0" width="140" height="210" fill={`url(#${uid}-grad)`} />
       </svg>
+    </motion.div>
+  );
+}
+
+// Shadow-veiled front — fractal mist, an intricate 12-tick eye, VEILED.
+function ShroudedFront() {
+  return (
+    <div style={shroudedStyle}>
+      <ShroudFog />
       <div style={{ position: 'absolute', left: 0, right: 0, top: '38%', display: 'flex', justifyContent: 'center' }}>
         <VeiledEye />
       </div>

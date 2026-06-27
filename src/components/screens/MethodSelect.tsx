@@ -127,10 +127,11 @@ export default function MethodSelect() {
       // During effects the spread is still face-down; a shroud lands as the veil.
       return state.shroudedMethods.includes(i) && hasShroudPlayed(i) ? 'shrouded' : 'face-down';
     }
-    // ready/selecting: a picked shrouded card un-veils to its real front.
+    // ready/selecting: a picked shrouded card un-veils to its real front, the
+    // fog dispersing slowly over the top ('revealing') rather than popping away.
     if (state.shroudedMethods.includes(i)) {
       const isPicked = pending && (i === pending.finalIndex);
-      return isPicked && revealShrouded ? 'face-up' : 'shrouded';
+      return isPicked && revealShrouded ? 'revealing' : 'shrouded';
     }
     return 'face-up';
   };
