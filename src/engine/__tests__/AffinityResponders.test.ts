@@ -234,6 +234,18 @@ describe('fate-fated-card responder', () => {
   });
 });
 
+describe('fate-fated-card per-pick odds', () => {
+  it('does not fire when rng is above the lowered per-pick base (0.014) at ascendant Fate', () => {
+    const responder = buildAffinityResponders().find((r) => r.id === 'fate-fated-card')!;
+    const ctx = {
+      trigger: 'tarot:picked', affinities: { fate: 80, chaos: 50, order: 50, will: 50, light: 50, shadow: 50 },
+      slots: [], hand: null, spread: [], minigame: null, event: {},
+      draft: { handIndex: 0, tableIndex: 0 }, rng: () => 0.02,
+    } as any;
+    expect(responder.roll(ctx)).toBe(false); // 0.02 > 0.014 → no fire
+  });
+});
+
 describe("Fool's Reroll across the spread", () => {
   it('fires when The Fool is any position in a committed spread', () => {
     const foolReroll = buildInteractionResponders().find((r) => r.id === 'fool-reroll')!;

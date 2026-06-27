@@ -20,7 +20,7 @@ export const SECONDARY_FEED_FACTOR = 0.5; // secondary axis (e.g. Chaos when rev
 export const BAND_POWER_STEP = 0.7;       // event-resolved chance scales +70% per band above the gate
 
 // Tier base chances (playtest defaults; midpoints of the spec's ranges).
-export const TIER_BASE_CHANCE = { ambient: 0.5, notable: 0.22, major: 0.08 } as const;
+export const TIER_BASE_CHANCE = { ambient: 0.5, notable: 0.22, rare: 0.04, major: 0.08 } as const;
 
 export const AFFINITY_IDS: AffinityId[] = ['chaos', 'order', 'fate', 'will', 'light', 'shadow'];
 
@@ -71,7 +71,7 @@ export function defaultAffinityState(): Record<AffinityId, number> {
   );
 }
 
-export type EffectTier = 'ambient' | 'notable' | 'major';
+export type EffectTier = 'ambient' | 'notable' | 'rare' | 'major';
 
 export interface BandedEffect {
   id: string;

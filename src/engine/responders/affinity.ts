@@ -121,7 +121,7 @@ export function buildAffinityResponders(): Responder[] {
         typeof c.draft.handIndex === 'number'
         && typeof c.draft.tableIndex === 'number'
         && c.draft.fatedDrawnThisDraft !== true,
-      roll: (c) => bandRoll(c, 'fate', 'ascendant', T.notable),
+      roll: (c) => bandRoll(c, 'fate', 'ascendant', 0.014),
       apply: (c) => {
         // Draw a fresh card distinct from the original
         const usedIds = new Set((c.draft.usedCardIds as string[] | undefined) ?? []);
