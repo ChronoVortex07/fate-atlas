@@ -16,6 +16,7 @@ import HistoryModal from '../overlays/HistoryModal';
 import ConstellationFan from '../overlays/ConstellationFan';
 import InteractionSequencer from '../overlays/InteractionSequencer';
 import { InteractionFocusProvider } from '../../context/InteractionFocusContext';
+import { AnchorProvider } from '../../context/AnchorRegistry';
 
 export default function GameTable() {
   const { state } = useGameEngine();
@@ -62,6 +63,7 @@ export default function GameTable() {
   };
 
   return (
+    <AnchorProvider>
     <div style={hubStyle}>
       {state.history.length > 0 && (
         <button
@@ -99,6 +101,7 @@ export default function GameTable() {
         <ContinueBar />
       )}
     </div>
+    </AnchorProvider>
   );
 }
 
