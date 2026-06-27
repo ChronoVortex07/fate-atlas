@@ -432,11 +432,21 @@ export default function TarotMinigame() {
                           <path d="M1 1 H9 M1 1 V9 M1 1 Q11 11 21 11 M1 1 Q11 11 11 21"
                             stroke="currentColor" strokeWidth="0.8" fill="none" strokeLinecap="round" />
                         </svg>
-                        <CardSigil card={revealed} size={22} color={theme.accent} />
-                        <div style={handCardNameStyle}>{revealed.name}</div>
-                        <div style={handCardOrientStyle}>
-                          {revealed.orientation === 'upright' ? '▲ Upright' : '▼ Reversed'}
-                        </div>
+                        {revealed.veiled ? (
+                          <>
+                            <span style={{ fontSize: 22, lineHeight: 1, color: '#9b6bb0', textShadow: '0 0 8px rgba(155,107,176,0.8)' }}>◈</span>
+                            <div style={{ ...handCardNameStyle, color: '#9b6bb0', fontStyle: 'italic' }}>Veiled</div>
+                            <div style={handCardOrientStyle}>— withheld —</div>
+                          </>
+                        ) : (
+                          <>
+                            <CardSigil card={revealed} size={22} color={theme.accent} />
+                            <div style={handCardNameStyle}>{revealed.name}</div>
+                            <div style={handCardOrientStyle}>
+                              {revealed.orientation === 'upright' ? '▲ Upright' : '▼ Reversed'}
+                            </div>
+                          </>
+                        )}
                       </motion.div>
                     ) : card ? (
                       <div

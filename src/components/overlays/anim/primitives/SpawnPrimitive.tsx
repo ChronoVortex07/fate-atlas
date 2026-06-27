@@ -2,47 +2,42 @@ import { motion } from 'framer-motion';
 import AnchoredStage, { type PrimitiveProps } from '../AnchoredStage';
 
 /**
- * A new card materializes beside the source. Used by chaos-second-result (a
- * duplicate fractures off), will-widen, major-convergence, etc. The ghost card
- * scales/rotates into being out of a themed particle burst.
+ * A card materializes into being on the anchored slot — used by
+ * chaos-second-result (a second reading manifests), will-widen, etc. A
+ * card-shaped sheath forms over the real fan card out of a themed burst, then
+ * dissolves to reveal it, reading clearly as "a new card appeared here".
  */
 export default function SpawnPrimitive({ rect, theme, durationMs }: PrimitiveProps) {
   const [core, accent] = theme.palette;
   const sec = durationMs / 1000;
 
   return (
-    <AnchoredStage rect={rect} theme={theme} burst={{ count: 90, spread: 130 }}>
-      {/* Ghost card emerging to the right of the original. */}
+    <AnchoredStage rect={rect} theme={theme} burst={{ count: 70, model: 'radial', spread: 110 }}>
+      {/* Forming sheath — exactly over the real card, scaling up out of nothing. */}
       <motion.div
         style={{
           position: 'absolute',
           inset: 0,
-          left: '60%',
-          borderRadius: 8,
+          borderRadius: 6,
           border: `1.5px solid ${accent}`,
-          background: `linear-gradient(160deg, ${core}33, ${accent}11)`,
-          boxShadow: `0 0 26px ${core}aa, 0 0 60px ${core}55`,
+          background: `linear-gradient(165deg, ${core}cc, ${core}55)`,
+          boxShadow: `0 0 26px ${core}cc, 0 0 60px ${core}66`,
         }}
-        initial={{ opacity: 0, scale: 0.2, rotate: -12 }}
-        animate={{
-          opacity: [0, 1, 1, 0.9],
-          scale: [0.2, 1.12, 1],
-          rotate: [-12, 4, 0],
-        }}
-        transition={{ duration: sec * 0.8, ease: 'easeOut', times: [0, 0.5, 0.75, 1] }}
+        initial={{ opacity: 0, scale: 0.05, rotate: -18 }}
+        animate={{ opacity: [0, 1, 1, 0], scale: [0.05, 1.14, 1, 1], rotate: [-18, 6, 0, 0] }}
+        transition={{ duration: sec, ease: 'easeOut', times: [0, 0.45, 0.7, 1] }}
       />
-      {/* Fracture flash across the original. */}
+      {/* Expanding shock ring punctuating the moment of appearance. */}
       <motion.div
         style={{
           position: 'absolute',
-          inset: 0,
-          borderRadius: 8,
-          background: `linear-gradient(105deg, transparent 40%, ${accent}cc 50%, transparent 60%)`,
-          mixBlendMode: 'screen',
+          inset: '-10%',
+          borderRadius: 10,
+          border: `2px solid ${accent}`,
         }}
-        initial={{ opacity: 0, x: '-30%' }}
-        animate={{ opacity: [0, 1, 0], x: ['-30%', '30%', '60%'] }}
-        transition={{ duration: sec * 0.4, ease: 'easeOut' }}
+        initial={{ opacity: 0.9, scale: 0.2 }}
+        animate={{ opacity: 0, scale: 1.8 }}
+        transition={{ duration: sec * 0.5, ease: 'easeOut' }}
       />
     </AnchoredStage>
   );

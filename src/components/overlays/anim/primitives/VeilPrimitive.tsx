@@ -2,9 +2,10 @@ import { motion } from 'framer-motion';
 import AnchoredStage, { type PrimitiveProps } from '../AnchoredStage';
 
 /**
- * A veil descends over the card and it dims/desaturates. Used by shadow-shroud,
- * shadow-veil-position, and fate-fated-card. Ink-smoke falls as `source-over`
- * particles so the darkness reads as concealment, not glow.
+ * A shadow curtain falls over the anchored card and stays — used by
+ * shadow-shroud, shadow-veil-position, fate-fated-card. The card's own veiled
+ * state (rendered by FanCard / the minigame spread) persists the concealment
+ * after the curtain settles.
  */
 export default function VeilPrimitive({ rect, theme, durationMs }: PrimitiveProps) {
   const [core, deep] = theme.palette;
@@ -14,23 +15,23 @@ export default function VeilPrimitive({ rect, theme, durationMs }: PrimitiveProp
     <AnchoredStage
       rect={rect}
       theme={theme}
-      burst={{ count: 60, model: 'falling', blend: 'source-over', spread: 90 }}
+      burst={{ count: 70, model: 'falling', blend: 'source-over', spread: 80 }}
     >
-      {/* Curtain falling from the top edge over the card. */}
+      {/* Opaque curtain falling from the top edge, concealing the card. */}
       <motion.div
         style={{
           position: 'absolute',
           inset: 0,
-          borderRadius: 8,
+          borderRadius: 6,
           transformOrigin: 'top center',
-          background: `linear-gradient(180deg, ${deep}f2 0%, ${core}cc 100%)`,
-          boxShadow: `0 0 22px ${core}88`,
+          background: `linear-gradient(180deg, #05030a 0%, ${deep} 55%, ${core}dd 100%)`,
+          boxShadow: `0 0 24px ${core}aa, inset 0 0 20px #000`,
         }}
-        initial={{ scaleY: 0, opacity: 0.2 }}
-        animate={{ scaleY: [0, 1, 1, 0.9], opacity: [0.2, 0.95, 0.9, 0.7] }}
+        initial={{ scaleY: 0, opacity: 0.6 }}
+        animate={{ scaleY: 1, opacity: [0.6, 1, 1, 0.92] }}
         transition={{ duration: sec, ease: 'easeIn', times: [0, 0.5, 0.8, 1] }}
       />
-      {/* Edge shimmer riding down with the veil. */}
+      {/* Leading shimmer edge riding down with the curtain. */}
       <motion.div
         style={{
           position: 'absolute',
@@ -40,8 +41,8 @@ export default function VeilPrimitive({ rect, theme, durationMs }: PrimitiveProp
           background: `linear-gradient(90deg, transparent, ${core}, transparent)`,
         }}
         initial={{ top: '0%', opacity: 0 }}
-        animate={{ top: ['0%', '100%'], opacity: [0, 0.8, 0] }}
-        transition={{ duration: sec * 0.8, ease: 'easeIn' }}
+        animate={{ top: ['0%', '100%'], opacity: [0, 0.9, 0] }}
+        transition={{ duration: sec * 0.7, ease: 'easeIn' }}
       />
     </AnchoredStage>
   );

@@ -388,6 +388,12 @@ export class GameEngine {
         rerolled,
         ...this.state.turnResults.slice(committedIndex + 1),
       ];
+      // Anchor the reroll animation to the rerolled die's fan slot so the fan
+      // expands to it and the recast plays on the real card (not the dice board,
+      // which has already advanced by the time the deferred sequencer runs).
+      this.state.eventQueue = this.state.eventQueue.map((r) =>
+        r.responderId === 'fool-reroll' ? { ...r, targetSlot: committedIndex } : r,
+      );
     }
 
     // Chaos surge: spawn a second result of the same type.
