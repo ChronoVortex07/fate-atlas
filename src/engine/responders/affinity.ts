@@ -100,14 +100,19 @@ export function buildAffinityResponders(): Responder[] {
     {
       id: 'fate-deal-swap', source: 'affinity', triggers: ['tarot:deal'],
       group: { kind: 'exclusive', band: 'OVERRIDE' }, weight: w('fate'),
-      condition: (c) => Array.isArray(c.draft.faces) && (c.draft.faces as unknown[]).length >= 1,
-      roll: (c) => bandRoll(c, 'fate', 'ascendant', T.major),
+      condition: (c) =>
+        Array.isArray(c.draft.faces) && (c.draft.faces as unknown[]).length >= 1
+        && Array.isArray(c.draft.fated) && (c.draft.fated as boolean[]).some((f) => !f),
+      roll: (c) => bandRoll(c, 'fate', 'ascendant', T.rare),
       apply: (c) => {
         const faces = c.draft.faces as unknown as TarotCardFace[];
-        const idx = Math.floor(c.rng() * faces.length);
+        const fated = c.draft.fated as boolean[];
+        const candidates = faces.map((_, i) => i).filter((i) => !fated[i]);
+        const idx = candidates[Math.floor(c.rng() * candidates.length)];
         const used = new Set(faces.map((f) => f.id));
         const replacement = drawTarotCard(c.affinities).spread![0].card;
         if (used.has(replacement.id)) return null;
+        c.draft.swapFromCardId = faces[idx].id;
         faces[idx] = replacement;
         c.draft.faces = faces as unknown as typeof c.draft.faces;
         c.draft.swappedIndex = idx;
@@ -213,6 +218,7 @@ export function buildAffinityResponders(): Responder[] {
         const i = Math.floor(c.rng() * faces.length);
         faces[i] = buildFace(DECK_BY_ID[faces[i].id], faces[i].orientation === 'upright' ? 'reversed' : 'upright');
         c.draft.outcome = consolidateSpread(faces);
+        c.draft.wildCardIndex = i;
         return report('chaos-wild-card', 'Chaos', 'One card defies the spread — it turns against the rest.', 'flip');
       },
     },
@@ -226,6 +232,7 @@ export function buildAffinityResponders(): Responder[] {
         const result = c.draft.outcome as TarotResult;
         const faces = result.spread!.map((s) => buildFace(DECK_BY_ID[s.card.id], 'upright'));
         c.draft.outcome = consolidateSpread(faces);
+        c.draft.orderAnchored = true;
         return report('order-anchor', 'Order', 'The spread settles — anchored, upright, and coherent.', 'anchor');
       },
     },

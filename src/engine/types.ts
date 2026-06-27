@@ -442,6 +442,10 @@ export interface TarotDraftState {
   shufflesRemaining: number;   // from affinityEffects.spreadRedraws
   phase: 'drafting' | 'committing';
   fatedDrawnThisDraft?: boolean; // once-per-draft gate for fate-fated-card
+  // Reveal-time markers recorded by commitDraft for the inline reveal animations.
+  revealSwap?: { index: number; fromCardId: string }; // fate-deal-swap
+  revealWildCard?: number;                              // chaos-wild-card (flipped slot)
+  revealOrderAnchored?: boolean;                        // order-anchor (straightened all)
 }
 
 export interface DiceMinigameState {

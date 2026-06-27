@@ -1143,21 +1143,42 @@ export class GameEngine {
     if (draft.hand.some((h) => h === null)) throw new Error('Hand is not full');
 
     draft.phase = 'committing';
-    const faces = draft.hand.map((h) => {
-      if (h!.revealedFace) return h!.revealedFace; // use peeked face (locked orientation)
+
+    const fated: boolean[] = draft.hand.map((h) => h!.fated === true);
+    let faces = draft.hand.map((h) => {
+      if (h!.revealedFace) return h!.revealedFace;
       return buildFace(DECK_BY_ID[h!.cardId], pickOrientation(this.affinityEngine.getState()));
     });
 
-    // Dispatch pre-consolidation trigger for meta-interactions
+    // Deal-swap: Fate may replace one non-fated face before reveal.
+    const dealBefore = this.state.eventQueue.length;
+    const { draft: dealDraft } = this.dispatchAt('tarot:deal', {
+      faces: faces as unknown as SlotResult[],
+      fated,
+    });
+    faces = (dealDraft.faces as unknown as TarotCardFace[]) ?? faces;
+    if (typeof dealDraft.swappedIndex === 'number' && typeof dealDraft.swapFromCardId === 'string') {
+      draft.revealSwap = { index: dealDraft.swappedIndex, fromCardId: dealDraft.swapFromCardId };
+    }
+    // Narrated inline by the reveal — keep the report out of the sequencer queue
+    // (it stays in turnEffects for the run record).
+    this.state.eventQueue = this.state.eventQueue.slice(0, dealBefore);
+
+    // Existing pre-consolidation hook.
     this.dispatchAt('tarot:committed', { faces: faces as unknown as SlotResult[], reverse });
 
     let result = consolidateSpread(faces);
     if (reverse) result = reverseSpread(result);
 
-    const meta: MinigameMeta = reverse
-      ? { reversed: true }
-      : { revealedAsDrawn: true };
+    // Orient post-modifiers: Chaos flips one face; Order straightens all.
+    const orientBefore = this.state.eventQueue.length;
+    const { draft: orientDraft } = this.dispatchAt('tarot:orient', { outcome: result });
+    result = (orientDraft.outcome as TarotResult) ?? result;
+    if (typeof orientDraft.wildCardIndex === 'number') draft.revealWildCard = orientDraft.wildCardIndex;
+    if (orientDraft.orderAnchored === true) draft.revealOrderAnchored = true;
+    this.state.eventQueue = this.state.eventQueue.slice(0, orientBefore);
 
+    const meta: MinigameMeta = reverse ? { reversed: true } : { revealedAsDrawn: true };
     this.completeMinigame(result, meta);
   }
 

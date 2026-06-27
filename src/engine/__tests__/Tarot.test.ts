@@ -364,6 +364,29 @@ describe('tarot draft state', () => {
   });
 });
 
+describe('commitDraft deal-swap pipeline', () => {
+  it('records revealSwap on a non-fated face when fate-deal-swap is forced', () => {
+    const e = new GameEngine();
+    e.startTurn('self');
+    // Ensure tarot is in the pool and fate is at ascendant for fate-deal-swap.
+    e.loadState({ availableMethods: ['tarot', 'd20', 'iching'], affinities: { chaos: 50, order: 50, fate: 75, will: 50, light: 50, shadow: 50 } });
+    const tIdx = e.getState().availableMethods.indexOf('tarot');
+    e.selectMethod(tIdx);
+    // Fill the 3-slot hand from the table.
+    for (let h = 0; h < 3; h++) {
+      const draft = e.getState().minigameState as any;
+      const tableIdx = draft.table.findIndex((t: any) => t !== null);
+      e.pickForHand(h, tableIdx);
+    }
+    e.forceEffects(['fate-deal-swap'], false);
+    e.commitDraft(false);
+    const draft = e.getState().minigameState as any;
+    expect(draft.revealSwap).toBeTruthy();
+    expect(typeof draft.revealSwap.index).toBe('number');
+    expect(typeof draft.revealSwap.fromCardId).toBe('string');
+  });
+});
+
 describe('MAJOR_GLOW_FAMILY', () => {
   it('covers all 22 Major Arcana cards', () => {
     const majorIds = MAJOR_ARCANA.map((c) => c.id);
