@@ -31,9 +31,9 @@ This spec wires these effects into the live tarot reveal flow, gives `fate-deal-
 - Any change to the drafting interactions (pick/peek/return/shuffle/swap) or to `tarot:commit` spread interactions.
 - A new per-card orientation UI. The Reveal-as-Drawn / Invert-Meaning choice (and Fate's preempt of it) remains the orientation mechanism.
 
-## Architecture (Approach A — engine pipeline + thin UI hook)
+## Architecture (Approach A — engine pipeline + inline reveal choreography)
 
-Game logic stays in the engine. The reveal-time mutations ride the existing `InteractionSequencer` + anchored primitives. The **only** new UI flow is the Fate orientation preempt, which inherently must replace the Reveal/Invert buttons.
+Game logic stays in the engine. The reveal-time mutations are **narrated inline by `TarotMinigame`** during the `committing` phase, mirroring how `DiceMinigame` consumes `planDiceRoll`/roll-mode — *not* via the `InteractionSequencer`. This is a deliberate refinement of the original "ride the sequencer" sketch: the deal-swap must render swapped card **content** (the original card burning to reveal the real card underneath), the effects are per-hand-slot, and they must be timed against the existing inline face-flip reveal — none of which the sequencer's anchored overlay primitives can do. The post-commit `tarot:commit` fan effects continue to use the sequencer unchanged. Engine rolls happen at commit (resolve-first), and the component reads the recorded outcome to narrate (narrate-second).
 
 ### Reveal pipeline (order of operations)
 
@@ -51,20 +51,22 @@ Steps 2–4 anchor to the **hand-slots row** (`outcome`, already registered and 
 
 - **Split the orient responders by timing.**
   - `fate-auto-orient` → moves to a **preempt** check run before the orientation choice. Rewired to set a `fateOrientation` decision (coin-flip) rather than reversing an already-consolidated spread. Drives the god-hand (component overlay) — does **not** emit a sequencer report.
-  - `chaos-wild-card` + `order-anchor` → stay on `tarot:orient`, now dispatched **after** consolidation + orientation so they genuinely post-modify. Their reports ride the sequencer (flip / glow primitives, hand-row anchor).
+  - `chaos-wild-card` + `order-anchor` → stay on `tarot:orient`, now dispatched **after** consolidation + orientation so they genuinely post-modify. `commitDraft` records which face flipped / that the spread was straightened onto the draft for the component to animate inline.
 - **`planReveal()`** (new) — called when the hand fills. Runs the Fate preempt roll; returns `{ preempt: boolean, orientation: 'upright' | 'reversed' | null }`. No side effects beyond the roll.
 - **`commitDraft(orientation)`** restructured into the pipeline: build faces → dispatch `tarot:deal` (deal-swap; sets `swappedIndex`) → `tarot:committed` → consolidate → apply orientation → dispatch `tarot:orient` (chaos/order post-modify) → `completeMinigame`. The former test-only `resolveTarotDeal` / `resolveSpreadOrientation` become these internal steps.
 - **`fate-deal-swap` guard** — its `condition` excludes any face locked by `fate-fated-card` this draft (a locked card "is not yours to refuse," and equally not Fate's to swap away).
 - **Remove the dead `setOrientation()` stub** (the Reveal/Invert choice + Fate preempt fully cover orientation). Will is still fed by the player's Invert action as today.
 - Engine purity preserved: no React/DOM in `src/engine/**`. The component reads `planReveal()`'s result and decides whether to render the god-hand.
 
-### Animations
+### Animations (inline in `TarotMinigame`'s reveal choreography)
 
-- **Burn-reveal primitive (new)** for `fate-deal-swap`. An `AnchoredStage`-based primitive over the swapped hand slot: a card-shaped sheath of the rejected card immolates — an ember edge eats irregular holes outward via an animated alpha **mask** (canvas or SVG mask, no new deps), with ember/smoke particles from `ParticleField` (`shard` + `rising`, warm Fate-gold→ember palette) — revealing the real card underneath. Replaces the Override card-slide for this effect.
-- **God-hand for `fate-auto-orient`.** Generalize the existing `FateForceOverlay` into a reusable god-hand overlay parameterized by **target** (method tile / hand row / card) and **gesture** (point / turn / grasp). Auto-orient uses the "turn the hand row" gesture. This generalization also sets up TODO #5 (out of scope here).
-- **Chaos wild-card** → existing **Flip** primitive on the rogue face. **Order anchor** → existing **Glow** (order lattice) over the spread. Both hand-row anchored.
+`commitDraft` records the reveal outcome on the draft (`revealSwap`, `revealWildCard`, `revealOrderAnchored`, `revealOrientation`); the component reads these in the `committing` phase and animates the affected hand slot(s) as the faces turn up.
 
-The only genuinely new art is the burn-reveal primitive.
+- **Burn-reveal (new component)** for `fate-deal-swap`. Over the swapped hand slot the original (rejected) card face is rendered and immolates — an ember edge eats irregular holes outward via an animated alpha **mask** (CSS/SVG mask, no new deps), with ember/smoke particles — revealing the real committed card underneath.
+- **God-hand for `fate-auto-orient`.** Reuse the existing `FateForceOverlay` with a hand-row `HandTarget` + auto-orient text (the same component MethodSelect uses for fate-force-method). A richer gesture/parameterization is optional; full generalization (and TODO #5's fated-card god-hand) is out of scope here.
+- **Chaos wild-card** → an inline single-face flip on the rogue slot. **Order anchor** → an inline upright-straighten + brief order glow across the row.
+
+The only genuinely new art is the burn-reveal component.
 
 ## Odds tuning
 
@@ -88,7 +90,7 @@ Exact constants are tunable in playtest; the targets above are the design intent
   - `commitDraft` pipeline — deal-swap replaces a **non-fated** face and sets `swappedIndex`; refuses to target a fated card; `chaos-wild-card` flips exactly one face *after* orientation is applied; `order-anchor` straightens all; pipeline ordering is deterministic.
   - Probability gates verified with stubbed `Math.random` (deal-swap ~0.04, fated per-pick ~0.014, auto-orient `ascendant` ~0.08).
   - Regression: update existing `AgencyDecisions` / `Tarot` tests for the new `commitDraft` signature + split orient triggers; the 518-test suite stays green.
-- **Visual (no component harness):** the headless Playwright probe recipe (`?debug` + `window.__engine` + report injection) — burn-reveal on the swapped slot, god-hand on the auto-orient preempt, Flip/Glow for chaos/order on the spread.
+- **Visual (no component harness):** the headless Playwright probe recipe (`?debug` + `window.__engine` + `loadState` to stage a `committing`-phase draft with reveal markers) — burn-reveal on the swapped slot, god-hand on the auto-orient preempt, the chaos flip / order straighten on the row.
 - **Manual:** a high-Fate tarot reading confirming preempt → buttons suppressed → god-hand → commit, plus a deal-swap burn.
 
 ## Documentation to keep in sync (per CLAUDE.md)
@@ -98,5 +100,5 @@ Exact constants are tunable in playtest; the targets above are the design intent
 
 ## Open risks
 
-- **Timing of multiple reveal effects.** A reading could queue deal-swap + a post-modifier + commit effects. The sequencer already plays a queue in order; the implementation must verify the deferred-transition (`runOrDefer`) timing holds across the longer pipeline and that the hand-row faces are mounted when each animation anchors.
+- **Timing of multiple reveal effects.** A reading could combine a deal-swap, a post-modifier, *and* the post-commit `tarot:commit` fan effects. The inline reveal choreography (burn/flip/glow in the hand row) must finish before, and not fight with, the deferred sequencer batch that narrates the fan effects. Sequence the inline reveal first, then let the existing `runOrDefer`/review-beat flow run the fan batch.
 - **God-hand generalization scope.** Parameterizing `FateForceOverlay` must not regress the existing fate-force-method presentation.
