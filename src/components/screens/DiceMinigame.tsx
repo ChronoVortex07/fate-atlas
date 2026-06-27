@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
 import { rollD20 } from '../../data/dice';
 import DiceCast, { canUse3D, type DiceCastHandle, type FlickVector } from './dice3d/DiceCast';
@@ -14,6 +14,7 @@ const REVEAL_DELAY_MS = 1200;
 
 export default function DiceMinigame() {
   const { state, engine } = useGameEngine();
+  const reduce = useReducedMotion();
   const use3D = useRef(canUse3D()).current;
   const castRef = useRef<DiceCastHandle | null>(null);
   const committedRef = useRef(false);
@@ -152,6 +153,8 @@ export default function DiceMinigame() {
                 <span style={tapHintStyle}>Drag back &amp; release to flick</span>
               </div>
             )}
+            {/* Ghost numbers lift off the settled dice and feed the tally below. */}
+            {phase === 'tally' && breakdown && !reduce && <DiceGhosts breakdown={breakdown} />}
           </div>
         ) : (
           phase === 'idle' ? (
@@ -212,6 +215,33 @@ export default function DiceMinigame() {
   );
 }
 
+// Ghost numbers that lift off the settled dice (canvas centre, under the
+// top-down camera) and arc down toward the tally counter beneath the canvas —
+// d20 first, then each Bless (+, gold) and Bane (−, crimson), staggered to land
+// as the running total ticks in DiceTally (500 + i*650 ms cadence).
+function DiceGhosts({ breakdown }: { breakdown: DiceCheckBreakdown }) {
+  const ghosts: { label: string; color: string }[] = [
+    { label: String(breakdown.d20), color: '#c8d8f0' },
+    ...breakdown.bless.map((n) => ({ label: `+${n}`, color: '#d4a854' })),
+    ...breakdown.bane.map((n) => ({ label: `−${n}`, color: '#c0392b' })),
+  ];
+  return (
+    <div style={ghostLayerStyle} aria-hidden>
+      {ghosts.map((g, i) => (
+        <motion.span
+          key={`${i}-${g.label}`}
+          style={{ ...ghostStyle, color: g.color, textShadow: `0 0 12px ${g.color}` }}
+          initial={{ opacity: 0, x: '-50%', y: 0, scale: 0.6 }}
+          animate={{ opacity: [0, 1, 1, 0], y: [-6, -18, 70, 120], scale: [0.6, 1.15, 1, 0.8] }}
+          transition={{ delay: (500 + i * 650) / 1000, duration: 0.8, ease: 'easeOut', times: [0, 0.2, 0.7, 1] }}
+        >
+          {g.label}
+        </motion.span>
+      ))}
+    </div>
+  );
+}
+
 const containerStyle: React.CSSProperties = { width: '100%', maxWidth: '560px', padding: '2rem' };
 const contentStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' };
 const headingStyle: React.CSSProperties = {
@@ -249,6 +279,14 @@ const badgeStyle: React.CSSProperties = {
 const interpStyle: React.CSSProperties = {
   fontFamily: "'Cormorant Garamond', serif", fontWeight: 400, fontSize: 'clamp(0.8rem, 1.5vw, 0.95rem)',
   color: '#7b9ec7', fontStyle: 'italic', textAlign: 'center', margin: 0, maxWidth: '320px',
+};
+// Ghost-number overlay — centred over the canvas; each span animates from there.
+const ghostLayerStyle: React.CSSProperties = {
+  position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible', zIndex: 4,
+};
+const ghostStyle: React.CSSProperties = {
+  position: 'absolute', left: '50%', top: '50%',
+  fontFamily: "'Cormorant Garamond', serif", fontWeight: 700, fontSize: '2.2rem', lineHeight: 1,
 };
 const rerollRowStyle: React.CSSProperties = { display: 'flex', gap: '0.6rem', marginTop: '0.25rem' };
 const rerollBtnStyle: React.CSSProperties = {
