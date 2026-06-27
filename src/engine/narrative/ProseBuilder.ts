@@ -144,8 +144,9 @@ export class ProseBuilder {
         return { text: parts.join(', '), valence: 'neu', group: 'body' };
       }
       case 'opposition': {
+        // Labels stay lower-cased; capPunct fixes the sentence start as needed.
         const t = this.pick('opposition', F.opposition)
-          .replace('{favor}', cap(beat.favPole.label))
+          .replace('{favor}', beat.favPole.label)
           .replace('{adverse}', beat.advPole.label);
         return { text: t, valence: 'neu', group: 'tension' };
       }
@@ -156,7 +157,7 @@ export class ProseBuilder {
           return { text: this.pick(`tension_${key}`, pool), valence: 'neu', group: 'tension' };
         }
         const t = this.pick('tension_variance', F.tensionVariance)
-          .replace('{a}', cap(beat.pair[0]))
+          .replace('{a}', beat.pair[0])
           .replace('{b}', beat.pair[1]);
         return { text: t, valence: 'neu', group: 'tension' };
       }
@@ -214,8 +215,4 @@ export class ProseBuilder {
     sentences.push(cur);
     return sentences.map(capPunct).join(' ');
   }
-}
-
-function cap(s: string): string {
-  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }

@@ -87,8 +87,8 @@ export const READING_FRAGMENTS = {
   } satisfies Record<ModifierRole, string[]>,
 
   connectives: {
-    additive: ['and so ', ', and ', ' — and ', '; ', ', where '],
-    contrast: ['— yet ', ', and still ', ' — but beneath this, ', ', though '],
+    additive: [' and so ', ', and ', ' — and ', '; ', ', where '],
+    contrast: [' — yet ', ', and still ', ' — but beneath this, ', ', though '],
   },
 
   // ── Theme moods: key = theme. Each fragment names the theme noun. ──
