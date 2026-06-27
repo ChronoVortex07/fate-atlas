@@ -2,16 +2,6 @@ import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
 import { useInteractionFocus } from '../../context/InteractionFocusContext';
-import RerollAnimation from './InteractionAnimations/RerollAnimation';
-import FlipAnimation from './InteractionAnimations/FlipAnimation';
-import MirrorAnimation from './InteractionAnimations/MirrorAnimation';
-import AddChoiceAnimation from './InteractionAnimations/AddChoiceAnimation';
-import SecondResultAnimation from './InteractionAnimations/SecondResultAnimation';
-import ShroudAnimation from './InteractionAnimations/ShroudAnimation';
-import WidenAnimation from './InteractionAnimations/WidenAnimation';
-import OverrideAnimation from './InteractionAnimations/OverrideAnimation';
-import ThinAnimation from './InteractionAnimations/ThinAnimation';
-import InterruptAnimation from './InteractionAnimations/InterruptAnimation';
 import { useAnchorResolver, constellationKey } from '../../context/AnchorRegistry';
 import { primitiveFor, themeFor, anchorKeyFor, expandSlotFor, type Primitive } from './anim/theme';
 import type { PrimitiveProps } from './anim/AnchoredStage';
@@ -184,53 +174,23 @@ function renderAnimation(
   resolve: (key: string) => DOMRect | null,
   turnResults: SlotResult[],
 ) {
-  // Migrated effects play ON the real card via an anchored primitive.
+  // Every effect now plays ON the real card (or, for `interrupt`, across the
+  // screen) via an anchored primitive. An animation with no anchored primitive
+  // (only `thin`/`dissolve`, which is narrated inline by MethodSelect and never
+  // reaches this sequencer) renders nothing rather than crashing.
   const primitive = primitiveFor(report.animation);
   const Anchored = ANCHORED[primitive];
-  if (Anchored) {
-    const rect = resolve(anchorKeyFor(report));
-    const theme = themeFor(report, turnResults);
-    const durationMs = DURATION[report.animation] ?? DEFAULT_DURATION;
-    // Mirror reflects between two cards: resolve the source card's rect too.
-    const sourceRect =
-      primitive === 'mirror' && typeof report.sourceSlot === 'number'
-        ? resolve(constellationKey(report.sourceSlot))
-        : undefined;
-    return <Anchored rect={rect} theme={theme} durationMs={durationMs} sourceRect={sourceRect} />;
-  }
+  if (!Anchored) return null;
 
-  // Legacy centered animations (not yet migrated).
-  const props = {
-    description: report.description,
-    sourceSlot: report.sourceSlot ?? null,
-    targetSlot: report.targetSlot ?? null,
-  };
-
-  switch (report.animation) {
-    case 'reroll':
-      return <RerollAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
-    case 'flip':
-      return <FlipAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
-    case 'mirror':
-      return <MirrorAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
-    case 'add-choice':
-      return <AddChoiceAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
-    case 'second-result':
-      return <SecondResultAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
-    case 'shroud':
-      return <ShroudAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
-    case 'widen':
-      return <WidenAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
-    case 'thin':
-      return <ThinAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
-    case 'interrupt':
-      return <InterruptAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
-    case 'override':
-      return <OverrideAnimation description={props.description} sourceSlot={props.sourceSlot} targetSlot={props.targetSlot} />;
-    default:
-      // Generic fallback — no crash for unknown animation strings (e.g. 'roll-mode')
-      return null;
-  }
+  const rect = resolve(anchorKeyFor(report));
+  const theme = themeFor(report, turnResults);
+  const durationMs = DURATION[report.animation] ?? DEFAULT_DURATION;
+  // Mirror reflects between two cards: resolve the source card's rect too.
+  const sourceRect =
+    primitive === 'mirror' && typeof report.sourceSlot === 'number'
+      ? resolve(constellationKey(report.sourceSlot))
+      : undefined;
+  return <Anchored rect={rect} theme={theme} durationMs={durationMs} sourceRect={sourceRect} />;
 }
 
 // ── Styles ──
