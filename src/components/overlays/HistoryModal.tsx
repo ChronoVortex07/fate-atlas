@@ -62,7 +62,7 @@ export default function HistoryModal({ onClose }: { onClose: () => void }) {
               .slice()
               .reverse()
               .map((run: RunRecord) => (
-                <div key={run.id} style={runCardStyle}>
+                <div key={run.id} style={{ ...runCardStyle, ...(run.corrupted ? { borderColor: '#5a2230', boxShadow: '0 0 12px #ff2d4a33' } : {}) }}>
                   <div style={runHeaderStyle}>
                     <span style={badgeStyle}>
                       {QUESTION_LABELS[run.question] ?? run.question}
@@ -76,9 +76,11 @@ export default function HistoryModal({ onClose }: { onClose: () => void }) {
                       </span>
                     ))}
                   </div>
-                  {run.synthesis?.headline && (
+                  {run.corrupted ? (
+                    <p style={{ ...headlineStyle, color: '#ff8a98' }} className="cx-ca-text">error — recovered fragments</p>
+                  ) : run.synthesis?.headline ? (
                     <p style={headlineStyle}>{run.synthesis.headline}</p>
-                  )}
+                  ) : null}
                 </div>
               ))
           )}
