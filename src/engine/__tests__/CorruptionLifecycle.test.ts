@@ -99,6 +99,29 @@ describe('GameEngine corruption lifecycle', () => {
     expect(afterBase.order).toBe(20);           // untouched — base was never high
   });
 
+  it('routes to the rupture screen, wipes, scrubs corrupted records, then completeRupture → title', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const e = new GameEngine(3);
+    e.startTurn('self');
+    e.loadState({
+      affinities: { chaos: 100, order: 100, fate: 100, will: 100, light: 100, shadow: 100 },
+      history: [
+        { id: 'a', timestamp: 1, question: 'self', turnResults: [], effects: [], synthesis: null as any, corrupted: true },
+        { id: 'b', timestamp: 2, question: 'self', turnResults: [], effects: [], synthesis: null as any },
+      ],
+    });
+    e.setCorruption(99);
+    oneReading(e);
+    const s = e.getState();
+    expect(s.screen).toBe('rupture');
+    expect(s.affinityBase.chaos).toBe(RUPTURE_RESET);
+    expect(s.corruption.band).toBe('dormant');
+    expect(s.history.map((r) => r.id)).toEqual(['b']); // corrupted record scrubbed
+
+    e.completeRupture();
+    expect(e.getState().screen).toBe('title');
+  });
+
   it('resets hasIntruded when corruption starves to 0', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99); // suppress procs + seeding noise
     const e = new GameEngine(3);

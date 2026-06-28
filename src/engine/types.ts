@@ -579,7 +579,8 @@ export type Screen =
   | 'minigame'
   | 'happening'
   | 'interaction'
-  | 'result';
+  | 'result'
+  | 'rupture';
 
 export interface GameState {
   screen: Screen;

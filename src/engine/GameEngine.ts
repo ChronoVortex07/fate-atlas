@@ -53,6 +53,7 @@ export class GameEngine {
   private minigamesPerTurn: number;
   private pendingTransition: (() => void) | null = null;
   private pendingAdvance: (() => void) | null = null;
+  private pendingRupture = false;
   private turnEffects: EffectReport[] = []; // per-turn accumulator of all reports (for RunRecord)
   private happeningOfferedThisTurn = false;
   private selectedMethodInfected = false;
@@ -564,7 +565,17 @@ export class GameEngine {
     this.affinityEngine.decayMandate();
     this.affinityEngine.tickModifiers(); // decay/expire surges once per completed reading
     this.applyCorruptionTick();
-    this.maybeIntrude(); // B6 inserts a rupture guard above this call
+    // Rupture guard: if performRupture fired this tick, route to the interstitial
+    // screen BEFORE maybeIntrude (so a rupturing turn does not also intrude) and
+    // BEFORE the final-reading guard (the turn ends here regardless of completed count).
+    if (this.pendingRupture) {
+      this.pendingRupture = false;
+      this.state.screen = 'rupture';
+      this.saveToStorage();
+      this.notify();
+      return;
+    }
+    this.maybeIntrude();
     this.peekOverrideThisReading = null; // peek override lasts exactly one reading
 
     // Final reading?
@@ -636,8 +647,17 @@ export class GameEngine {
     this.notify();
   }
 
+  // Called by the UI when the rupture interstitial animation ends. Delegates to
+  // returnToTitle() which resets turn state, preserves carryover (affinities/
+  // history/usedHappeningIds — already scrubbed/reset by performRupture), and
+  // sets screen='title'. Confirmed safe: returnToTitle does no extra flows.
+  completeRupture(): void {
+    this.returnToTitle();
+  }
+
   // The Rupture: reality tears, the world re-forms low, and corruption vanishes
-  // without a trace. (The between-worlds interstitial is UI, handled in a later plan.)
+  // without a trace. History records marked corrupted are scrubbed — no trace.
+  // Sets pendingRupture so advanceAfterCommit routes to the 'rupture' interstitial.
   private performRupture(): void {
     const reset = AFFINITY_IDS.reduce(
       (acc, id) => ((acc[id] = RUPTURE_RESET), acc),
@@ -646,6 +666,8 @@ export class GameEngine {
     this.affinityEngine.setState(reset);
     this.affinityEngine.clearModifiers();
     this.corruptionEngine.clear();
+    this.state.history = this.state.history.filter((r) => !r.corrupted); // scrub — no trace
+    this.pendingRupture = true;
     this.bus.emit('corruption-ruptured', {});
   }
 
