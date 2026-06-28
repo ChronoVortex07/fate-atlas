@@ -41,6 +41,8 @@ export function seedChance(food: number): number {
   return Math.min(SEED_MAX_CHANCE, food * SEED_FOOD_FACTOR);
 }
 
+export const INFECTION_GAIN_MULT = 2; // corruption growth multiplier when an infected method is played
+
 // How many offered methods corruption taints at each band. Infection (the
 // amplified-growth mechanic + its selection-screen telegraph) begins at spreading.
 export function infectedCountForBand(band: CorruptionBand): number {

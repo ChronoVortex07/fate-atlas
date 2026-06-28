@@ -7,7 +7,7 @@ import { TurnOrchestrator } from './TurnOrchestrator';
 import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
 import { AFFINITY_DEFINITIONS, defaultAffinityState, AFFINITY_IDS } from '../data/affinities';
-import { RUPTURE_RESET, infectedCountForBand } from '../data/corruption';
+import { RUPTURE_RESET, infectedCountForBand, INFECTION_GAIN_MULT } from '../data/corruption';
 import { selectHappening, HAPPENING_GAP_CHANCE } from '../data/happenings';
 import { dispatch } from './events/EventDispatcher';
 import { buildAffinityResponders } from './responders/affinity';
@@ -53,6 +53,7 @@ export class GameEngine {
   private pendingAdvance: (() => void) | null = null;
   private turnEffects: EffectReport[] = []; // per-turn accumulator of all reports (for RunRecord)
   private happeningOfferedThisTurn = false;
+  private selectedMethodInfected = false;
 
   constructor(minigamesPerTurn = 3) {
     this.minigamesPerTurn = minigamesPerTurn;
@@ -346,6 +347,7 @@ export class GameEngine {
   confirmSelection(): void {
     const pending = this.state.drawPhase?.pendingSelection;
     if (!pending) return;
+    this.selectedMethodInfected = this.state.infectedMethods.includes(pending.finalIndex);
     this.state.selectedMethod = pending.method;
     this.state.activeSlotIndex = null;
     this.state.screen = 'minigame';
@@ -556,7 +558,9 @@ export class GameEngine {
   // notify() which re-derives them from the engine — only drains and ruptured are consumed here.
   private applyCorruptionTick(): void {
     const gains = this.affinityEngine.consumeRealizedGains();
-    const tick = this.corruptionEngine.tick(this.affinityEngine.getBase(), gains);
+    const mult = this.selectedMethodInfected ? INFECTION_GAIN_MULT : 1;
+    const tick = this.corruptionEngine.tick(this.affinityEngine.getBase(), gains, Math.random, mult);
+    this.selectedMethodInfected = false; // applies to exactly one reading
     if (Object.keys(tick.drains).length > 0) this.affinityEngine.erode(tick.drains);
     if (tick.ruptured) this.performRupture();
   }

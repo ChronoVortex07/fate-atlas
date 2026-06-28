@@ -31,6 +31,7 @@ export class CorruptionEngine {
     affinities: Record<AffinityId, number>,
     realizedGains: number,
     rng: () => number = Math.random,
+    infectionMult = 1,
   ): CorruptionTickResult {
     const food = corruptionFood(affinities);
 
@@ -44,7 +45,7 @@ export class CorruptionEngine {
     // Active: grow on food, starve without it.
     const drains: Partial<Record<AffinityId, number>> = {};
     if (food > 0) {
-      this.value = Math.min(PINNACLE, this.value + EROSION_RATE * food + SKIM_RATE * Math.max(0, realizedGains));
+      this.value = Math.min(PINNACLE, this.value + (EROSION_RATE * food + SKIM_RATE * Math.max(0, realizedGains)) * infectionMult);
       for (const id of AFFINITY_IDS) {
         const excess = affinities[id] - HIGH_THRESHOLD;
         if (excess > 0) drains[id] = DRAIN_RATE * excess;
