@@ -1,9 +1,10 @@
-import type { ThemeTag, DimensionValues, ModifierRole } from '../engine/types';
+import type { ThemeTag, DimensionValues, ModifierRole, HappeningEffect, AffinityAxis } from '../engine/types';
 
 export interface HappeningData {
   id: string;
   scene: string;
-  choices: { text: string; affinityChanges: Partial<Record<string, number>> }[];
+  choices: { text: string; effects: HappeningEffect[] }[];
+  axes: AffinityAxis[]; // dominant-axis tags for selection weighting (Task 3)
   tags: string[];
   themes: ThemeTag[];
   dimensions: DimensionValues;
@@ -15,10 +16,11 @@ export const HAPPENINGS: HappeningData[] = [
     id: 'crossroads',
     scene: 'A path splits before you beneath the star-field. One fork gleams with known light, the other vanishes into shadowed constellations.',
     choices: [
-      { text: 'Take the gleaming path — it feels certain.', affinityChanges: { order: 8 } },
-      { text: 'Step into the shadowed stars — uncertainty calls.', affinityChanges: { chaos: 8 } },
-      { text: 'Sit at the crossroads and wait for a sign.', affinityChanges: { order: 4, chaos: 4 } },
+      { text: 'Take the gleaming path — it feels certain.', effects: [{ kind: 'shift', affinity: 'order', amount: 8 }] },
+      { text: 'Step into the shadowed stars — uncertainty calls.', effects: [{ kind: 'shift', affinity: 'chaos', amount: 8 }] },
+      { text: 'Sit at the crossroads and wait for a sign.', effects: [{ kind: 'shift', affinity: 'order', amount: 4 }, { kind: 'shift', affinity: 'chaos', amount: 4 }] },
     ],
+    axes: ['fortune'],
     tags: ['event', 'choice', 'affinity-shift'],
     themes: ['mystery', 'transformation'],
     dimensions: { favorability: 0.0, certainty: -1.5, volatility: 1.5 },
@@ -28,9 +30,10 @@ export const HAPPENINGS: HappeningData[] = [
     id: 'falling-star',
     scene: 'A star tears across the sky, brilliant and brief. In its trail, a silence settles — the kind that asks a question.',
     choices: [
-      { text: 'Make a wish upon the falling light.', affinityChanges: { chaos: 10 } },
-      { text: 'Observe its trajectory — seek the pattern.', affinityChanges: { order: 10 } },
+      { text: 'Make a wish upon the falling light.', effects: [{ kind: 'shift', affinity: 'chaos', amount: 10 }] },
+      { text: 'Observe its trajectory — seek the pattern.', effects: [{ kind: 'shift', affinity: 'order', amount: 10 }] },
     ],
+    axes: ['fortune'],
     tags: ['event', 'choice', 'affinity-shift'],
     themes: ['upheaval', 'illumination'],
     dimensions: { favorability: 0.5, certainty: -0.5, volatility: 2.0 },
@@ -40,10 +43,11 @@ export const HAPPENINGS: HappeningData[] = [
     id: 'veiled-moon',
     scene: 'A veil of cloud drifts across the moon. Shapes form and dissolve — some feel like omens, others like memories.',
     choices: [
-      { text: 'Read the shapes as portents — they must mean something.', affinityChanges: { chaos: 6 } },
-      { text: 'Let them pass — clouds are only clouds.', affinityChanges: { order: 6 } },
-      { text: 'Draw the shapes in the dust, fixing them in place.', affinityChanges: { order: 3, chaos: 3 } },
+      { text: 'Read the shapes as portents — they must mean something.', effects: [{ kind: 'shift', affinity: 'chaos', amount: 6 }] },
+      { text: 'Let them pass — clouds are only clouds.', effects: [{ kind: 'shift', affinity: 'order', amount: 6 }] },
+      { text: 'Draw the shapes in the dust, fixing them in place.', effects: [{ kind: 'shift', affinity: 'order', amount: 3 }, { kind: 'shift', affinity: 'chaos', amount: 3 }] },
     ],
+    axes: ['fortune'],
     tags: ['event', 'choice', 'affinity-shift'],
     themes: ['mystery', 'surrender'],
     dimensions: { favorability: 0.0, certainty: -1.0, volatility: 1.0 },
@@ -53,9 +57,10 @@ export const HAPPENINGS: HappeningData[] = [
     id: 'whispering-thread',
     scene: 'A thread of starlight seems to whisper at the edge of hearing. Words form just beyond comprehension, promising secrets.',
     choices: [
-      { text: 'Lean in — strain to hear the whispered truth.', affinityChanges: { chaos: 7 } },
-      { text: 'Step back — some knowledge is not meant for you.', affinityChanges: { order: 7 } },
+      { text: 'Lean in — strain to hear the whispered truth.', effects: [{ kind: 'shift', affinity: 'chaos', amount: 7 }] },
+      { text: 'Step back — some knowledge is not meant for you.', effects: [{ kind: 'shift', affinity: 'order', amount: 7 }] },
     ],
+    axes: ['fortune'],
     tags: ['event', 'choice', 'affinity-shift'],
     themes: ['mystery', 'illumination'],
     dimensions: { favorability: 0.0, certainty: -2.0, volatility: 1.0 },
@@ -65,9 +70,10 @@ export const HAPPENINGS: HappeningData[] = [
     id: 'convergence',
     scene: 'Three constellations drift toward alignment above you. The ancients called this a moment when the veil wears thin.',
     choices: [
-      { text: 'Align yourself with the convergence — become part of the pattern.', affinityChanges: { order: 9 } },
-      { text: 'Stand at an angle to it — see what the pattern hides.', affinityChanges: { chaos: 9 } },
+      { text: 'Align yourself with the convergence — become part of the pattern.', effects: [{ kind: 'shift', affinity: 'order', amount: 9 }] },
+      { text: 'Stand at an angle to it — see what the pattern hides.', effects: [{ kind: 'shift', affinity: 'chaos', amount: 9 }] },
     ],
+    axes: ['fortune'],
     tags: ['event', 'choice', 'affinity-shift'],
     themes: ['harmony', 'illumination'],
     dimensions: { favorability: 1.0, certainty: 1.0, volatility: -0.5 },
@@ -77,9 +83,10 @@ export const HAPPENINGS: HappeningData[] = [
     id: 'echo-of-past-reading',
     scene: 'The echo of a past divination resurfaces — a card, a number, a symbol — asking to be reconsidered.',
     choices: [
-      { text: 'Reinterpret the past — its meaning may have changed.', affinityChanges: { chaos: 5 } },
-      { text: 'Acknowledge and release — the past is settled.', affinityChanges: { order: 5 } },
+      { text: 'Reinterpret the past — its meaning may have changed.', effects: [{ kind: 'shift', affinity: 'chaos', amount: 5 }] },
+      { text: 'Acknowledge and release — the past is settled.', effects: [{ kind: 'shift', affinity: 'order', amount: 5 }] },
     ],
+    axes: ['fortune'],
     tags: ['event', 'choice', 'affinity-shift'],
     themes: ['transformation', 'illumination'],
     dimensions: { favorability: 0.0, certainty: -0.5, volatility: 1.5 },
@@ -89,9 +96,10 @@ export const HAPPENINGS: HappeningData[] = [
     id: 'dark-constellation',
     scene: 'A gap in the stars catches your eye — not empty, but dark. A constellation made of absence rather than light.',
     choices: [
-      { text: 'Study the negative space — what is missing matters.', affinityChanges: { order: 6 } },
-      { text: 'Fill the void with your own pattern — create meaning.', affinityChanges: { chaos: 6 } },
+      { text: 'Study the negative space — what is missing matters.', effects: [{ kind: 'shift', affinity: 'order', amount: 6 }] },
+      { text: 'Fill the void with your own pattern — create meaning.', effects: [{ kind: 'shift', affinity: 'chaos', amount: 6 }] },
     ],
+    axes: ['fortune'],
     tags: ['event', 'choice', 'affinity-shift'],
     themes: ['mystery', 'surrender'],
     dimensions: { favorability: -0.5, certainty: -1.5, volatility: 1.0 },
@@ -101,9 +109,10 @@ export const HAPPENINGS: HappeningData[] = [
     id: 'many-threads',
     scene: 'Countless threads of fate shimmer into view, each one a path not taken. The weave is impossibly complex.',
     choices: [
-      { text: 'Trace one thread backward — understand what shaped it.', affinityChanges: { order: 7 } },
-      { text: 'Pluck a thread and see what unravels — test the weave.', affinityChanges: { chaos: 7 } },
+      { text: 'Trace one thread backward — understand what shaped it.', effects: [{ kind: 'shift', affinity: 'order', amount: 7 }] },
+      { text: 'Pluck a thread and see what unravels — test the weave.', effects: [{ kind: 'shift', affinity: 'chaos', amount: 7 }] },
     ],
+    axes: ['fortune'],
     tags: ['event', 'choice', 'affinity-shift'],
     themes: ['mystery', 'transformation'],
     dimensions: { favorability: 0.0, certainty: -2.0, volatility: 2.0 },

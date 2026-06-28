@@ -1,4 +1,4 @@
-import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, RollMode, DivinationType, TarotCardFace, TableCard, TarotDraftState, AstralCast, IChingResult, HandCard } from './types';
+import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, RollMode, DivinationType, TarotCardFace, TableCard, TarotDraftState, AstralCast, IChingResult, HandCard, HappeningEffect } from './types';
 import { FULL_DECK, buildFace, pickOrientation, DECK_BY_ID, consolidateSpread, reverseSpread } from '../data/tarot';
 import { EventBus } from './EventBus';
 import { AffinityEngine } from './AffinityEngine';
@@ -79,6 +79,7 @@ export class GameEngine {
       synthesis: null,
       happening: null,
       selectedHappeningChoice: null,
+      pendingReadingEffects: [],
       history: [],
       eventLog: [],
       debug: false,
@@ -544,10 +545,7 @@ export class GameEngine {
       type: 'happening',
       id: data.id,
       scene: data.scene,
-      choices: data.choices.map((c) => ({
-        text: c.text,
-        affinityChanges: c.affinityChanges as Partial<Record<AffinityId, number>>,
-      })),
+      choices: data.choices.map((c) => ({ text: c.text, effects: c.effects })),
       tags: data.tags,
       themes: data.themes,
       dimensions: data.dimensions,
@@ -560,7 +558,7 @@ export class GameEngine {
     if (draft.addChoice === true && this.state.happening.choices.length > 0) {
       const bonusChoice = {
         text: 'A hidden path emerges — ' + this.state.happening.choices[0].text,
-        affinityChanges: { chaos: 5 } as Partial<Record<AffinityId, number>>,
+        effects: [{ kind: 'shift', affinity: 'chaos', amount: 5 }] as HappeningEffect[],
       };
       this.state.happening = {
         ...this.state.happening,
@@ -581,8 +579,10 @@ export class GameEngine {
       throw new Error(`Choice ${choiceIndex} not found in happening`);
     }
 
-    for (const [id, delta] of Object.entries(choice.affinityChanges)) {
-      this.affinityEngine.shift(id as AffinityId, delta as number, `happening:${this.state.happening.id}`);
+    for (const effect of choice.effects) {
+      if (effect.kind === 'shift') {
+        this.affinityEngine.shift(effect.affinity, effect.amount, `happening:${this.state.happening.id}`);
+      }
     }
 
     this.state.selectedHappeningChoice = choiceIndex;

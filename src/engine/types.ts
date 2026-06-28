@@ -367,17 +367,45 @@ export interface StringsResult extends ThematicData {
   tags: Tag[];
 }
 
+// ── Happening effects (Phase 2) ──
+export type AffinityAxis = 'agency' | 'information' | 'fortune';
+
+// Queued flags a happening grants to the NEXT reading; each maps onto existing
+// draft/peek vocabulary consumed at that reading's dispatch trigger (no new engine).
+export type ReadingEffectId =
+  | 'widen-pool'     // next draw: +1 method offered (cf. will-widen-pool)
+  | 'guarantee-peek' // next reading: peek gate forced open for one reading
+  | 'deny-peek'      // next reading: peek gate forced shut for one reading
+  | 'grant-reroll'   // next dice reading: offer a reroll (cf. will-offer-reroll)
+  | 'spawn-second'   // next reading commit: spawn a second result (cf. chaos-second-result)
+  | 'shroud-card';   // next draw: shroud one method (cf. shadow-shroud)
+
+// Phase 3 applies these to EFFECTIVE values via the unified modifier list. Phase 2
+// only carries the data; resolution is a no-op stub.
+export type TransformPayload = {
+  transform: 'invert-pair' | 'invert-all' | 'scramble';
+  axis?: AffinityAxis;
+};
+
+export type HappeningEffect =
+  | { kind: 'shift';    affinity: AffinityId; amount: number }                              // permanent nudge
+  | { kind: 'surge';    deltas: Partial<Record<AffinityId, number>>; readings: number }     // decaying temporary spike
+  | { kind: 'reading';  effect: ReadingEffectId }                                           // modify the next reading(s)
+  | { kind: 'cost';     affinity: AffinityId; amount: number }                              // positive magnitude, applied as a drain
+  | { kind: 'gamble';   outcomes: { weight: number; effects: HappeningEffect[] }[] }        // weighted branch
+  | { kind: 'upheaval'; transform: TransformPayload; readings: number };                    // Phase 3 (no-op stub in Phase 2)
+
+export interface HappeningChoice {
+  text: string;                 // the cryptic choice text shown to the player
+  effects: HappeningEffect[];   // one or more effects applied on choosing
+}
+
 export interface HappeningResult extends ThematicData {
   type: 'happening';
   id: string;
   scene: string; // atmospheric description
   choices: HappeningChoice[];
   tags: Tag[];
-}
-
-export interface HappeningChoice {
-  text: string; // the cryptic choice text shown to player
-  affinityChanges: Partial<Record<AffinityId, number>>;
 }
 
 export type DivinationResult = TarotResult | DiceResult | IChingResult | AstralResult | RuneResult | StringsResult;
@@ -530,6 +558,7 @@ export interface GameState {
   synthesis: SynthesisResult | null;
   happening: HappeningResult | null;
   selectedHappeningChoice: number | null;
+  pendingReadingEffects: ReadingEffectId[]; // queued by happenings, consumed by the next reading (turn-scoped)
   history: RunRecord[];
   eventLog: GameEvent[];
   debug: boolean;

@@ -83,11 +83,19 @@ function detectDecisions(state: ReturnType<typeof useGameEngine>['state']): Deci
 
   // 1. Happening choices
   if (state.screen === 'happening' && state.happening) {
-    const options: DecisionOption[] = state.happening.choices.map((choice) => ({
-      label: choice.text.length > 50 ? choice.text.slice(0, 47) + '…' : choice.text,
-      deltas: (choice.affinityChanges ?? {}) as Partial<Record<AffinityId, number>>,
-      impacts: computeImpacts((choice.affinityChanges ?? {}) as Partial<Record<AffinityId, number>>),
-    }));
+    const options: DecisionOption[] = state.happening.choices.map((choice) => {
+      const deltas: Partial<Record<AffinityId, number>> = {};
+      for (const effect of choice.effects) {
+        if (effect.kind === 'shift') {
+          deltas[effect.affinity] = (deltas[effect.affinity] ?? 0) + effect.amount;
+        }
+      }
+      return {
+        label: choice.text.length > 50 ? choice.text.slice(0, 47) + '…' : choice.text,
+        deltas,
+        impacts: computeImpacts(deltas),
+      };
+    });
     groups.push({ context: `Happening: "${(state.happening.scene ?? '').slice(0, 40)}"`, options });
   }
 
