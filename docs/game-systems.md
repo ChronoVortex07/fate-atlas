@@ -137,7 +137,7 @@ and all bands/effects/hints read **effective**; `getBase()` exposes the permanen
 
 > **Upheaval layer:** after surges are summed, **transform modifiers** in the unified
 > modifier list are applied **in list order** to bend the effective values further (the
-> upheaval layer, §10). `shift()` always writes **base** — the base-untouched invariant
+> upheaval layer, §8). `shift()` always writes **base** — the base-untouched invariant
 > holds even during an active upheaval; only the effective vector is bent.
 
 ---
@@ -518,7 +518,7 @@ Each choice carries `effects: HappeningEffect[]`. Six kinds are defined:
 | `surge` | Decaying temporary spike — `GameEngine.grantSurge(deltas, readings)` → the Phase 1 base/effective surge layer (§2). Contributes to effective value for `readings` readings then expires. |
 | `reading` | Queues a `ReadingEffectId` onto `state.pendingReadingEffects`; consumed by the **next** reading then dropped. |
 | `gamble` | Weighted branch — exactly one outcome's `effects[]` resolve (chosen by `pickGambleOutcome`). |
-| `upheaval` | Temporary transform — `GameEngine.grantUpheaval(transform, readings)` → the Phase 3 transform/upheaval layer (§10). Bends the effective vector for `readings` readings then snap-back (cliff expiry — no step-down). |
+| `upheaval` | Temporary transform — `GameEngine.grantUpheaval(transform, readings)` → the Phase 3 transform/upheaval layer (§8). Bends the effective vector for `readings` readings then snap-back (cliff expiry — no step-down). |
 
 ### 7d. `ReadingEffectId` → engine vocabulary
 
