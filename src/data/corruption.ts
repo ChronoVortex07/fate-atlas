@@ -40,3 +40,14 @@ export function seedChance(food: number): number {
   if (food <= 0) return 0;
   return Math.min(SEED_MAX_CHANCE, food * SEED_FOOD_FACTOR);
 }
+
+// How many offered methods corruption taints at each band. Infection (the
+// amplified-growth mechanic + its selection-screen telegraph) begins at spreading.
+export function infectedCountForBand(band: CorruptionBand): number {
+  switch (band) {
+    case 'spreading': return 1;
+    case 'virulent':
+    case 'pinnacle': return 2;
+    default: return 0; // dormant, seeded — no infected methods yet
+  }
+}

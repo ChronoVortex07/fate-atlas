@@ -7,7 +7,7 @@ import { TurnOrchestrator } from './TurnOrchestrator';
 import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
 import { AFFINITY_DEFINITIONS, defaultAffinityState, AFFINITY_IDS } from '../data/affinities';
-import { RUPTURE_RESET } from '../data/corruption';
+import { RUPTURE_RESET, infectedCountForBand } from '../data/corruption';
 import { selectHappening, HAPPENING_GAP_CHANCE } from '../data/happenings';
 import { dispatch } from './events/EventDispatcher';
 import { buildAffinityResponders } from './responders/affinity';
@@ -78,6 +78,7 @@ export class GameEngine {
       questionType: null,
       availableMethods: [],
       shroudedMethods: [],
+      infectedMethods: [],
       drawPhase: null,
       selectedMethod: null,
       turnResults: [],
@@ -209,6 +210,20 @@ export class GameEngine {
     else this.notify();
   }
 
+  // Pick which offered methods corruption taints this draw — count scales with the
+  // corruption band; indices are distinct and within the pool.
+  private rollInfectedMethods(poolSize: number): number[] {
+    const count = Math.min(poolSize, infectedCountForBand(this.corruptionEngine.getBand()));
+    if (count <= 0) return [];
+    const chosen: number[] = [];
+    while (chosen.length < count) {
+      let i = Math.floor(Math.random() * poolSize);
+      while (chosen.includes(i)) i = (i + 1) % poolSize; // linear-probe to a free index
+      chosen.push(i);
+    }
+    return chosen.sort((a, b) => a - b);
+  }
+
   // Refills/generates the pool, routing it through the select draw triggers so
   // pool-shaping (will-widen/fate-thin) and shrouding effects participate.
   private buildPool(bias: Partial<Record<DivinationType, number>> = {}, refill = false): void {
@@ -239,6 +254,8 @@ export class GameEngine {
         .find((i) => !this.state.shroudedMethods.includes(i));
       if (free !== undefined) this.state.shroudedMethods = [...this.state.shroudedMethods, free];
     }
+
+    this.state.infectedMethods = this.rollInfectedMethods(pool.length);
 
     // The draw-phase effects (widen/thin/shroud) are narrated INSIDE the card
     // spread by MethodSelect (EventBanner + in-spread animation), not by the
@@ -1457,6 +1474,7 @@ export class GameEngine {
     this.state.questionType = null;
     this.state.availableMethods = [];
     this.state.shroudedMethods = [];
+    this.state.infectedMethods = [];
     this.state.drawPhase = null;
     this.state.selectedMethod = null;
     this.state.turnResults = [];

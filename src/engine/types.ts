@@ -573,6 +573,7 @@ export interface GameState {
   questionType: QuestionType | null;
   availableMethods: DivinationType[];
   shroudedMethods: number[];
+  infectedMethods: number[]; // indices of offered methods tainted by corruption (parallels shroudedMethods)
   drawPhase: DrawPhase | null;
   selectedMethod: DivinationType | null;
   turnResults: SlotResult[];
