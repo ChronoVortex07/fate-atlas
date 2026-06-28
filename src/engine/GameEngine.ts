@@ -7,7 +7,7 @@ import { TurnOrchestrator } from './TurnOrchestrator';
 import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
 import { AFFINITY_DEFINITIONS, defaultAffinityState, AFFINITY_IDS } from '../data/affinities';
-import { RUPTURE_RESET, infectedCountForBand, INFECTION_GAIN_MULT } from '../data/corruption';
+import { RUPTURE_RESET, infectedCountForBand, INFECTION_GAIN_MULT, CORRUPTED_TAG } from '../data/corruption';
 import { selectHappening, HAPPENING_GAP_CHANCE } from '../data/happenings';
 import { dispatch } from './events/EventDispatcher';
 import { buildAffinityResponders } from './responders/affinity';
@@ -16,6 +16,7 @@ import { buildAstralResponders } from './responders/astral';
 import { buildIChingResponders } from './responders/iching';
 import { buildRuneResponders } from './responders/runes';
 import { buildStringsResponders } from './responders/strings';
+import { buildCorruptionResponders } from './responders/corruption';
 import { findScenario, freshStage, DEBUG_SCENARIOS } from './events/scenarios';
 import type { Responder, PhaseContext, PhaseDraft, EffectReport } from './events/types';
 import { planAstralCast as planAstralCastPure, resolveCastSelection as resolveCastSelectionPure, shouldOfferRecast } from './astral';
@@ -63,7 +64,7 @@ export class GameEngine {
     this.orchestrator = new TurnOrchestrator(this.bus);
     this.readingPlanner = new ReadingPlanner();
     this.narrativeAssembler = new NarrativeAssembler();
-    this.responders = [...buildAffinityResponders(), ...buildInteractionResponders(), ...buildAstralResponders(), ...buildIChingResponders(), ...buildRuneResponders(), ...buildStringsResponders()];
+    this.responders = [...buildAffinityResponders(), ...buildInteractionResponders(), ...buildAstralResponders(), ...buildIChingResponders(), ...buildRuneResponders(), ...buildStringsResponders(), ...buildCorruptionResponders()];
     this.state = this.defaultState();
     this.cachedSnapshot = JSON.parse(JSON.stringify(this.state)) as GameState;
   }
@@ -467,6 +468,9 @@ export class GameEngine {
         this.state.questionType ?? undefined,
       );
       this.state.turnResults = [...this.state.turnResults, second];
+      if (draft.corruptSpawn === true && !second.tags.includes(CORRUPTED_TAG)) {
+        second.tags = [...second.tags, CORRUPTED_TAG];
+      }
       const newIndex = this.state.turnResults.length - 1;
       // The responder cannot know the post-append index; patch its queued report
       // so the animation can spotlight the new fan slot.

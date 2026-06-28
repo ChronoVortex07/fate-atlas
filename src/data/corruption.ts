@@ -53,3 +53,5 @@ export function infectedCountForBand(band: CorruptionBand): number {
     default: return 0; // dormant, seeded — no infected methods yet
   }
 }
+
+export const CORRUPTED_TAG = 'corrupted'; // marks a result the player can tell was tampered with
