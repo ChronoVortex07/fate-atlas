@@ -6,8 +6,8 @@ import { CorruptionEngine } from './CorruptionEngine';
 import { TurnOrchestrator } from './TurnOrchestrator';
 import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
-import { AFFINITY_DEFINITIONS, defaultAffinityState, AFFINITY_IDS } from '../data/affinities';
-import { RUPTURE_RESET, infectedCountForBand, INFECTION_GAIN_MULT, CORRUPTED_TAG } from '../data/corruption';
+import { AFFINITY_DEFINITIONS, defaultAffinityState, AFFINITY_IDS, BAND_ORDER } from '../data/affinities';
+import { RUPTURE_RESET, infectedCountForBand, INFECTION_GAIN_MULT, CORRUPTED_TAG, CORRUPTION_BANDS } from '../data/corruption';
 import { selectHappening, HAPPENING_GAP_CHANCE } from '../data/happenings';
 import { dispatch } from './events/EventDispatcher';
 import { buildAffinityResponders } from './responders/affinity';
@@ -77,6 +77,7 @@ export class GameEngine {
       affinities: defaultAffinityState(),
       affinityBase: defaultAffinityState(),
       corruption: { value: 0, band: 'dormant' },
+      corruptionWarning: null,
       questionType: null,
       availableMethods: [],
       shroudedMethods: [],
@@ -109,11 +110,41 @@ export class GameEngine {
     this.state.affinityBase = this.affinityEngine.getBase();
     this.state.affinityEffects = this.affinityEngine.getEffects();
     this.state.corruption = { value: this.corruptionEngine.getValue(), band: this.corruptionEngine.getBand() };
+    this.state.corruptionWarning = this.deriveCorruptionWarning();
     if (this.peekOverrideThisReading === 'guarantee') this.state.affinityEffects = { ...this.state.affinityEffects, peekAvailable: true };
     else if (this.peekOverrideThisReading === 'deny') this.state.affinityEffects = { ...this.state.affinityEffects, peekAvailable: false };
     this.state.eventLog = this.bus.getHistory();
     this.cachedSnapshot = JSON.parse(JSON.stringify(this.state)) as GameState;
     this.listeners.forEach((fn) => fn(this.cachedSnapshot));
+  }
+
+  // Light's read on corruption. Below Ascendant, Light "cannot recognize a predator
+  // of itself" → null. Ascendant warns vaguely; Dominant names the tainted methods.
+  // At virulent+, the warning itself is corrupted (terminal lucidity): visibly false
+  // reassurance, after the danger is already obvious. Following Light never removes
+  // corruption — Light high enough to warn you is itself the excess that feeds it.
+  private deriveCorruptionWarning(): import('./types').CorruptionWarning | null {
+    const cband = this.corruptionEngine.getBand();
+    if (cband === 'dormant') return null;
+
+    const lightIdx = BAND_ORDER.indexOf(this.affinityEngine.bandOf('light'));
+    if (lightIdx < BAND_ORDER.indexOf('ascendant')) return null;
+
+    if (CORRUPTION_BANDS.indexOf(cband) >= CORRUPTION_BANDS.indexOf('virulent')) {
+      return {
+        present: true, tainted: true, methods: [],
+        text: 'The light swells, certain and warm: there is nothing wrong here. All is well. All is well.',
+      };
+    }
+
+    const namesMethods = this.affinityEngine.bandOf('light') === 'dominant';
+    return {
+      present: true, tainted: false,
+      methods: namesMethods ? [...this.state.infectedMethods] : [],
+      text: namesMethods
+        ? 'The light picks out the tainted paths — something feeds where they lead.'
+        : 'The light wavers — something here does not belong, though its shape stays hidden.',
+    };
   }
 
   // ---------- Public accessors for debug panel ----------

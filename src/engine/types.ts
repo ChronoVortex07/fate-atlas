@@ -52,6 +52,14 @@ export interface CorruptionSnapshot {
   band: CorruptionBand;
 }
 
+// Light's read on corruption. Null when Light cannot perceive a predator.
+export interface CorruptionWarning {
+  present: boolean;   // a predator is sensed
+  tainted: boolean;   // the warning itself is corrupted (terminal lucidity, virulent+)
+  methods: number[];  // indices of methods named as tainted (empty unless Light is Dominant)
+  text: string;       // diegetic flavor line for the UI
+}
+
 export interface AffinityState {
   id: AffinityId;
   value: number; // 0–100
@@ -570,6 +578,7 @@ export interface GameState {
   affinities: Record<AffinityId, number>;     // effective (base + surges)
   affinityBase: Record<AffinityId, number>;   // permanent base only (for surge transparency/debug)
   corruption: CorruptionSnapshot;
+  corruptionWarning: CorruptionWarning | null;
   questionType: QuestionType | null;
   availableMethods: DivinationType[];
   shroudedMethods: number[];
