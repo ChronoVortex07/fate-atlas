@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react';
 import MethodCard, { type MethodCardVisual, type MethodCardMotion } from './MethodCard';
+import type { CorruptedProp } from './MethodCardFront';
 import type { DivinationType } from '../../engine/types';
 
 export interface CardSpreadProps {
@@ -18,11 +19,13 @@ export interface CardSpreadProps {
   // Optional forwarded ref to the scroll row, so a parent can measure individual
   // card positions (children[i]) — used to aim the Fate-force hand at a card.
   containerRef?: React.RefObject<HTMLDivElement>;
+  // Optional: returns corruption class for index i (null = normal)
+  corruptedFor?: (index: number) => CorruptedProp;
 }
 
 export default function CardSpread({
   methods, visualFor, motionFor, appearedFor, appearDelayFor, dissolvingFor, phantomIndex,
-  interactive, onPick, dealNonce, containerRef,
+  interactive, onPick, dealNonce, containerRef, corruptedFor,
 }: CardSpreadProps) {
   const internalRef = useRef<HTMLDivElement>(null);
   const scrollRef = containerRef ?? internalRef;
@@ -51,6 +54,7 @@ export default function CardSpread({
           phantom={i === phantomIndex}
           interactive={interactive}
           onClick={() => onPick(i)}
+          corrupted={corruptedFor ? corruptedFor(i) : null}
         />
       ))}
     </div>

@@ -2,9 +2,11 @@ import MethodEmblem from './MethodEmblem';
 import { METHOD_FRONTS } from '../../data/method-cards';
 import type { DivinationType } from '../../engine/types';
 
+export type CorruptedProp = 'spreading' | 'virulent' | null;
+
 // The face-up card content: Celestial-Veil frame + family-tinted emblem, title,
 // and flavor. Fills its parent (MethodCard) which owns the 2:3 box + flip.
-export default function MethodCardFront({ method }: { method: DivinationType }) {
+export default function MethodCardFront({ method, corrupted = null }: { method: DivinationType; corrupted?: CorruptedProp }) {
   const cfg = METHOD_FRONTS[method];
   return (
     <div style={{ ...frontStyle, borderColor: cfg.color + '55' }}>
@@ -14,10 +16,16 @@ export default function MethodCardFront({ method }: { method: DivinationType }) 
       <span style={{ ...corner, bottom: 4, left: 4, borderColor: cfg.color, borderRight: 'none', borderTop: 'none' }} />
       <span style={{ ...corner, bottom: 4, right: 4, borderColor: cfg.color, borderLeft: 'none', borderTop: 'none' }} />
 
-      <div style={{ color: cfg.color, filter: `drop-shadow(0 0 6px ${cfg.color}55)` }}>
+      {/* corruption overlays for virulent band */}
+      {corrupted === 'virulent' && <div className="cx-scanlines" />}
+      {corrupted === 'virulent' && <div className="cx-mosh m1" />}
+      {corrupted === 'virulent' && <div className="cx-mosh m2" />}
+      {corrupted === 'virulent' && <div className="cx-mosh m3" />}
+
+      <div className={corrupted ? 'cx-glyph' : undefined} style={{ color: cfg.color, filter: `drop-shadow(0 0 6px ${cfg.color}55)` }}>
         <MethodEmblem method={method} size={Math.round(0.42 * 100)} />
       </div>
-      <div style={titleStyle}>{cfg.title}</div>
+      <div className={corrupted ? 'cx-name' : undefined} style={titleStyle}>{cfg.title}</div>
       <div style={flavorStyle}>{cfg.flavor}</div>
     </div>
   );
