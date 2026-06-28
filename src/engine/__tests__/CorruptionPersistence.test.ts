@@ -28,6 +28,13 @@ describe('corruption persistence', () => {
     expect(e.getState().corruption.value).toBe(42);
   });
 
+  it('preserves corruption across returnToQuestionSelect', () => {
+    const e = new GameEngine(3);
+    e.setCorruption(42);
+    e.returnToQuestionSelect();
+    expect(e.getState().corruption.value).toBe(42);
+  });
+
   it('clears corruption on clearHistory', () => {
     const e = new GameEngine(3);
     e.setCorruption(42);

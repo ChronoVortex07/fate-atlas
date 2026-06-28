@@ -214,8 +214,11 @@ world's six affinities being hoarded far above their natural baseline. It is **n
 an affinity: it has its own 0–100 scalar (`CorruptionEngine`), its own bands, and
 is exempt from coupling, diminishing returns, pairing, and baseline-drift.
 
-- **Food = imbalance.** `Σ max(0, affinity − 81)` across the six. Two maxed
-  affinities feed it as hard as several merely-high ones — concentration is punished.
+- **Food = imbalance.** `Σ max(0, affinity − 81)` across the six, measured on the
+  **raw base** vector — NOT the upheaval-bent effective view. An active inversion
+  upheaval cannot misdirect what corruption feeds on or drains; the real hoard is
+  always the target. Two maxed affinities feed it as hard as several merely-high
+  ones — concentration is punished.
 - **Seed.** Each completed reading, if there is any food, a chance (scaling with
   food, capped) spawns corruption. No imbalance → it can never appear.
 - **Grow.** While fed, corruption rises by erosion (per excess point) plus a skim

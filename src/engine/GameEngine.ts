@@ -533,9 +533,12 @@ export class GameEngine {
 
   // Once per completed reading: grow/seed/starve corruption off the current
   // imbalance, bleed the hoarded affinities down, and fire the Rupture at the pinnacle.
+  // NOTE: tick() receives the raw BASE vector (not the upheaval-bent effective view)
+  // so corruption punishes the real hoard; tick result value/band are surfaced via
+  // notify() which re-derives them from the engine — only drains and ruptured are consumed here.
   private applyCorruptionTick(): void {
     const gains = this.affinityEngine.consumeRealizedGains();
-    const tick = this.corruptionEngine.tick(this.affinityEngine.getState(), gains);
+    const tick = this.corruptionEngine.tick(this.affinityEngine.getBase(), gains);
     if (Object.keys(tick.drains).length > 0) this.affinityEngine.erode(tick.drains);
     if (tick.ruptured) this.performRupture();
   }

@@ -63,4 +63,39 @@ describe('GameEngine corruption lifecycle', () => {
     oneReading(e);
     expect(e.getState().corruption.value).toBe(0);
   });
+
+  it('feeds on BASE not effective vector: active upheaval inversion cannot redirect corruption food', () => {
+    // Regression for the getState() → getBase() fix:
+    // chaos is hoarded high in BASE (real food); order is low in base.
+    // The invert-pair upheaval on the fortune axis makes chaos LOOK low in the
+    // effective vector and order LOOK high — the old getState() path would misfeed
+    // on order (low base, fake-high effective) and NOT erode chaos (high base).
+    // With getBase(), corruption must still target chaos (the real hoard).
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const e = new GameEngine(3);
+    e.startTurn('self');
+    e.loadState({ affinities: { chaos: 100, order: 20, fate: 50, will: 50, light: 50, shadow: 50 } });
+    e.setCorruption(50);
+
+    // Grant an active invert-pair upheaval on the fortune axis (chaos ↔ order).
+    // This flips the effective view: chaos reads ≈0, order reads ≈80 — but base is unchanged.
+    e.grantUpheaval({ transform: 'invert-pair', axis: 'fortune' }, 3, 'test');
+
+    // Sanity: effective vector now shows chaos low, order high.
+    const beforeEff = e.getState().affinities;
+    expect(beforeEff.chaos).toBeLessThan(10); // ≈ 100 - 100
+    expect(beforeEff.order).toBeGreaterThan(70); // ≈ 100 - 20
+
+    // Base is untouched by the transform.
+    const beforeBase = e.getState().affinityBase;
+    expect(beforeBase.chaos).toBe(100);
+    expect(beforeBase.order).toBe(20);
+
+    oneReading(e);
+
+    // Corruption must have eroded the HIGH-BASE affinity (chaos), not order.
+    const afterBase = e.getState().affinityBase;
+    expect(afterBase.chaos).toBeLessThan(100); // eroded — base was the real hoard
+    expect(afterBase.order).toBe(20);           // untouched — base was never high
+  });
 });
