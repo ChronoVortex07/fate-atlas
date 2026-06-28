@@ -72,7 +72,7 @@ describe('AffinityEngine.shift pipeline', () => {
     expect(s.shadow).toBe(49);
   });
 
-  it('diminishing returns shrink successive same-run gains and floor at 0.5', () => {
+  it('diminishing returns shrink successive same-run gains and floor at 0.67', () => {
     const e = make();
     const g1 = noJitter(() => e.shift('chaos', 10, 't')); // dr=1.00 → 10
     const g2 = noJitter(() => e.shift('chaos', 10, 't')); // dr=0.95 → 9.5

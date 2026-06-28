@@ -1635,6 +1635,7 @@ export class GameEngine {
     this.usedHappeningIds = new Set(saved.usedHappeningIds);
     this.peekOverrideThisReading = null;
     this.pendingEmergentUpheaval = null;
+    this.pendingRupture = false;
     this.happeningOfferedThisTurn = false;
     this.selectedMethodInfected = false;
     this.bus.clear();
@@ -1661,6 +1662,7 @@ export class GameEngine {
     this.usedHappeningIds = new Set(usedIds);
     this.peekOverrideThisReading = null;
     this.pendingEmergentUpheaval = null;
+    this.pendingRupture = false;
     this.happeningOfferedThisTurn = false;
     this.selectedMethodInfected = false;
     this.bus.clear();

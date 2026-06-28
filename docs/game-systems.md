@@ -282,7 +282,7 @@ synthesis result (headline, paragraphs, tensionNote, affinityNote) before writin
 |-------|---------|------------------------|
 | 0 | dormant / seeded | Clean — no alteration |
 | 1 | spreading | Subtle: tone drift (e.g. `promise → warning`, `clarity → static`) + interior letter transpositions; each word has ~25% chance of one effect |
-| 2 | virulent (67–98) | Heavy ramp: same drift/typo pass (28%), plus redaction (`█`-blocks, ~18%), Unicode combining-character garble (~30%), stutter repeats (~10%), and **one** injected contradiction sentence appended |
+| 2 | virulent (67–98) | Heavy ramp: same drift/typo pass (28%), plus redaction (`█`-blocks, ~18%), Unicode combining-character garble (~40%), stutter repeats (~10%), and **one** injected contradiction sentence appended |
 | 3 | virulent near-pinnacle (ramp from 67→99) | As level 2 but **two** contradictions injected; the continuous ramp `2 + min(1, (value−67)/(99−67))` means falsification deepens as the Rupture approaches |
 
 The synthesis is falsified in-place on `state.synthesis`; the underlying result objects (`turnResults`) are **not** altered. The LLM prompt (`generateLLMPrompt`) is independently passed through `corruptText` at the same level, so sharing a reading at virulent+ exports a corrupted transcript.

@@ -1,6 +1,5 @@
 import { useEffect, useMemo } from 'react';
 import { useGameEngine } from '../../hooks/useGameEngine';
-import '../../styles/corruption.css';
 
 const RUPTURE_MS = 8000; // matches the 8s keyframe timeline
 

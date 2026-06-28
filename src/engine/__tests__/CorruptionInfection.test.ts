@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { GameEngine } from '../GameEngine';
-import { infectedCountForBand } from '../../data/corruption';
-import { rollInfectedCount } from '../../data/corruption';
+import { infectedCountForBand, rollInfectedCount } from '../../data/corruption';
 
 describe('minigame infection — infected method data', () => {
   it('marks no methods when corruption is dormant', () => {
