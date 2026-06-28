@@ -113,7 +113,7 @@ across runs (localStorage `fate-atlas-save`); at the start of each run every aff
 Result-tag feeds grant `+5` per matching tag; action feeds grant `+6` (`+3` to a secondary
 axis). Happening *slots* do **not** feed affinity on reveal — only the **chosen** happening
 option shifts affinity. Happening choices may also grant **surges** (decaying temporary
-spikes) via `GameEngine.grantSurge` → `AffinityEngine.grantSurge` (see §7 and the
+spikes) via `GameEngine.grantSurge` → `AffinityEngine.grantSurge` (see §8 and the
 base/effective split above).
 
 Fortune **tag** feeds (Chaos/Order from result tags **and** the spread/strings coherence bonuses) are capped at **+8 base per run** (`FORTUNE_TAG_CAP`); behavior feeds (player actions) are uncapped (diminishing returns still applies).
@@ -137,7 +137,7 @@ and all bands/effects/hints read **effective**; `getBase()` exposes the permanen
 
 > **Upheaval layer:** after surges are summed, **transform modifiers** in the unified
 > modifier list are applied **in list order** to bend the effective values further (the
-> upheaval layer, §8). `shift()` always writes **base** — the base-untouched invariant
+> upheaval layer, §9). `shift()` always writes **base** — the base-untouched invariant
 > holds even during an active upheaval; only the effective vector is bent.
 
 ---
@@ -145,7 +145,7 @@ and all bands/effects/hints read **effective**; `getBase()` exposes the permanen
 ## 3. Effects of each band
 
 Two kinds of effect derive from a band: **static** modifiers (always on at that band, no
-roll) and **event-driven** effects (probabilistic responders, see §4).
+roll) and **event-driven** effects (probabilistic responders, see §5).
 
 > **Effective value:** Bands are read from the **transformed effective** value (`base + surges`,
 > then transform modifiers applied in list order — §2 upheaval layer). An active upheaval
@@ -169,7 +169,7 @@ roll) and **event-driven** effects (probabilistic responders, see §4).
 
 ### 3b. Per-affinity band ladder
 
-Combining the static effects above with the event-driven responders in §5:
+Combining the static effects above with the event-driven responders in §6:
 
 - **Chaos** — *stirring:* restless flavor. *ascendant:* at the tarot reveal, one random face
   may flip to the opposite orientation (`chaos-wild-card`, narrated inline as an emphasized
@@ -207,7 +207,35 @@ Combining the static effects above with the event-driven responders in §5:
 
 ---
 
-## 4. Tarot spreads & consolidation
+## 4. Corruption (engine foundation)
+
+Corruption is a self-correcting predator that arises from **imbalance** — the
+world's six affinities being hoarded far above their natural baseline. It is **not**
+an affinity: it has its own 0–100 scalar (`CorruptionEngine`), its own bands, and
+is exempt from coupling, diminishing returns, pairing, and baseline-drift.
+
+- **Food = imbalance.** `Σ max(0, affinity − 81)` across the six. Two maxed
+  affinities feed it as hard as several merely-high ones — concentration is punished.
+- **Seed.** Each completed reading, if there is any food, a chance (scaling with
+  food, capped) spawns corruption. No imbalance → it can never appear.
+- **Grow.** While fed, corruption rises by erosion (per excess point) plus a skim
+  on the reading's realized affinity gains, and drains the hoarded affinities back
+  down into itself.
+- **Starve.** With no food, corruption decays and vanishes — the only way to be rid
+  of it short of the Rupture (and, since affinities are hidden, only by blindly
+  lowering one's highest forces).
+- **Bands:** dormant → seeded → spreading → virulent → pinnacle.
+- **The Rupture** fires at the pinnacle: affinities reset low (every affinity to 25),
+  corruption clears to 0, no trace remains.
+- **Carryover:** corruption persists across `reset`/`returnToTitle` and the save,
+  worsening game-over-game; only `clearHistory` and the Rupture clear it.
+
+> Tuning lives in `src/data/corruption.ts`. The player-facing effects, exploits,
+> Light early-warning, and the Rupture interstitial are built in later plans.
+
+---
+
+## 5. Tarot spreads & consolidation
 
 The tarot overhaul introduced a full 78-card deck (22 Major + 56 Minor Arcana), a
 three-card Past/Present/Future spread, procedural consolidation into a single game slot,
@@ -385,7 +413,7 @@ The spread composition is visible at every display surface:
 
 ---
 
-## 5. Event-driven affinity effects (responder catalog)
+## 6. Event-driven affinity effects (responder catalog)
 
 All gated by `bandRoll` unless noted. "Min band" is the gate; the chance scales upward in
 higher bands (§1).
@@ -417,7 +445,7 @@ surfaces if present. The collapsed outcome is narrated once as **"The Cast"**.
 
 **Spread combine reducer** (`reducers.ts`): the `spread` reducer collects all
 `EffectReport`s emitted by spread-internal responders (including the new ones above and
-the spread-internal interactions in §6) and returns them as an array for batch narration.
+the spread-internal interactions in §7) and returns them as an array for batch narration.
 
 > **Light Position Foresight** — When `usePeek` is called during a tarot deal, the
 > returned `leaning` string names the spread position whose card has the largest sum of
@@ -427,7 +455,7 @@ the spread-internal interactions in §6) and returns them as an array for batch 
 
 ---
 
-## 6. Meta-interactions (between divination results)
+## 7. Meta-interactions (between divination results)
 
 Meta-interactions use two distinct scopes:
 
@@ -435,7 +463,7 @@ Meta-interactions use two distinct scopes:
   current hand plus previously committed results. They fire on `dice:commit`, `tarot:commit`,
   `iching:commit`, or `happening:start` and operate on the entire spread.
 - **Spread-internal interactions** (the five after the table) match *within a single tarot
-  spread* — the three faces of the consolidated tarot result (§4). They fire on `tarot:commit`
+  spread* — the three faces of the consolidated tarot result (§5). They fire on `tarot:commit`
   via the `spread` combine channel, whose reducer collects all reports and emits them as an
   array. Because they operate on the unconsolidated faces, they can inspect individual cards'
   suits, elements, arcana type, and orientation.
@@ -445,7 +473,7 @@ automatically participates). All are deterministic (`roll → true`) except **Mi
 
 > **Note:** the `chaos-happening-interrupt` responder (previously a Chaos-ascendant SPAWN
 > at `minigame:end`) has been **removed**. Happenings are now offered by the decoupled
-> cadence logic in `GameEngine.shouldOfferHappening` (see §7). The `iching-happening-boost`
+> cadence logic in `GameEngine.shouldOfferHappening` (see §8). The `iching-happening-boost`
 > responder (`happening:start`) is **preserved** and unchanged — an I Ching with changing
 > lines still appends a hidden bonus choice when a happening fires.
 
@@ -470,7 +498,7 @@ without blocking the cross-slot resolution flow.
 
 ---
 
-## 7. Happenings
+## 8. Happenings
 
 Authored cryptic scenes offered **at most once per turn**, in a between-reading gap, and
 **never after the final reading** (so any granted effect still has a reading to land on).
@@ -518,7 +546,7 @@ Each choice carries `effects: HappeningEffect[]`. Six kinds are defined:
 | `surge` | Decaying temporary spike — `GameEngine.grantSurge(deltas, readings)` → the Phase 1 base/effective surge layer (§2). Contributes to effective value for `readings` readings then expires. |
 | `reading` | Queues a `ReadingEffectId` onto `state.pendingReadingEffects`; consumed by the **next** reading then dropped. |
 | `gamble` | Weighted branch — exactly one outcome's `effects[]` resolve (chosen by `pickGambleOutcome`). |
-| `upheaval` | Temporary transform — `GameEngine.grantUpheaval(transform, readings)` → the Phase 3 transform/upheaval layer (§8). Bends the effective vector for `readings` readings then snap-back (cliff expiry — no step-down). |
+| `upheaval` | Temporary transform — `GameEngine.grantUpheaval(transform, readings)` → the Phase 3 transform/upheaval layer (§9). Bends the effective vector for `readings` readings then snap-back (cliff expiry — no step-down). |
 
 ### 7d. `ReadingEffectId` → engine vocabulary
 
@@ -552,7 +580,7 @@ An active I Ching with changing lines (`iching-happening-boost` responder at
 
 ---
 
-## 8. Upheavals (Phase 3)
+## 9. Upheavals (Phase 3)
 
 An **upheaval** is a temporary transform applied to the effective affinity vector. Where a
 surge shifts individual affinities up or down (still additive), a transform *bends the
@@ -625,7 +653,7 @@ Opt-in upheaval lifetime is set per happening choice (the `readings` field).
 
 ---
 
-## 9. Debug scenarios
+## 10. Debug scenarios
 
 Each responder has a one-click debug scenario (`DEBUG_SCENARIOS` in `scenarios.ts`) that
 stages the precondition and **forces** the effect. Forcing bypasses the probabilistic `roll`
@@ -642,7 +670,7 @@ the condition requires. Open the debug panel (`?debug` or `Ctrl+Shift+D`) to run
 
 ---
 
-## 10. Astromancy
+## 11. Astromancy
 
 Astromancy (`type: 'astral'`) is the fourth divination method. Two real **3D d12 dice** are
 thrown onto a 12-house zodiac board that is **visible before the cast**: a **Planet die** and a
@@ -651,7 +679,7 @@ comes to rest in decides the house. The angle between the two houses produces an
 The reading is **Planet-in-Sign-in-House** plus the aspect between them — four signals
 combined into a single `AstralResult`.
 
-The d20 skill-check method coexists with astromancy in the pool; both are available. See §14 for the skill-check model (DC, Bless/Bane, criticals).
+The d20 skill-check method coexists with astromancy in the pool; both are available. See §15 for the skill-check model (DC, Bless/Bane, criticals).
 
 Sources of truth: [`src/data/astromancy.ts`](../src/data/astromancy.ts),
 [`src/engine/astral.ts`](../src/engine/astral.ts),
@@ -703,7 +731,7 @@ Modality dimension leans: **cardinal** +0.5 vol · **fixed** +0.5 cer/−0.5 vol
 ### 10c. House board (12 houses)
 
 The Planet die's landing house determines the arena. The Sign die's landing house is used only
-to compute the aspect (see §10d).
+to compute the aspect (see §11d).
 
 | House | Arena | Theme |
 |-------|-------|-------|
@@ -747,7 +775,7 @@ landing houses and maps it to an aspect name. A step of 6 is opposition (180°).
 ### 10f. Dignity and debility
 
 A planet is **dignified** when it lands in one of its home signs; **debilitated** in a hostile
-sign. Both tag the result and activate dedicated responders (§10h).
+sign. Both tag the result and activate dedicated responders (§11h).
 
 | Planet | Dignified in | Debilitated in |
 |--------|-------------|----------------|
@@ -833,7 +861,7 @@ weight-1 MUTATE rivals in a tie); the rest are weight 1.
 
 ---
 
-## 11. I Ching
+## 12. I Ching
 
 I Ching (`type: 'iching'`) is the third divination method. The seeker casts three coins
 six times to build a **primary hexagram** from the bottom line up; changing lines transform
@@ -995,11 +1023,11 @@ Note: `chaos-line-cascade` can *create* a transformation from scratch — its co
 `< 6 changing lines` (not `≥ 1`), so Chaos can add the very first changing line to an
 otherwise stable cast, producing a relating hexagram where none would have existed.
 
-See §5 for the full responder catalog entry.
+See §6 for the full responder catalog entry.
 
 ---
 
-## 12. Rune Casting
+## 13. Rune Casting
 
 Rune Casting (`type: 'rune'`) is the fifth divination method. The player flings a handful of
 **6 Elder Futhark stones** onto a concentric casting cloth and reads the **scatter**: which
@@ -1081,12 +1109,12 @@ Heart), `silent-field` (≥ half face-down), `errant-rune` (a stone off-cloth).
 One cross-type responder, **`rune-tiwaz-victory`** (`MUTATE`, triggers `dice:commit` + `rune:commit`):
 when a Tiwaz rune and a critical-high d20 are both in the spread, favorability +1.0 on the
 committed result. Because rune results emit `reversible` and `reversed`, they also **automatically
-participate** in the existing `mirror` and `iching-resonant-change` interactions (§6) with no extra
+participate** in the existing `mirror` and `iching-resonant-change` interactions (§7) with no extra
 code. Each responder has a matching `rune-*` entry in `DEBUG_SCENARIOS`.
 
 ---
 
-## 13. Strings of Fate
+## 14. Strings of Fate
 
 Strings of Fate (`type: 'strings'`) is the sixth divination method. The seeker draws a
 crimson **thread of fate** through a fog-shrouded radial web of authored
@@ -1182,7 +1210,7 @@ The decoupled cadence (`GameEngine.shouldOfferHappening`) covers Strings between
 
 ---
 
-## 14. d20 Skill-Check Minigame
+## 15. d20 Skill-Check Minigame
 
 The d20 method (`type: 'd20'`) is the second divination method. The player **flicks a 3D d20
 into a stone bowl**; the engine resolves the natural roll against a reading-relative

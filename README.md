@@ -199,6 +199,12 @@ at through atmospheric flavor text.
 
 See [`docs/game-systems.md`](docs/game-systems.md) for the full affinity/band/effect reference.
 
+**Corruption.** Hoard a few forces too high for too long and something from beyond
+the stars takes notice — a red, glitching wrongness that feeds on imbalance and
+erodes what you've hoarded. It cannot be fought head-on, only starved by letting
+your strongest forces fall. Left unchecked it builds to a Rupture that tears the
+reading apart and leaves the world low and quiet again, as if nothing happened.
+
 ### Upheavals
 
 At rare extremes the weave can **invert or scramble the displayed affinities** for a few readings. An upheaval bends the *effective* affinity vector — the values that drive every band, hint, and effect — without touching the underlying base. When it expires the real values resurface unchanged.
