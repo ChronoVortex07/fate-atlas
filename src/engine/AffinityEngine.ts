@@ -1,8 +1,9 @@
-import type { AffinityId, AffinityBand, AffinityAction, AffinityEffects, Taggable, AffinityMandate, AffinityModifier } from './types';
+import type { AffinityId, AffinityBand, AffinityAction, AffinityEffects, Taggable, AffinityMandate, AffinityModifier, TransformPayload } from './types';
 import type { AffinityDefinition } from '../data/affinities';
 import {
   AFFINITY_IDS,
   AFFINITY_PAIRS,
+  AXIS_AFFINITIES,
   BASELINE,
   BAND_ORDER,
   bandOf,
@@ -65,17 +66,48 @@ export class AffinityEngine {
     return this.mandate.gainMult[id] ?? this.mandate.globalMult;
   }
 
-  // Effective value = permanent base + active surge contributions (step-down decayed).
-  // Phase 3 will apply transform modifiers here, after surges.
-  private eff(id: AffinityId): number {
-    let v = this.base[id];
-    for (const m of this.modifiers) {
-      if (m.kind === 'surge') {
-        const factor = m.readingsRemaining / m.initialReadings;
-        v += (m.deltas[id] ?? 0) * factor;
+  // The full effective vector: base + Σ active surge contributions (step-down
+  // decayed), then transform modifiers applied IN LIST ORDER (upheaval layer).
+  private effectiveVector(): Record<AffinityId, number> {
+    const v = {} as Record<AffinityId, number>;
+    for (const id of AFFINITY_IDS) {
+      let x = this.base[id];
+      for (const m of this.modifiers) {
+        if (m.kind === 'surge') {
+          const factor = m.readingsRemaining / m.initialReadings;
+          x += (m.deltas[id] ?? 0) * factor;
+        }
       }
+      v[id] = this.clamp(x);
     }
-    return this.clamp(v);
+    for (const m of this.modifiers) {
+      if (m.kind === 'transform') this.applyTransform(v, m);
+    }
+    return v;
+  }
+
+  // Bends the effective vector in place. invert-pair flips one axis's two poles;
+  // invert-all flips all six; scramble redistributes by the modifier's fixed permutation.
+  private applyTransform(v: Record<AffinityId, number>, m: Extract<AffinityModifier, { kind: 'transform' }>): void {
+    if (m.transform === 'invert-all') {
+      for (const id of AFFINITY_IDS) v[id] = this.clamp(100 - v[id]);
+      return;
+    }
+    if (m.transform === 'invert-pair') {
+      const pair = AXIS_AFFINITIES[m.axis ?? 'fortune'];
+      for (const id of pair) v[id] = this.clamp(100 - v[id]);
+      return;
+    }
+    // scramble: result[id] = pre-scramble[ permutation[id] ]
+    if (m.permutation) {
+      const src = { ...v };
+      for (const id of AFFINITY_IDS) v[id] = src[m.permutation[id]];
+    }
+  }
+
+  // Effective value for one id (delegates to the shared vector).
+  private eff(id: AffinityId): number {
+    return this.effectiveVector()[id];
   }
 
   getBase(): Record<AffinityId, number> {
@@ -93,6 +125,38 @@ export class AffinityEngine {
       initialReadings: readings,
       source,
     });
+  }
+
+  // ── Upheaval (transform) layer ──
+  grantUpheaval(payload: TransformPayload, readings: number, source: string): void {
+    if (readings <= 0) return;
+    const mod: Extract<AffinityModifier, { kind: 'transform' }> = {
+      id: `transform:${source}:${this.modSeq++}`,
+      kind: 'transform',
+      transform: payload.transform,
+      axis: payload.axis,
+      readingsRemaining: readings,
+      initialReadings: readings,
+      source,
+    };
+    if (payload.transform === 'scramble') mod.permutation = this.makeScramblePermutation();
+    this.modifiers.push(mod);
+  }
+
+  hasActiveTransform(): boolean {
+    return this.modifiers.some((m) => m.kind === 'transform');
+  }
+
+  // Fisher–Yates over the six ids → a fixed mapping result-id → source-id.
+  private makeScramblePermutation(): Record<AffinityId, AffinityId> {
+    const sources = [...AFFINITY_IDS];
+    for (let i = sources.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [sources[i], sources[j]] = [sources[j], sources[i]];
+    }
+    const perm = {} as Record<AffinityId, AffinityId>;
+    AFFINITY_IDS.forEach((id, i) => { perm[id] = sources[i]; });
+    return perm;
   }
 
   // Advance every modifier one reading; drop the expired ones. Called once per
@@ -277,10 +341,7 @@ export class AffinityEngine {
   }
 
   getState(): Record<AffinityId, number> {
-    return AFFINITY_IDS.reduce(
-      (acc, id) => ((acc[id] = this.eff(id)), acc),
-      {} as Record<AffinityId, number>,
-    );
+    return this.effectiveVector();
   }
 
   setState(values: Partial<Record<AffinityId, number>>): void {
