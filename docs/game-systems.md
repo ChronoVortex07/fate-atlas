@@ -154,16 +154,19 @@ Combining the static effects above with the event-driven responders in §5:
   (`order-anchor`, narrated inline as a blue straightening glow). Otherwise steadier flavor
   and clarity as it rises; opposes Chaos via coupling.
 - **Fate** — *ascendant:* the method pool may be thinned by one (`fate-thin-pool`,
-  probabilistic, won't drop below 2); a dealt card may burn-swap for a fresh draw before
+  probabilistic, won't drop below 2); a picked card may be seized and locked into the hand
+  with a god-hand (`fate-fated-card`); a dealt card may burn-swap for a fresh draw before
   it turns (`fate-deal-swap`); the spread-wide orientation may be seized for you at the
   reveal via a god-hand overlay (`fate-auto-orient`); a reroll may ring hollow
   (`fate-hollow-reroll`); your method choice may be redirected (`fate-force-method`).
-  *dominant:* those effects intensify. These deal/orient/reveal effects (`fate-deal-swap`,
-  `fate-auto-orient`, `chaos-wild-card`, `order-anchor`) are narrated **inline by
-  `TarotMinigame`** (driven by reveal markers `revealSwap`/`revealWildCard`/
-  `revealOrderAnchored` on the draft) — their reports are stripped from `eventQueue` but
-  kept in `turnEffects` for the run record. The post-commit `tarot:commit` fan effects still
-  use the `InteractionSequencer`.
+  *dominant:* those effects intensify. These pick/deal/orient/reveal effects
+  (`fate-fated-card`, `fate-deal-swap`, `fate-auto-orient`, `chaos-wild-card`,
+  `order-anchor`) are narrated **inline by `TarotMinigame`**, not the `InteractionSequencer`
+  — the deal/orient/flip ones via reveal markers `revealSwap`/`revealWildCard`/
+  `revealOrderAnchored` on the draft, and `fate-fated-card` via the Fate god-hand pressing
+  the picked slot (the component reads `handCard.fated`, set in `pickForHand`). Their reports
+  are stripped from `eventQueue` but kept in `turnEffects` for the run record. The post-commit
+  `tarot:commit` fan effects still use the `InteractionSequencer`.
 - **Will** — *stirring:* a "reroll?" prompt may appear (`will-offer-reroll`). *ascendant:*
   a disliked spread position may be redrawn (`spreadRedraws = 1`); your will may widen the
   method pool (`will-widen-pool`). *dominant:* up to two disliked positions may be redrawn
@@ -369,7 +372,7 @@ higher bands (§1).
 | `shadow-shroud` | `select:draw:end` | MUTATE | Shadow ascendant · flat 20%/step | Shrouds **1–3 distinct** method cards (1 at ascendant, +1 roll at ascendant, +1 at dominant; capped at pool size) | `shroud` |
 | `fate-force-method` | `select:pick` | OVERRIDE | Fate ascendant · major | Redirects your method choice to a different one | `override` |
 | `fate-deal-swap` | `tarot:deal` | OVERRIDE | Fate ascendant · rare (~0.04) | Swaps one dealt face for a fresh distinct draw before reveal | `override` |
-| `fate-fated-card` | `tarot:picked` | OVERRIDE | Fate ascendant · ~0.014 | Substitutes the picked card for a different one and locks it into the hand slot (immutable — cannot be returned, swapped, or removed). Once per draft. | `shroud` |
+| `fate-fated-card` | `tarot:picked` | OVERRIDE | Fate ascendant · ~0.014 | Substitutes the picked card for a different one and locks it into the hand slot (immutable — cannot be returned, swapped, or removed; shown with the chains-of-fate binding). Once per draft. Narrated inline by the Fate god-hand pressing the slot; report stripped from the sequencer, kept in `turnEffects`. | `god-hand (inline)` |
 | `fate-auto-orient` | `tarot:reveal` | OVERRIDE | Fate ascendant · major | Seizes the spread-wide orientation pre-commit (coin flip); narrated by the god-hand overlay, emits no sequencer report | `override` |
 | `chaos-wild-card` | `tarot:orient` | MUTATE | Chaos ascendant · notable | Flips one random face in the spread to the opposite orientation | `flip` |
 | `order-anchor` | `tarot:orient` | MUTATE | Order ascendant · notable | Sets every reversed face upright — coerces the spread to full upright | `anchor` |
