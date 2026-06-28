@@ -130,6 +130,22 @@ export const DEBUG_SCENARIOS: DebugScenario[] = [
         tags: [], themes: [], dimensions: { favorability: 0, certainty: 0, volatility: 0 }, modifierRoles: [],
       };
     } },
+  { id: 'happening-upheaval', label: 'Happening: opt-in upheaval (invert Fortune)', group: 'Interaction', forced: [], isolate: false,
+    setup: (s) => {
+      s.screen = 'happening';
+      s.happening = {
+        type: 'happening', id: 'many-threads',
+        scene: 'Countless threads of fate shimmer into view — pluck one and the weave may tear.',
+        choices: [
+          { text: 'Pluck a thread and see what unravels.', effects: [
+            { kind: 'upheaval', transform: { transform: 'invert-pair', axis: 'fortune' }, readings: 2 },
+            { kind: 'surge', deltas: { chaos: 20 }, readings: 2 },
+          ] },
+          { text: 'Leave the weave be.', effects: [{ kind: 'shift', affinity: 'order', amount: 6 }] },
+        ],
+        tags: [], themes: [], dimensions: { favorability: 0, certainty: 0, volatility: 0 }, modifierRoles: [],
+      };
+    } },
   // ── Affinity (Task 13: new affinity responders) ──
   { id: 'chaos-wild-card', label: 'Chaos: wild card flips', group: 'Affinity', forced: ['chaos-wild-card'], isolate: true,
     setup: (s) => { atTarot(s); set(s, { chaos: 80 }); } },
