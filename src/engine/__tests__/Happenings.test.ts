@@ -100,7 +100,7 @@ describe('resolveHappening effect resolution', () => {
     expect(s.affinityBase.shadow).toBeLessThanOrEqual(50); // the other outcome did NOT fire
   });
 
-  it('upheaval is a no-op stub in Phase 2 but sibling effects still apply', () => {
+  it('upheaval inverts effective and sibling effects also apply (Phase 3)', () => {
     const engine = new GameEngine();
     engine.startTurn('self');
     resolveWith(engine, [
@@ -108,8 +108,9 @@ describe('resolveHappening effect resolution', () => {
       { kind: 'surge', deltas: { chaos: 20 }, readings: 2 },
     ]);
     const s = engine.getState();
-    expect(s.affinities.chaos).toBe(70); // surge applied
-    expect(s.affinityBase.chaos).toBe(50); // upheaval did NOT transform/mutate anything
+    // base 50 + surge 20 = 70 effective pre-transform; invert-pair on fortune → 100 - 70 = 30
+    expect(s.affinities.chaos).toBe(30); // upheaval inverted (base+surge effective)
+    expect(s.affinityBase.chaos).toBe(50); // base untouched
   });
 
   it('startTurn clears pendingReadingEffects', () => {

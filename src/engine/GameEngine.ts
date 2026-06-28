@@ -1,4 +1,4 @@
-import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, RollMode, DivinationType, TarotCardFace, TableCard, TarotDraftState, AstralCast, IChingResult, HandCard, HappeningEffect, ReadingEffectId } from './types';
+import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, RollMode, DivinationType, TarotCardFace, TableCard, TarotDraftState, AstralCast, IChingResult, HandCard, HappeningEffect, ReadingEffectId, TransformPayload } from './types';
 import { FULL_DECK, buildFace, pickOrientation, DECK_BY_ID, consolidateSpread, reverseSpread } from '../data/tarot';
 import { EventBus } from './EventBus';
 import { AffinityEngine } from './AffinityEngine';
@@ -658,7 +658,7 @@ export class GameEngine {
         for (const e of this.pickGambleOutcome(effect.outcomes)) this.applyHappeningEffect(e, source);
         break;
       case 'upheaval':
-        // Phase 3 wires this into the unified modifier list as a `transform`. No-op here.
+        this.affinityEngine.grantUpheaval(effect.transform, effect.readings, source);
         break;
       default: {
         const _exhaustive: never = effect;
@@ -1261,6 +1261,14 @@ export class GameEngine {
   // responders call this; it notifies so the effective affinities surface on the snapshot.
   grantSurge(deltas: Partial<Record<AffinityId, number>>, readings: number, source: string): void {
     this.affinityEngine.grantSurge(deltas, readings, source);
+    this.notify();
+  }
+
+  // Public entry point for granting an upheaval (transform) modifier. The Task 6
+  // debug scenario and tests call this; it notifies so the inverted effective
+  // values surface on the snapshot.
+  grantUpheaval(transform: TransformPayload, readings: number, source: string): void {
+    this.affinityEngine.grantUpheaval(transform, readings, source);
     this.notify();
   }
 
