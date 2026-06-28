@@ -579,6 +579,7 @@ export interface GameState {
   affinityBase: Record<AffinityId, number>;   // permanent base only (for surge transparency/debug)
   corruption: CorruptionSnapshot;
   corruptionWarning: CorruptionWarning | null;
+  forbiddenSightAvailable: boolean; // corruption Virulent+ — the watching eye may be summoned
   questionType: QuestionType | null;
   availableMethods: DivinationType[];
   shroudedMethods: number[];

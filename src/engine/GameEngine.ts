@@ -78,6 +78,7 @@ export class GameEngine {
       affinityBase: defaultAffinityState(),
       corruption: { value: 0, band: 'dormant' },
       corruptionWarning: null,
+      forbiddenSightAvailable: false,
       questionType: null,
       availableMethods: [],
       shroudedMethods: [],
@@ -111,6 +112,7 @@ export class GameEngine {
     this.state.affinityEffects = this.affinityEngine.getEffects();
     this.state.corruption = { value: this.corruptionEngine.getValue(), band: this.corruptionEngine.getBand() };
     this.state.corruptionWarning = this.deriveCorruptionWarning();
+    this.state.forbiddenSightAvailable = this.forbiddenSightAvailable();
     if (this.peekOverrideThisReading === 'guarantee') this.state.affinityEffects = { ...this.state.affinityEffects, peekAvailable: true };
     else if (this.peekOverrideThisReading === 'deny') this.state.affinityEffects = { ...this.state.affinityEffects, peekAvailable: false };
     this.state.eventLog = this.bus.getHistory();
@@ -147,6 +149,11 @@ export class GameEngine {
         ? 'The light picks out the tainted paths — something feeds where they lead.'
         : 'The light wavers — something here does not belong, though its shape stays hidden.',
     };
+  }
+
+  // Forbidden-sight unlocks only at the virulent band or deeper.
+  forbiddenSightAvailable(): boolean {
+    return CORRUPTION_BANDS.indexOf(this.corruptionEngine.getBand()) >= CORRUPTION_BANDS.indexOf('virulent');
   }
 
   // ---------- Public accessors for debug panel ----------

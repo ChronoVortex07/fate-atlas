@@ -26,6 +26,9 @@ export class CorruptionEngine {
   setValue(v: number): void { this.value = Math.max(0, Math.min(PINNACLE, v)); }
   clear(): void { this.value = 0; }
 
+  // Direct add (used by forbidden-sight's once-per-minigame cost). Clamped.
+  add(amount: number): void { this.value = Math.max(0, Math.min(PINNACLE, this.value + amount)); }
+
   // Advance one completed reading. Pure except for the internal scalar.
   tick(
     affinities: Record<AffinityId, number>,

@@ -55,3 +55,6 @@ export function infectedCountForBand(band: CorruptionBand): number {
 }
 
 export const CORRUPTED_TAG = 'corrupted'; // marks a result the player can tell was tampered with
+
+export const SIGHT_COST = 6;   // corruption added on the first forbidden-sight use per minigame
+export const LIE_OFFSET = 18;  // magnitude the one falsified force is shifted by
