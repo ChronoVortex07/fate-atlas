@@ -1,4 +1,4 @@
-import type { AffinityId, AffinityBand, AffinityAction } from '../engine/types';
+import type { AffinityId, AffinityBand, AffinityAction, AffinityAxis } from '../engine/types';
 
 // ── Scale & bands (playtest defaults) ──
 export const BASELINE = 50;
@@ -23,6 +23,11 @@ export const BAND_POWER_STEP = 0.7;       // event-resolved chance scales +70% p
 // Tier base chances (playtest defaults; midpoints of the spec's ranges).
 export const TIER_BASE_CHANCE = { ambient: 0.5, notable: 0.22, rare: 0.04, major: 0.08 } as const;
 
+// ── Upheaval tuning (Phase 3; playtest defaults) ──
+export const EMERGENT_THRESHOLD = 95;  // effective affinity at/above which reality may flip
+export const EMERGENT_CHANCE = 0.04;   // per-reading roll once at the extreme (rare)
+export const EMERGENT_READINGS = 2;    // readings an emergent upheaval stays active
+
 export const AFFINITY_IDS: AffinityId[] = ['chaos', 'order', 'fate', 'will', 'light', 'shadow'];
 
 export const AFFINITY_PAIRS: Record<AffinityId, AffinityId> = {
@@ -33,6 +38,20 @@ export const AFFINITY_PAIRS: Record<AffinityId, AffinityId> = {
   light: 'shadow',
   shadow: 'light',
 };
+
+// Which polar pair each axis owns (selection + transform target).
+export const AXIS_AFFINITIES: Record<AffinityAxis, [AffinityId, AffinityId]> = {
+  agency: ['fate', 'will'],
+  information: ['light', 'shadow'],
+  fortune: ['chaos', 'order'],
+};
+
+// Which axis a single affinity belongs to.
+export function axisOf(id: AffinityId): AffinityAxis {
+  if (id === 'fate' || id === 'will') return 'agency';
+  if (id === 'light' || id === 'shadow') return 'information';
+  return 'fortune';
+}
 
 export function bandOf(value: number): AffinityBand {
   if (value <= BAND_BOUNDS.latentMax) return 'latent';

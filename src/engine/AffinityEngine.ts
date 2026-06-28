@@ -112,7 +112,11 @@ export class AffinityEngine {
   }
 
   getModifiers(): AffinityModifier[] {
-    return this.modifiers.map((m) => ({ ...m, deltas: { ...m.deltas } }));
+    return this.modifiers.map((m) =>
+      m.kind === 'surge'
+        ? { ...m, deltas: { ...m.deltas } }
+        : { ...m, permutation: m.permutation ? { ...m.permutation } : undefined },
+    );
   }
 
   // ── The single mutation chokepoint ──

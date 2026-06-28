@@ -26,7 +26,21 @@ export interface AffinitySurgeModifier {
   source: string;
 }
 
-export type AffinityModifier = AffinitySurgeModifier;
+// Phase 3: a transform upheaval modifier — bends EFFECTIVE values (after surges)
+// for a fixed number of readings, then expires as a cliff. `scramble` stores its
+// permutation, fixed at creation, so repeated effective reads stay stable.
+export interface AffinityTransformModifier {
+  id: string;
+  kind: 'transform';
+  transform: 'invert-pair' | 'invert-all' | 'scramble';
+  axis?: AffinityAxis;                                  // required for 'invert-pair'
+  permutation?: Record<AffinityId, AffinityId>;         // 'scramble' only: result[id] = preVector[permutation[id]]
+  readingsRemaining: number;
+  initialReadings: number;
+  source: string;                                       // e.g. 'happening:falling-star' / 'emergent:chaos'
+}
+
+export type AffinityModifier = AffinitySurgeModifier | AffinityTransformModifier;
 
 export type AffinityBand = 'latent' | 'stirring' | 'ascendant' | 'dominant';
 
