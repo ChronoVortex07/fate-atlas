@@ -9,7 +9,9 @@ the **meta-interactions** between divination results, and the **happenings**.
 >
 > | System | Source of truth |
 > |--------|-----------------|
-> | Affinities, bands, feeds, tuning constants | [`src/data/affinities.ts`](../src/data/affinities.ts) |
+> | Affinities, bands, feeds, tuning constants (incl. Phase 4 rebalance: `COUPLING_OTHER`, `DR_FLOOR`, `RUN_DRIFT`) | [`src/data/affinities.ts`](../src/data/affinities.ts) |
+> | Corruption bands, infection counts, intrusion chance, Rupture reset, Phase 3 constants | [`src/data/corruption.ts`](../src/data/corruption.ts) |
+> | Reading falsification (corruptText, corruptSynthesis, corruptionTextLevel) | [`src/engine/CorruptionGlitch.ts`](../src/engine/CorruptionGlitch.ts) |
 > | Affinity shift math, static band-derived effects, base/effective split + surge layer + transform/upheaval layer (`effectiveVector`, `grantUpheaval`) | [`src/engine/AffinityEngine.ts`](../src/engine/AffinityEngine.ts) |
 > | Event-driven affinity effects (responders) | [`src/engine/responders/affinity.ts`](../src/engine/responders/affinity.ts) |
 > | Meta-interactions (responders) | [`src/engine/responders/interactions.ts`](../src/engine/responders/interactions.ts) |
@@ -77,7 +79,7 @@ Base chances by tier (`TIER_BASE_CHANCE`): **ambient 0.50**, **notable 0.22**, *
 Six hidden affinities form three opposed pairs. Values are **0–100**, baseline **50**, and
 are **never shown directly** — only hinted through atmospheric flavor text. They persist
 across runs (localStorage `fate-atlas-save`); at the start of each run every affinity
-**drifts 12% back toward baseline**.
+**drifts 8% back toward baseline**.
 
 | Pair | Affinity | Theme | Opposite |
 |------|----------|-------|----------|
@@ -120,9 +122,9 @@ Fortune **tag** feeds (Chaos/Order from result tags **and** the spread/strings c
 
 ### Shift mechanics (`AffinityEngine.shift`)
 
-- **Gains** pass through *diminishing returns* (−5% per prior feed this run, floored at 50%),
+- **Gains** pass through *diminishing returns* (−5% per prior feed this run, floored at **67%**),
   then random *jitter* (×0.85–1.15), then **coupling fan-out**: the opposite affinity loses
-  **35%** of the realized gain and each of the other four loses **15%**.
+  **35%** of the realized gain and each of the other four loses **9%**.
 - **Penalties** (negative deltas) apply directly with **no** fan-out.
 
 ### Base vs. effective + surges
@@ -233,15 +235,17 @@ is exempt from coupling, diminishing returns, pairing, and baseline-drift.
 - **Carryover:** corruption persists across `reset`/`returnToTitle` and the save,
   worsening game-over-game; only `clearHistory` and the Rupture clear it.
 
-> Tuning lives in `src/data/corruption.ts`. The Rupture interstitial and
-> force-the-weave / forbidden-sight player actions are built in later plans.
+> Tuning lives in `src/data/corruption.ts` and the gain-pipeline constants in
+> `src/data/affinities.ts` (see §2 shift mechanics for the rebalanced knobs).
 
 ### Automatic corruption effects (Phase 2)
 
 - **Visible to the effect system.** Corruption rides on `PhaseContext.corruption`;
   responders gate on it via `corruptionRoll` (the corruption analog of `bandRoll`).
 - **Minigame infection.** At each draw, corruption taints offered methods
-  (`state.infectedMethods`): one at *spreading*, two at *virulent+*. Playing an
+  (`state.infectedMethods`) via a probabilistic roll (`rollInfectedCount`): *dormant*
+  and *seeded* produce 0; *spreading* produces 0 or 1 (50/50 split at `INFECT_SPLIT =
+  0.5`); *virulent* and *pinnacle* produce 1 or 2 (same 50/50 split). Playing an
   infected method amplifies that reading's corruption growth (`INFECTION_GAIN_MULT`)
   — the affinity gain proceeds as normal, but the corruption tick runs inflated on top
   of it, so farming hoarded affinities feeds corruption faster.
@@ -266,6 +270,63 @@ radar; corruption is a soft haze *behind* the web and never shown; the lie is be
 only by a label pulsing a hair off-beat. Following the glimpse can guide the player, but
 the act of looking feeds corruption — and the Light high enough to keep glimpsing is
 itself the excess that sustains it.
+
+### Reading falsification (Phase 3)
+
+`CorruptionGlitch.ts` defines `corruptionTextLevel(band, value)` → 0–3 and
+`corruptText(text, level, rng)` / `corruptSynthesis`. `GameEngine` applies them to the
+synthesis result (headline, paragraphs, tensionNote, affinityNote) before writing to
+`state.synthesis`, and also to the copy-paste LLM prompt via `generateLLMPrompt`.
+
+| Level | Band(s) | Falsification character |
+|-------|---------|------------------------|
+| 0 | dormant / seeded | Clean — no alteration |
+| 1 | spreading | Subtle: tone drift (e.g. `promise → warning`, `clarity → static`) + interior letter transpositions; each word has ~25% chance of one effect |
+| 2 | virulent (67–98) | Heavy ramp: same drift/typo pass (28%), plus redaction (`█`-blocks, ~18%), Unicode combining-character garble (~30%), stutter repeats (~10%), and **one** injected contradiction sentence appended |
+| 3 | virulent near-pinnacle (ramp from 67→99) | As level 2 but **two** contradictions injected; the continuous ramp `2 + min(1, (value−67)/(99−67))` means falsification deepens as the Rupture approaches |
+
+The synthesis is falsified in-place on `state.synthesis`; the underlying result objects (`turnResults`) are **not** altered. The LLM prompt (`generateLLMPrompt`) is independently passed through `corruptText` at the same level, so sharing a reading at virulent+ exports a corrupted transcript.
+
+### Intrusion (Phase 3)
+
+A **phantom line** — player-aware, hostile, lowercase — surfaces at **virulent+** after each completed reading. `GameEngine.maybeIntrude()` is called post-commit (after the rupture guard):
+
+- **Gate:** band must be `virulent` or `pinnacle`.
+- **Chance:** `intrusionChance(value)` = 0 below 67 (spreading boundary); at 67 it is 8%; it ramps linearly to 33% at 99. Formula: `0.08 + ((value − 67) / (99 − 67)) × 0.25`.
+- **Forced guarantee:** if no intrusion has fired yet this corruption event and `value ≥ NEAR_PINNACLE` (90), the intrusion fires unconditionally (`forced = true`), regardless of the chance roll.
+- **Delivery:** `state.intrusion = { text }` (one of five `INTRUSION_PHRASES`); the React `IntrusionOverlay` renders it and auto-clears after 2.4 s via `engine.clearIntrusion()`.
+- **Reset:** `intrusion` is cleared at the start of each new minigame (`selectMethod`). The `hasIntruded` flag on `CorruptionEngine` resets when corruption decays to 0 (starve-to-zero), so each new corruption event earns its own guaranteed intrusion near the pinnacle.
+
+### Corrupted history record (Phase 3)
+
+When a turn completes at *spreading* or above (`isVisibleCorruption` = `spreading | virulent | pinnacle`), the `RunRecord` stored in `state.history` is flagged `corrupted: true`. The history UI renders these records garbled. The Rupture scrubs them entirely (`state.history.filter(r => !r.corrupted)`) — no trace remains in the carryover save.
+
+### Rupture interstitial (Phase 3)
+
+When `CorruptionEngine.tick()` sets `ruptured = true`, `performRupture()` runs synchronously:
+
+1. Every affinity is reset to `RUPTURE_RESET` (25 — latent band).
+2. All affinity modifiers (surges, transforms) are cleared.
+3. Corruption is cleared to 0.
+4. Corrupted history records are scrubbed.
+5. `pendingRupture = true` is set; `advanceAfterCommit` detects it and routes `state.screen` to `'rupture'` **before** any further transition logic.
+
+The `RuptureInterstitial` screen plays an unskippable ~8 s sequence, then calls `engine.completeRupture()` → `returnToTitle()`. `state.screen` becomes `'title'`. The save written at rupture time reflects the reset state so a hard reload does not re-enter the rupture screen. `intrusion` is not checked after a rupture tick (the rupture guard in `advanceAfterCommit` precedes `maybeIntrude`).
+
+### Phase 4 gain-pipeline rebalance
+
+Three tuning constants in `src/data/affinities.ts` were tightened so corruption, not the
+gain pipeline, polices excess:
+
+| Constant | Old | New | Effect |
+|----------|-----|-----|--------|
+| `COUPLING_OTHER` | 0.15 | **0.09** | Lateral coupling (non-opposite affinities) weakened — hoard is less self-damping |
+| `DR_FLOOR` | 0.50 | **0.67** | Diminishing-returns floor raised — sustained building stays more rewarding |
+| `RUN_DRIFT` | 0.12 | **0.08** | Per-run baseline drift reduced — high affinities persist longer between runs |
+
+The net effect: affinities climb faster and stay high longer, making the imbalance that feeds
+corruption easier to sustain — shifting the policing role from the gain pipeline to the
+corruption system itself.
 
 ---
 

@@ -210,6 +210,13 @@ festers, though heeding it will never be enough to drive corruption out. When co
 it and the hidden forces show themselves, though one of them is always a lie, and looking
 only feeds the thing that watches back.
 
+As corruption deepens further, the readings themselves begin to change — first a
+wrong word here and there, then redacted passages, then sentences that contradict
+everything the stars just told you. The words in your history blur and shift too.
+At the very edge of ruin, something speaks directly: a line of lowercase text that
+was not part of the reading, and could not have been. When the Rupture finally fires,
+the corrupted pages vanish from the record entirely — as if they never happened.
+
 ### Upheavals
 
 At rare extremes the weave can **invert or scramble the displayed affinities** for a few readings. An upheaval bends the *effective* affinity vector — the values that drive every band, hint, and effect — without touching the underlying base. When it expires the real values resurface unchanged.
