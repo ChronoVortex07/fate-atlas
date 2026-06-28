@@ -101,8 +101,6 @@ export const DEBUG_SCENARIOS: DebugScenario[] = [
     setup: (s) => { atDice(s); set(s, { fate: 90 }); } },
   { id: 'fate-force-method', label: 'Fate forces the method', group: 'Affinity', forced: ['fate-force-method'], isolate: true,
     setup: (s) => { atMethodSelect(s); set(s, { fate: 90 }); } },
-  { id: 'chaos-happening-interrupt', label: 'Chaos interrupts with a happening', group: 'Affinity', forced: ['chaos-happening-interrupt'], isolate: true,
-    setup: (s) => { atDice(s); set(s, { chaos: 75 }); } },
   { id: 'light-advantage', label: 'Light grants advantage', group: 'Affinity', forced: ['light-advantage'], isolate: true,
     setup: (s) => { atDice(s); set(s, { light: 75 }); } },
   { id: 'shadow-disadvantage', label: 'Shadow imposes disadvantage', group: 'Affinity', forced: ['shadow-disadvantage'], isolate: true,

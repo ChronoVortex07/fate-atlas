@@ -109,20 +109,6 @@ describe('affinity responders via dispatch', () => {
     expect(c.draft.spawnSecond).toBe('d20');
   });
 
-  it('chaos-happening-interrupt sets interruptHappening when not the last reading', () => {
-    const c = ctx({ trigger: 'minigame:end', draft: { lastReading: false },
-      affinities: { ...defaultAffinityState(), chaos: 75 } });
-    dispatch('minigame:end', c, buildAffinityResponders(), { forced: ['chaos-happening-interrupt'], isolate: true });
-    expect(c.draft.interruptHappening).toBe(true);
-  });
-
-  it('chaos-happening-interrupt does not fire on the last reading (condition guard)', () => {
-    const c = ctx({ trigger: 'minigame:end', draft: { lastReading: true },
-      affinities: { ...defaultAffinityState(), chaos: 75 } });
-    dispatch('minigame:end', c, buildAffinityResponders(), { forced: ['chaos-happening-interrupt'], isolate: true });
-    expect(c.draft.interruptHappening).toBeUndefined();
-  });
-
   it('will-choice trumps offer-reroll in the roll-mode reducer', () => {
     const c = ctx({ trigger: 'dice:roll', draft: { rollMods: [] },
       affinities: { ...defaultAffinityState(), will: 95 }, rng: () => 0 });

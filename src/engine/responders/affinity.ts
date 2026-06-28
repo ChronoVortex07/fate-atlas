@@ -176,14 +176,6 @@ export function buildAffinityResponders(): Responder[] {
       },
     },
     {
-      id: 'chaos-happening-interrupt', source: 'affinity', triggers: ['minigame:end'],
-      group: { kind: 'exclusive', band: 'SPAWN' }, weight: w('chaos'),
-      condition: (c) => c.draft.lastReading !== true,
-      roll: (c) => bandRoll(c, 'chaos', 'ascendant', T.major),
-      apply: (c) => { c.draft.interruptHappening = true;
-        return report('chaos-happening-interrupt', 'Chaos', 'The weave tears — something intrudes.', 'interrupt'); },
-    },
-    {
       id: 'light-advantage', source: 'affinity', triggers: ['dice:roll'],
       group: { kind: 'combine', channel: 'roll-mode' }, weight: w('light'),
       condition: () => true, roll: (c) => bandRoll(c, 'light', 'ascendant', T.ambient),

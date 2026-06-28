@@ -6,7 +6,7 @@ import { TurnOrchestrator } from './TurnOrchestrator';
 import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
 import { AFFINITY_DEFINITIONS, defaultAffinityState } from '../data/affinities';
-import { selectHappening } from '../data/happenings';
+import { selectHappening, HAPPENING_GAP_CHANCE } from '../data/happenings';
 import { dispatch } from './events/EventDispatcher';
 import { buildAffinityResponders } from './responders/affinity';
 import { buildInteractionResponders } from './responders/interactions';
@@ -48,6 +48,7 @@ export class GameEngine {
   private pendingTransition: (() => void) | null = null;
   private pendingAdvance: (() => void) | null = null;
   private turnEffects: EffectReport[] = []; // per-turn accumulator of all reports (for RunRecord)
+  private happeningOfferedThisTurn = false;
 
   constructor(minigamesPerTurn = 3) {
     this.minigamesPerTurn = minigamesPerTurn;
@@ -264,6 +265,7 @@ export class GameEngine {
     this.state.awaitingContinue = false;
     this.turnEffects = [];
     this.peekOverrideThisReading = null;
+    this.happeningOfferedThisTurn = false;
 
     this.narrativeAssembler.resetRotation();
 
@@ -487,16 +489,10 @@ export class GameEngine {
       return;
     }
 
-    // Between-minigame transition. Ask the minigame:end trigger whether a
-    // happening interrupts the flow.
+    // Between-minigame transition. Decoupled cadence decides whether a happening interrupts.
     this.orchestrator.removeUsedMethod(result.type as 'tarot' | 'd20' | 'iching' | 'astral' | 'rune' | 'strings');
-    const { draft: endDraft } = this.dispatchAt('minigame:end', {
-      lastReading: completed >= this.minigamesPerTurn,
-    });
-
-    if (endDraft.interruptHappening === true) {
-      // The minigame:end dispatch may itself have queued the interrupt report;
-      // narrate it on the current screen, then open the happening.
+    if (this.shouldOfferHappening(completed)) {
+      this.happeningOfferedThisTurn = true;
       this.runOrDefer(() => this.triggerHappening());
       return;
     }
@@ -556,6 +552,17 @@ export class GameEngine {
 
     this.state.synthesis = synthesisResult;
     this.bus.emit('synthesis-complete', { result: synthesisResult });
+  }
+
+  // Decoupled cadence: at most one happening per turn, in a between-reading gap,
+  // never after the final reading (so its granted effect has a reading to land on).
+  // Placement varies (HAPPENING_GAP_CHANCE) but is guaranteed by the last eligible gap.
+  private shouldOfferHappening(completed: number): boolean {
+    if (this.happeningOfferedThisTurn) return false;
+    const remaining = this.minigamesPerTurn - completed;
+    if (remaining <= 0) return false;           // no reading left for the effect to land on
+    if (remaining === 1) return true;           // last eligible gap → guarantee once/turn
+    return Math.random() < HAPPENING_GAP_CHANCE; // earlier gap → chance
   }
 
   triggerHappening(): void {
@@ -732,7 +739,8 @@ export class GameEngine {
     // DC + Bless/Bane from the slots already committed this turn (the active dice
     // slot is not appended until completeMinigame, so turnResults == prior slots).
     const check = planDiceCheck(this.state.turnResults);
-    const offerReroll = (draft.offerReroll ?? false) || this.consumeReadingEffect('grant-reroll');
+    const rerollGranted = this.consumeReadingEffect('grant-reroll'); // consume before OR so it is never short-circuited
+    const offerReroll = (draft.offerReroll ?? false) || rerollGranted;
     this.notify();
     return {
       mode: draft.rollMode ?? 'single',

@@ -159,17 +159,22 @@ describe('GameEngine — new lifecycle', () => {
     if (idx === -1) return;
     engine.selectMethod(idx);
     if (engine.getState().screen !== 'minigame') return;
+    // Keep Math.random suppressed through continueAfterReview so the between-reading
+    // cadence (shouldOfferHappening) does not fire the early-gap chance (0.99 >= 0.5).
     const orig = Math.random; Math.random = () => 0.99;
-    engine.completeMinigame(dieResult());
-    Math.random = orig;
-    // Review beat: result committed, but the screen has NOT advanced.
-    expect(engine.getState().awaitingContinue).toBe(true);
-    expect(engine.getState().screen).toBe('minigame');
-    expect(engine.getState().turnResults.length).toBe(1);
-    // Continue advances.
-    engine.continueAfterReview();
-    expect(engine.getState().awaitingContinue).toBe(false);
-    expect(engine.getState().screen).toBe('method-select');
+    try {
+      engine.completeMinigame(dieResult());
+      // Review beat: result committed, but the screen has NOT advanced.
+      expect(engine.getState().awaitingContinue).toBe(true);
+      expect(engine.getState().screen).toBe('minigame');
+      expect(engine.getState().turnResults.length).toBe(1);
+      // Continue advances.
+      engine.continueAfterReview();
+      expect(engine.getState().awaitingContinue).toBe(false);
+      expect(engine.getState().screen).toBe('method-select');
+    } finally {
+      Math.random = orig;
+    }
   });
 
   it('continueAfterReview is a no-op when not awaiting', () => {
@@ -269,24 +274,31 @@ describe('GameEngine — dispatch effects', () => {
     engine.forceEffects(['chaos-second-result'], true);
 
     const die = engine.getState().turnResults; // baseline length
-    engine.completeMinigame({
-      type: 'd20', result: 11, threshold: 'neutral', interpretation: '',
-      tags: [], themes: [], dimensions: { favorability: 0, certainty: 0, volatility: 0 },
-      modifierRoles: [],
-    } as any);
+    // Keep Math.random suppressed through continueAfterReview so the between-reading
+    // cadence (shouldOfferHappening) does not fire the early-gap chance (0.99 >= 0.5).
+    const orig = Math.random; Math.random = () => 0.99;
+    try {
+      engine.completeMinigame({
+        type: 'd20', result: 11, threshold: 'neutral', interpretation: '',
+        tags: [], themes: [], dimensions: { favorability: 0, certainty: 0, volatility: 0 },
+        modifierRoles: [],
+      } as any);
 
-    // Deferred: queue has events, screen has NOT advanced past minigame.
-    expect(engine.getState().eventQueue.length).toBeGreaterThan(0);
-    expect(engine.getState().screen).toBe('minigame');
+      // Deferred: queue has events, screen has NOT advanced past minigame.
+      expect(engine.getState().eventQueue.length).toBeGreaterThan(0);
+      expect(engine.getState().screen).toBe('minigame');
 
-    // Draining the batch runs the deferred transition — which is now the review beat.
-    engine.finishEventBatch();
-    expect(engine.getState().eventQueue.length).toBe(0);
-    expect(engine.getState().awaitingContinue).toBe(true);
-    expect(engine.getState().screen).toBe('minigame');
-    engine.continueAfterReview();
-    expect(engine.getState().screen).toBe('method-select');
-    expect(die).toBeDefined();
+      // Draining the batch runs the deferred transition — which is now the review beat.
+      engine.finishEventBatch();
+      expect(engine.getState().eventQueue.length).toBe(0);
+      expect(engine.getState().awaitingContinue).toBe(true);
+      expect(engine.getState().screen).toBe('minigame');
+      engine.continueAfterReview();
+      expect(engine.getState().screen).toBe('method-select');
+      expect(die).toBeDefined();
+    } finally {
+      Math.random = orig;
+    }
   });
 
   it('records the turn effects into the run history', () => {

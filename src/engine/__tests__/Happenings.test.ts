@@ -125,6 +125,53 @@ describe('resolveHappening effect resolution', () => {
   });
 });
 
+describe('happening cadence (decoupled from Chaos)', () => {
+  // Helper: play one non-happening reading to completion, draining any event batch.
+  function playOneReading(engine: GameEngine) {
+    const methods = engine.getState().availableMethods;
+    const idx = methods.findIndex((m) => m !== 'happening');
+    engine.selectMethod(idx);
+    // Cadence cares only about the completed-reading count, so commit a real d20
+    // result regardless of the selected method (avoids per-method draw shapes).
+    const result = (engine as unknown as { orchestrator: { drawSingleResult: (t: string, a: object) => import('../types').SlotResult } })
+      .orchestrator.drawSingleResult('d20', engine.getState().affinities);
+    engine.completeMinigame(result);
+    if (engine.getState().eventQueue.length > 0) engine.finishEventBatch();
+    if (engine.getState().awaitingContinue) engine.continueAfterReview();
+  }
+
+  it('offers a happening exactly once per turn, never after the final reading', () => {
+    const engine = new GameEngine();
+    engine.startTurn('self');
+    const orig = Math.random;
+    Math.random = () => 0.99; // suppress the early-gap chance so it lands on the guaranteed last gap
+    try {
+      playOneReading(engine);                       // after reading 1 (early gap, chance suppressed)
+      expect(engine.getState().screen).not.toBe('happening');
+      playOneReading(engine);                       // after reading 2 (last eligible gap → guaranteed)
+      expect(engine.getState().screen).toBe('happening');
+    } finally {
+      Math.random = orig;
+    }
+  });
+
+  it('does not offer a second happening in the same turn', () => {
+    const engine = new GameEngine();
+    engine.startTurn('self');
+    const orig = Math.random;
+    Math.random = () => 0; // fire at the first eligible gap
+    try {
+      playOneReading(engine);
+      expect(engine.getState().screen).toBe('happening');
+      engine.resolveHappening(0);                   // back to method-select
+      playOneReading(engine);                       // second gap — must NOT offer again
+      expect(engine.getState().screen).not.toBe('happening');
+    } finally {
+      Math.random = orig;
+    }
+  });
+});
+
 describe('pendingReadingEffects consumption', () => {
   it('widen-pool grows the next draw by one method and is then consumed', () => {
     const engine = new GameEngine();
