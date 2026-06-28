@@ -1392,6 +1392,7 @@ export class GameEngine {
     try {
       const data = {
         affinities: this.affinityEngine.serialize(),
+        corruption: this.corruptionEngine.serialize(),
         history: this.state.history,
         usedHappeningIds: Array.from(this.usedHappeningIds),
       };
@@ -1407,6 +1408,7 @@ export class GameEngine {
       if (!raw) return false;
       const data = JSON.parse(raw);
       if (data.affinities) this.affinityEngine.loadFrom(data.affinities);
+      if (data.corruption) this.corruptionEngine.loadFrom(data.corruption);
       if (data.history) this.state.history = data.history;
       if (data.usedHappeningIds) this.usedHappeningIds = new Set(data.usedHappeningIds);
       this.state.affinities = this.affinityEngine.getState();
@@ -1524,6 +1526,7 @@ export class GameEngine {
   clearHistory(): void {
     this.affinityEngine.setState(defaultAffinityState());
     this.affinityEngine.clearModifiers();
+    this.corruptionEngine.clear();
     this.state = this.defaultState();
     this.state.affinities = this.affinityEngine.getState();
     this.usedHappeningIds = new Set();
