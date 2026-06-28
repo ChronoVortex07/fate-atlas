@@ -104,6 +104,11 @@ export class AffinityEngine {
 
   clearModifiers(): void {
     this.modifiers = [];
+    // The temporary layer and the per-run feed counters are both run-scoped; a full
+    // clear (reset paths) zeroes them together so the Fortune cap / diminishing-returns
+    // state can't leak across a reset that doesn't pass back through beginRun().
+    this.fortuneTagFeedThisRun = 0;
+    for (const id of AFFINITY_IDS) this.feedsThisRun[id] = 0;
   }
 
   getModifiers(): AffinityModifier[] {

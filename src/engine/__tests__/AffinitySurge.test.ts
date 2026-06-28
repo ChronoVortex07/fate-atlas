@@ -51,4 +51,13 @@ describe('AffinityEngine surges', () => {
     expect(e.getModifiers()).toHaveLength(0);
     expect(e.getState().chaos).toBe(e.getBase().chaos);
   });
+
+  it('clearModifiers also resets the per-run Fortune cap counter', () => {
+    const e = make();
+    // Exhaust the Fortune tag cap (FORTUNE_TAG_CAP = 8) without a beginRun.
+    e.feedFortuneTag('chaos', 8, 't');
+    expect(e.feedFortuneTag('chaos', 5, 't')).toBe(0); // cap exhausted
+    e.clearModifiers();
+    expect(e.feedFortuneTag('chaos', 5, 't')).toBeGreaterThan(0); // counter reset by clear
+  });
 });
