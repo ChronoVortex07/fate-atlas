@@ -248,6 +248,7 @@ export class GameEngine {
     this.state.synthesis = null;
     this.state.happening = null;
     this.state.selectedHappeningChoice = null;
+    this.state.pendingReadingEffects = [];
     this.state.eventQueue = [];
     this.state.awaitingContinue = false;
     this.turnEffects = [];
@@ -579,11 +580,8 @@ export class GameEngine {
       throw new Error(`Choice ${choiceIndex} not found in happening`);
     }
 
-    for (const effect of choice.effects) {
-      if (effect.kind === 'shift') {
-        this.affinityEngine.shift(effect.affinity, effect.amount, `happening:${this.state.happening.id}`);
-      }
-    }
+    const source = `happening:${this.state.happening.id}`;
+    for (const effect of choice.effects) this.applyHappeningEffect(effect, source);
 
     this.state.selectedHappeningChoice = choiceIndex;
     this.state.affinities = this.affinityEngine.getState();
@@ -600,6 +598,41 @@ export class GameEngine {
 
     this.saveToStorage();
     this.notify();
+  }
+
+  // Routes one happening effect to its engine primitive. Recursive for `gamble`.
+  private applyHappeningEffect(effect: HappeningEffect, source: string): void {
+    switch (effect.kind) {
+      case 'shift':
+        this.affinityEngine.shift(effect.affinity, effect.amount, source);
+        break;
+      case 'cost':
+        this.affinityEngine.shift(effect.affinity, -Math.abs(effect.amount), source);
+        break;
+      case 'surge':
+        this.affinityEngine.grantSurge(effect.deltas, effect.readings, source);
+        break;
+      case 'reading':
+        this.state.pendingReadingEffects = [...this.state.pendingReadingEffects, effect.effect];
+        break;
+      case 'gamble':
+        for (const e of this.pickGambleOutcome(effect.outcomes)) this.applyHappeningEffect(e, source);
+        break;
+      case 'upheaval':
+        // Phase 3 wires this into the unified modifier list as a `transform`. No-op here.
+        break;
+    }
+  }
+
+  private pickGambleOutcome(outcomes: { weight: number; effects: HappeningEffect[] }[]): HappeningEffect[] {
+    if (outcomes.length === 0) return [];
+    const total = outcomes.reduce((s, o) => s + o.weight, 0);
+    let roll = Math.random() * total;
+    for (const o of outcomes) {
+      roll -= o.weight;
+      if (roll <= 0) return o.effects;
+    }
+    return outcomes[outcomes.length - 1].effects;
   }
 
   // ---------- Dispatch-driven action methods ----------
