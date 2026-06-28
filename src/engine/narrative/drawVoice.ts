@@ -1,38 +1,8 @@
-import type { SlotResult, ModifierRole, DimensionValues } from '../types';
-import type { DrawVoice, FavBand } from './types';
-import { READING_FRAGMENTS } from '../../data/reading-fragments';
+import type { SlotResult, ModifierRole } from '../types';
+import type { DrawVoice } from './types';
+import { favBandOf, withArticle, gloss, verbPhrase, stableIndex } from './voices/shared';
 
-export function favBandOf(value: number): FavBand {
-  if (value >= 0.5) return 'high';
-  if (value <= -0.5) return 'low';
-  return 'neutral';
-}
-
-/** Deterministic, rotation-free index into a pool, varied per draw. */
-function stableIndex(key: string, len: number): number {
-  if (len <= 0) return 0;
-  let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
-  return Math.abs(h) % len;
-}
-
-/** Prefix "The " for a card name unless it already carries an article. */
-function withArticle(name: string): string {
-  return /^(the|a|an) /i.test(name) ? name : `The ${name}`;
-}
-
-/** Trim a flavor sentence to a short, lower-cased gloss phrase. */
-function gloss(text: string): string {
-  const first = text.split(/[.;—]/)[0]?.trim() ?? '';
-  if (!first) return '';
-  return first.charAt(0).toLowerCase() + first.slice(1);
-}
-
-function verbPhrase(role: ModifierRole, dims: DimensionValues, seedKey: string): string {
-  const band = favBandOf(dims.favorability);
-  const pool = READING_FRAGMENTS.verbPhrases[role][band];
-  return pool[stableIndex(seedKey, pool.length)];
-}
+export { favBandOf };
 
 /**
  * Turn a single concrete draw into a grammatical fragment: a named `subject`
@@ -87,7 +57,6 @@ export function describeDraw(slot: SlotResult, role: ModifierRole): DrawVoice {
       return { subject, clause };
     }
     default: {
-      // astral, rune, or any future type: generic name + interpretation.
       const named = (slot as { name?: string }).name ?? slot.type;
       const interp = (slot as { interpretation?: string }).interpretation ?? '';
       const subject = `the ${named}`;
