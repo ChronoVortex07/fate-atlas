@@ -10,7 +10,7 @@ the **meta-interactions** between divination results, and the **happenings**.
 > | System | Source of truth |
 > |--------|-----------------|
 > | Affinities, bands, feeds, tuning constants | [`src/data/affinities.ts`](../src/data/affinities.ts) |
-> | Affinity shift math, static band-derived effects | [`src/engine/AffinityEngine.ts`](../src/engine/AffinityEngine.ts) |
+> | Affinity shift math, static band-derived effects, base/effective split + surge layer | [`src/engine/AffinityEngine.ts`](../src/engine/AffinityEngine.ts) |
 > | Event-driven affinity effects (responders) | [`src/engine/responders/affinity.ts`](../src/engine/responders/affinity.ts) |
 > | Meta-interactions (responders) | [`src/engine/responders/interactions.ts`](../src/engine/responders/interactions.ts) |
 > | Roll-mode combine reducer | [`src/engine/events/reducers.ts`](../src/engine/events/reducers.ts) |
@@ -138,6 +138,9 @@ and all bands/effects/hints read **effective**; `getBase()` exposes the permanen
 
 Two kinds of effect derive from a band: **static** modifiers (always on at that band, no
 roll) and **event-driven** effects (probabilistic responders, see §4).
+
+> **Effective value:** Bands are read from the **effective** value (`base + surges`), so a
+> surge can temporarily grant a higher band's effects without altering the persisted base.
 
 ### 3a. Static band-derived modifiers (`AffinityEngine.getEffects`)
 
