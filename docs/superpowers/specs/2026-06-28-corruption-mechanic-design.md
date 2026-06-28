@@ -150,26 +150,68 @@ read as the immune system giving up, not a cure — a final burst of clarity tha
 itself the disease. It never denies corruption in a way the player would believe;
 the corruption of the signal is *obvious*.
 
-## 9. Risk / reward layer
+## 9. Risk / reward layer — what corruption is good for
 
-Corruption is dangerous but exploitable. Corrupted minigames amplify corruption
-gain — but a player who *recognizes* them (via the selection-screen telegraph or
-Light's warning) can deliberately farm corrupted effects/payoffs while racing the
-Rupture. Because farming keeps affinities (and often Light) high, the farmer is on
-a *tightening* spiral: the very act of farming accelerates the doom. This is the
-intended tension, not a balance bug.
+Corruption is dangerous but exploitable. A player who *recognizes* corrupted
+methods (via the selection-screen telegraph or Light's warning) can deliberately
+**farm** them. The unifying logic: **corruption breaks the world's laws, and that
+is its appeal** — everything the affinity system throttles or hides, corruption
+can override, always for the same price: *feed the predator, hasten the Rupture.*
 
-## 10. Corrupted-variant effects
+**The three exploits:**
 
-At **Virulent**, affinity banded-effects fire as twisted variants — implemented by
-reusing the existing responders with a **corruption flag**, not new responders
-where avoidable. Examples (final set chosen in the plan):
+1. **Overcharged effects.** Corrupted-variant banded effects are strictly *more
+   potent* than their clean versions, but anomalous/noisy (raw power traded for
+   reliability). Same system as the §7 Virulent "curse" — see §10; it is
+   double-edged, not purely a downside.
+2. **Force the weave (wishes).** Corruption lets the player force outcomes the
+   affinity RNG would never grant — lock the exact card/roll/hexagram, re-draw the
+   whole spread, or undo a commit. The forced result still carries a visible
+   corruption taint (anomalous, per §2). Available from **Spreading+**; each use
+   spikes corruption.
+3. **Forbidden sight.** Corruption shows truths the game hides — full pool
+   preview, future results, even glimpses of the otherwise-hidden affinity/band
+   state — but what it shows is a *mix of true and anomalous*, so it can never be
+   fully trusted. This deliberately, partially pierces the hidden-system design;
+   gate it to higher corruption bands and keep the unreliability real so it stays
+   tempting rather than authoritative.
 
-- A Light **peek** shows an *anomalous lie* (visibly wrong, per §2).
-- A Fate **fated-card** locks the *wrong* card.
-- A reroll **glitches** (returns garbage / repeats / visibly malfunctions).
+**Farming model (convert hoard → power).** A corrupted minigame **amplifies
+corruption gain** (erodes excess faster) while **dampening the affinity feed** that
+turn. Farming therefore *spends down* the imbalance you accumulated, turning hoard
+into payoff before the Rupture claims it. To keep farming, the player must keep
+re-hoarding (greed) — but corruption tends to outrun their spending, racing them to
+the Rupture. Self-correcting *and* a genuine deal-with-the-devil.
 
-The principle: the player's own affinity powers turn against them, visibly.
+**Balance invariant (non-negotiable):** **no corruption exploit may accelerate raw
+affinity accumulation.** Exploits spend the *existing* hoard for power / control /
+sight — never grow it. (This is why "forbidden growth / over-cap gains" was
+rejected: a faster growth path would break the starve lever and make corruption
+impossible to fight off.)
+
+## 10. Corrupted-variant effects (double-edged)
+
+Affinity banded-effects can fire as twisted variants — implemented by reusing the
+existing responders with a **corruption flag**, not new responders where avoidable.
+These are **double-edged**, and the same system serves both faces:
+
+- As the §7 **Virulent curse**: at high corruption they fire *unbidden*, the
+  player's own powers visibly turning against them.
+- As the §9 **overcharged exploit**: deliberately triggered in corrupted games,
+  they are *more potent* than the clean version — power traded for reliability.
+
+Examples (final set chosen in the plan; each is potent **and** anomalous per §2):
+
+| Clean effect | Corrupted variant |
+|--------------|-------------------|
+| Light **peek** (foresight) | Reveals the whole pool + a future result — but salts in an anomalous false entry you can't distinguish. |
+| Will **choice** (cast two, keep one) | Cast *three*, keep one — but one option is visibly garbage. |
+| Chaos **wild-surge** (spawn a second result) | Spawns *extra* results — one or more arrive garbled/corrupted. |
+| Fate **fated-card** (lock a picked card) | Locks the card — but it may be the *wrong* one. |
+| Any **reroll** | Re-rolls freely / repeatedly — but results glitch (garbage, repeats, visible malfunction). |
+
+The principle: corruption's power is real but *wrong* — you can lean on it, never
+trust it.
 
 ## 11. The Rupture (pinnacle event)
 
@@ -242,7 +284,12 @@ polices excess.* Exact values are tuned in the plan (with playtest defaults).
 ## 16. Open tuning questions (resolve in plan)
 
 - `HIGH_THRESHOLD`, seed-chance curve, erosion %, skim %, decay rate, band cutoffs.
-- Rebalance knob values.
+- Rebalance knob values (and confirming reduction stays feasible vs growth — the
+  starve lever must remain viable; see §9 balance invariant).
+- Corrupted-game farming factors: corruption-gain amplification and affinity-feed
+  dampening per turn.
+- Force-the-weave: cost-per-use (corruption spike) and which bands unlock it.
+- Forbidden-sight: which bands unlock it and the true/anomalous mix ratio.
 - Record-scrubbing: delete vs "recovered fragments".
 - Exact corrupted-variant effect set.
 - Whether the between-worlds interstitial is skippable / how long it lingers.
