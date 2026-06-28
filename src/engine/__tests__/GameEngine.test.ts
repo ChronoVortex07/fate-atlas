@@ -349,14 +349,20 @@ describe('spread coherence feeds', () => {
     const orig = Math.random; Math.random = () => 0.99;
     e.completeMinigame(spread, { revealedAsDrawn: true });
     Math.random = orig;
-    // With coherence feed: expected Order = 62 (tag +5 → coupling → coherence +6 → Fate coupling).
+    // With coherence feed: expected Order = 58 (tag +5 → cap truncation → coherence capped → Fate coupling).
     // Recomputed with new constants: COUPLING_OPPOSITE=0.35, COUPLING_OTHER=0.15, DR_STEP=0.05, DR_FLOOR=0.5.
-    // Step 1: feedFortuneTag('order',5): dr=1.0, jitter=1.147, gain=5.735 → order=56.
-    // Step 2: shift('order',6) coherence: dr=0.95, gain=6.538 → order=63.
-    // Step 3: shift('fate',6) reveal-as-drawn: dr=1.0, gain=6.882 → order -= 6.882*0.15=1.032 → order=round(61.97)=62.
-    // ('random' no longer feeds Chaos, so Order is no longer reduced by that coupling.)
+    // FORTUNE_TAG_CAP=8. Math.random=0.99, jitter=0.85+0.99*0.30=1.147.
+    // Step 1: feedFortuneTag('order',5): fortuneTagFeedThisRun=0→5, allowed=5; shift('order',5):
+    //   dr=1.0, gain=5*1.0*1.147=5.735 → order=round(50+5.735)=56.
+    //   chaos=round(50-5.735*0.35)=round(47.993)=48. others=round(50-5.735*0.15)=round(49.14)=49.
+    // Step 2: feedFortuneTag('order',6,'spread-aligned'): fortuneTagFeedThisRun=5, remaining=3, allowed=3;
+    //   shift('order',3): dr=0.95 (feedsThisRun[order]=1), gain=3*0.95*1.147=3.269 → order=round(56+3.269)=59.
+    //   chaos=round(48-3.269*0.35)=round(46.856)=47. fate/will/light/shadow=round(49-0.490)=49.
+    // Step 3: shift('fate',6) reveal-as-drawn: dr=1.0, gain=6.882 → fate=round(49+6.882)=56.
+    //   will(opp)=round(49-6.882*0.35)=round(46.591)=47.
+    //   order=round(59-6.882*0.15)=round(59-1.032)=round(57.968)=58.
     // Without coherence feed: Order would be 55.
-    expect(e.getState().affinities.order).toBe(62);
+    expect(e.getState().affinities.order).toBe(58);
   });
 
   it('committing an all-reversed spread boosts Chaos above tag-feed baseline', () => {
@@ -370,14 +376,20 @@ describe('spread coherence feeds', () => {
     const orig = Math.random; Math.random = () => 0.99;
     e.completeMinigame(spread, { revealedAsDrawn: true });
     Math.random = orig;
-    // With coherence feed: expected Chaos = 62 (tag +5 → coupling → coherence +6 → Fate coupling).
+    // With coherence feed: expected Chaos = 58 (tag +5 → cap truncation → coherence capped → Fate coupling).
     // Recomputed with new constants: COUPLING_OPPOSITE=0.35, COUPLING_OTHER=0.15, DR_STEP=0.05, DR_FLOOR=0.5.
-    // Step 1: feedFortuneTag('chaos',5): dr=1.0, jitter=1.147, gain=5.735 → chaos=56.
-    // Step 2: shift('chaos',6) coherence: dr=0.95, gain=6.538 → chaos=63.
-    // Step 3: shift('fate',6) reveal-as-drawn: dr=1.0, gain=6.882 → chaos -= 6.882*0.15=1.032 → chaos=round(61.97)=62.
-    // ('random' no longer feeds Chaos; only 'reversed' matches now.)
+    // FORTUNE_TAG_CAP=8. Math.random=0.99, jitter=0.85+0.99*0.30=1.147.
+    // Step 1: feedFortuneTag('chaos',5): fortuneTagFeedThisRun=0→5, allowed=5; shift('chaos',5):
+    //   dr=1.0, gain=5*1.0*1.147=5.735 → chaos=round(50+5.735)=56.
+    //   order=round(50-5.735*0.35)=round(47.993)=48. others=round(50-5.735*0.15)=round(49.14)=49.
+    // Step 2: feedFortuneTag('chaos',6,'spread-cascade'): fortuneTagFeedThisRun=5, remaining=3, allowed=3;
+    //   shift('chaos',3): dr=0.95 (feedsThisRun[chaos]=1), gain=3*0.95*1.147=3.269 → chaos=round(56+3.269)=59.
+    //   order=round(48-3.269*0.35)=round(46.856)=47. fate/will/light/shadow=round(49-0.490)=49.
+    // Step 3: shift('fate',6) reveal-as-drawn: dr=1.0, gain=6.882 → fate=round(49+6.882)=56.
+    //   will(opp)=round(49-6.882*0.35)=round(46.591)=47.
+    //   chaos=round(59-6.882*0.15)=round(59-1.032)=round(57.968)=58.
     // Without coherence feed: Chaos would be 55.
-    expect(e.getState().affinities.chaos).toBe(62);
+    expect(e.getState().affinities.chaos).toBe(58);
   });
 
   it('a mixed-orientation spread does not get a coherence boost', () => {
@@ -556,5 +568,45 @@ describe('tarot draft — fated cards', () => {
     Math.random = orig;
     // Should succeed (not throw about fated)
     expect(result.success).toBe(true);
+  });
+});
+
+describe('GameEngine — affinity surges', () => {
+  it('exposes affinityBase on the snapshot and reflects a granted surge in effective affinities', () => {
+    const engine = new GameEngine();
+    engine.startTurn('self');
+    engine.grantSurge({ chaos: 30 }, 3, 'test');
+    const s = engine.getState();
+    expect(s.affinityBase.chaos).toBe(50);     // permanent base
+    expect(s.affinities.chaos).toBe(80);       // effective = base + 30 (factor 1.0)
+  });
+
+  it('ticks surges once per completed reading (step-down decay)', () => {
+    const engine = new GameEngine();
+    engine.startTurn('self');
+    engine.grantSurge({ chaos: 30 }, 3, 'test');
+    const orig = Math.random; Math.random = () => 0.99; // suppress probabilistic responders/happenings
+    try {
+      const methods = engine.getState().availableMethods;
+      const idx = methods.findIndex((m) => m !== 'happening');
+      engine.selectMethod(idx);
+      engine.completeMinigame(dieResult()); // dieResult carries no Fortune tags → base unchanged
+      if (engine.getState().eventQueue.length > 0) engine.finishEventBatch();
+      if (engine.getState().awaitingContinue) engine.continueAfterReview();
+    } finally {
+      Math.random = orig;
+    }
+    const s = engine.getState();
+    expect(s.affinityBase.chaos).toBe(50);   // base still untouched by the surge
+    expect(s.affinities.chaos).toBe(70);     // surge decayed one step: +20 (factor 2/3)
+  });
+
+  it('clears surges on reset', () => {
+    const engine = new GameEngine();
+    engine.startTurn('self');
+    engine.grantSurge({ chaos: 30 }, 3, 'test');
+    engine.reset();
+    const s = engine.getState();
+    expect(s.affinities.chaos).toBe(s.affinityBase.chaos); // no surge contribution
   });
 });

@@ -516,7 +516,8 @@ export type Screen =
 
 export interface GameState {
   screen: Screen;
-  affinities: Record<AffinityId, number>;
+  affinities: Record<AffinityId, number>;     // effective (base + surges)
+  affinityBase: Record<AffinityId, number>;   // permanent base only (for surge transparency/debug)
   questionType: QuestionType | null;
   availableMethods: DivinationType[];
   shroudedMethods: number[];

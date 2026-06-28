@@ -66,6 +66,7 @@ export class GameEngine {
     return {
       screen: 'title',
       affinities: defaultAffinityState(),
+      affinityBase: defaultAffinityState(),
       questionType: null,
       availableMethods: [],
       shroudedMethods: [],
@@ -93,6 +94,7 @@ export class GameEngine {
 
   private notify(): void {
     this.state.affinities = this.affinityEngine.getState();
+    this.state.affinityBase = this.affinityEngine.getBase();
     this.state.affinityEffects = this.affinityEngine.getEffects();
     this.state.eventLog = this.bus.getHistory();
     this.cachedSnapshot = JSON.parse(JSON.stringify(this.state)) as GameState;
@@ -334,15 +336,15 @@ export class GameEngine {
     // Spread coherence feeds (All Upright → Order, All Reversed → Chaos).
     if (result.type === 'tarot' && (result as TarotResult).spread && (result as TarotResult).spread!.length > 1) {
       const faces = (result as TarotResult).spread!.map((s) => s.card);
-      if (faces.every((f) => f.orientation === 'upright')) this.affinityEngine.shift('order', 6, 'spread-aligned');
-      else if (faces.every((f) => f.orientation === 'reversed')) this.affinityEngine.shift('chaos', 6, 'spread-cascade');
+      if (faces.every((f) => f.orientation === 'upright')) this.affinityEngine.feedFortuneTag('order', 6, 'spread-aligned');
+      else if (faces.every((f) => f.orientation === 'reversed')) this.affinityEngine.feedFortuneTag('chaos', 6, 'spread-cascade');
     }
 
     // Strings coherence feeds (mirrors the tarot spread-coherence rule).
     if (result.type === 'strings') {
       const coh = pathCoherence((result as StringsResult).path);
-      if (coh === 'coherent') this.affinityEngine.shift('order', 6, 'strings-coherent');
-      else if (coh === 'tangled') this.affinityEngine.shift('chaos', 6, 'strings-tangled');
+      if (coh === 'coherent') this.affinityEngine.feedFortuneTag('order', 6, 'strings-coherent');
+      else if (coh === 'tangled') this.affinityEngine.feedFortuneTag('chaos', 6, 'strings-tangled');
     }
 
     // Player-action feeds derived from how this result was reached.
@@ -450,6 +452,7 @@ export class GameEngine {
     // that SET it (mandateFresh), so the immediate next reading feels the full
     // mandate; each later commit weakens it toward 1.0.
     this.affinityEngine.decayMandate();
+    this.affinityEngine.tickModifiers(); // decay/expire surges once per completed reading
 
     // Final reading?
     if (completed >= this.minigamesPerTurn) {
@@ -1176,6 +1179,13 @@ export class GameEngine {
     return this.affinityEngine.getEffects();
   }
 
+  // Public entry point for granting a temporary affinity surge. Phase 2 happenings and
+  // responders call this; it notifies so the effective affinities surface on the snapshot.
+  grantSurge(deltas: Partial<Record<AffinityId, number>>, readings: number, source: string): void {
+    this.affinityEngine.grantSurge(deltas, readings, source);
+    this.notify();
+  }
+
   loadState(json: Partial<GameState>): void {
     Object.assign(this.state, json);
     if (json.affinities) {
@@ -1206,6 +1216,7 @@ export class GameEngine {
     scenario.setup(stage);
 
     this.affinityEngine.setState(stage.affinities);
+    this.affinityEngine.clearModifiers();
     this.state.affinities = this.affinityEngine.getState();
     this.state.screen = stage.screen as GameState['screen'];
     this.state.selectedMethod = stage.selectedMethod as GameState['selectedMethod'];
@@ -1318,7 +1329,7 @@ export class GameEngine {
     const { debug, debugConfig } = this.state;
 
     const saved = {
-      affinities: this.affinityEngine.getState(),
+      affinities: this.affinityEngine.getBase(), // permanent only, not effective
       history: this.state.history,
       usedHappeningIds: Array.from(this.usedHappeningIds),
     };
@@ -1328,6 +1339,7 @@ export class GameEngine {
     this.state.debug = debug;
     this.state.debugConfig = debugConfig;
     this.affinityEngine.setState(saved.affinities);
+    this.affinityEngine.clearModifiers();
     this.state.affinities = this.affinityEngine.getState();
     this.state.history = saved.history;
     this.usedHappeningIds = new Set(saved.usedHappeningIds);
@@ -1340,7 +1352,7 @@ export class GameEngine {
     // Preserve debug state
     const { debug, debugConfig } = this.state;
 
-    const affinities = this.affinityEngine.getState();
+    const affinities = this.affinityEngine.getBase(); // permanent only, not effective
     const history = this.state.history;
     const usedIds = Array.from(this.usedHappeningIds);
     this.state = this.defaultState();
@@ -1349,6 +1361,7 @@ export class GameEngine {
     this.state.debug = debug;
     this.state.debugConfig = debugConfig;
     this.affinityEngine.setState(affinities);
+    this.affinityEngine.clearModifiers();
     this.state.affinities = this.affinityEngine.getState();
     this.state.history = history;
     this.usedHappeningIds = new Set(usedIds);
@@ -1359,6 +1372,7 @@ export class GameEngine {
 
   clearHistory(): void {
     this.affinityEngine.setState(defaultAffinityState());
+    this.affinityEngine.clearModifiers();
     this.state = this.defaultState();
     this.state.affinities = this.affinityEngine.getState();
     this.usedHappeningIds = new Set();
