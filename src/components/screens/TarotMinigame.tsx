@@ -77,10 +77,21 @@ export default function TarotMinigame() {
   const [godPressed, setGodPressed] = useState(false);
   const [handTarget, setHandTarget] = useState<HandTarget | null>(null);
   const [burnDone, setBurnDone] = useState(false);
+  // Fate god-hand for a fated draw (a picked card Fate refuses to let go).
+  const [fatedForce, setFatedForce] = useState<{ index: number } | null>(null);
+  const [fatedPressed, setFatedPressed] = useState(false);
+  const [fatedTarget, setFatedTarget] = useState<HandTarget | null>(null);
   const planRequestedRef = useRef(false);
   const godPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const commitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handRowRef = useRef<HTMLDivElement | null>(null);
+  const handSlotRefs = useRef<(HTMLElement | null)[]>([]);
+  // Synchronous gate: true while the fated god-hand plays, so the orientation
+  // preempt (which can trigger on the same notify when a fated pick fills the
+  // hand) waits its turn instead of racing the render.
+  const suppressPreemptRef = useRef(false);
+  const fatedPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fatedDoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Track container width for correct fan-out math
   useEffect(() => {
@@ -93,12 +104,19 @@ export default function TarotMinigame() {
   // Cancel any pending rAF on unmount
   useEffect(() => () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current); }, []);
 
+  // Clear fated god-hand timers on unmount.
+  useEffect(() => () => {
+    if (fatedPressTimerRef.current != null) clearTimeout(fatedPressTimerRef.current);
+    if (fatedDoneTimerRef.current != null) clearTimeout(fatedDoneTimerRef.current);
+  }, []);
+
   // Preempt check: when the hand fills, ask the engine if Fate seizes the orientation.
   useEffect(() => {
     const d = state.minigameState as TarotDraftState | null;
     if (!d || d.method !== 'tarot') return;
     if (d.phase !== 'drafting') return;
     if (!d.hand.every((h) => h !== null)) return;
+    if (suppressPreemptRef.current) return; // let the fated god-hand finish first
     if (planRequestedRef.current) return;
     planRequestedRef.current = true;
     const plan = engine.planReveal();
@@ -118,17 +136,31 @@ export default function TarotMinigame() {
       if (godPressTimerRef.current != null) { clearTimeout(godPressTimerRef.current); godPressTimerRef.current = null; }
       if (commitTimerRef.current != null) { clearTimeout(commitTimerRef.current); commitTimerRef.current = null; }
     };
-  }, [state.minigameState, engine]);
+  }, [state.minigameState, engine, fatedForce]);
 
-  // Reset planRequestedRef on a fresh draft so a new reading re-arms the check.
+  // Reset transient reveal state as the draft empties/refills so a new reading
+  // re-arms cleanly. The orientation preempt re-arms whenever the hand is not yet
+  // full; the fated god-hand only resets on a fully empty hand, so a fated pick in
+  // slot 0/1 (hand not yet full) is not clobbered mid-animation.
   useEffect(() => {
     const d = state.minigameState as TarotDraftState | null;
-    if (d && d.phase === 'drafting' && !d.hand.every((h) => h !== null)) {
+    if (!d || d.method !== 'tarot' || d.phase !== 'drafting') return;
+    const full = d.hand.every((h) => h !== null);
+    const empty = d.hand.every((h) => h === null);
+    if (!full) {
       planRequestedRef.current = false;
       setPreempt(null);
       setGodPressed(false);
       setHandTarget(null);
       setBurnDone(false);
+    }
+    if (empty) {
+      suppressPreemptRef.current = false;
+      setFatedForce(null);
+      setFatedPressed(false);
+      setFatedTarget(null);
+      if (fatedPressTimerRef.current != null) { clearTimeout(fatedPressTimerRef.current); fatedPressTimerRef.current = null; }
+      if (fatedDoneTimerRef.current != null) { clearTimeout(fatedDoneTimerRef.current); fatedDoneTimerRef.current = null; }
     }
   }, [state.minigameState]);
 
@@ -170,6 +202,23 @@ export default function TarotMinigame() {
     setTimeout(() => {
       engine.pickForHand(emptySlot, tableIndex);
       setAnimatingPick(null);
+      // Fate may have seized this pick — locking a different card into the slot.
+      // Narrate it with the god-hand pressing that slot (same hand as fate-force-
+      // method), not the old veil. handCard.fated is set only when Fate fired.
+      const d = engine.getState().minigameState as TarotDraftState | null;
+      if (d && d.method === 'tarot' && d.hand[emptySlot]?.fated === true) {
+        suppressPreemptRef.current = true; // sync gate before the next render's effects
+        const rect = handSlotRefs.current[emptySlot]?.getBoundingClientRect();
+        if (rect) setFatedTarget({ x: rect.left + rect.width / 2, topY: rect.top });
+        setFatedPressed(false);
+        setFatedForce({ index: emptySlot });
+        fatedPressTimerRef.current = setTimeout(() => setFatedPressed(true), 600);
+        fatedDoneTimerRef.current = setTimeout(() => {
+          suppressPreemptRef.current = false;
+          setFatedForce(null);
+          setFatedPressed(false);
+        }, 1800);
+      }
     }, 200);
   }, [engine, draft.hand]);
 
@@ -474,6 +523,7 @@ export default function TarotMinigame() {
               return (
                 <div
                   key={label}
+                  ref={(el) => { handSlotRefs.current[i] = el; }}
                   style={handSlotColumnStyle}
                   onDragOver={handleHandDragOver}
                   onDrop={(e) => handleHandDrop(e, i)}
@@ -657,6 +707,17 @@ export default function TarotMinigame() {
               text={preempt.orientation === 'reversed' ? 'Fate turns the spread' : 'Fate sets the spread'}
               target={handTarget}
               pressed={godPressed}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Fate god-hand overlay — descends on a picked card Fate has seized (fated/locked) */}
+        <AnimatePresence>
+          {fatedForce && (
+            <FateForceOverlay
+              text="Fate claims this card"
+              target={fatedTarget}
+              pressed={fatedPressed}
             />
           )}
         </AnimatePresence>

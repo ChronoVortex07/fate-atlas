@@ -1,55 +1,91 @@
 import { motion } from 'framer-motion';
 
-const CHAINS_COLOR = '#9b6bb0';
-const CHAINS_OPACITY = 0.4;
+// Fate's binding is gold, not Shadow's violet — chains of FATE. Two strands of
+// interlocking links cross the whole card and lock at the center, so it reads
+// unmistakably as "bound by fate," not a faint ornament.
+
+// Lay a run of interlocking links along the segment (x1,y1)→(x2,y2). Alternating
+// link sizes give the rhythmic over/under look of a real chain.
+function strandLinks(x1: number, y1: number, x2: number, y2: number, keyPrefix: string) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+  const step = 12; // links overlap so the strand reads as continuous metal
+  const n = Math.max(1, Math.round(len / step));
+  const links = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const x = x1 + dx * t;
+    const y = y1 + dy * t;
+    const broad = i % 2 === 0; // alternate flat / on-edge links
+    links.push(
+      <rect
+        key={`${keyPrefix}-${i}`}
+        x={-9}
+        y={broad ? -5.5 : -3}
+        width={18}
+        height={broad ? 11 : 6}
+        rx={broad ? 5.5 : 3}
+        transform={`translate(${x}, ${y}) rotate(${angle})`}
+        fill="none"
+        stroke="url(#chainMetal)"
+        strokeWidth={2.2}
+      />,
+    );
+  }
+  return links;
+}
 
 export default function ChainsOfFate() {
   return (
     <motion.div
-      style={{
-        position: 'absolute',
-        inset: 0,
-        pointerEvents: 'none',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-      animate={{ opacity: [0.30, 0.50, 0.30] }}
-      transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+      style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
+      initial={{ opacity: 0, scale: 1.12 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.45, ease: 'easeOut' }}
+      aria-hidden
     >
-      <svg
-        width="72"
-        height="72"
-        viewBox="0 0 72 72"
+      {/* The chains pulse with a golden fate-glow (depth shadow kept beneath). */}
+      <motion.svg
+        width="100%"
+        height="100%"
+        viewBox="0 0 100 150"
+        preserveAspectRatio="none"
         fill="none"
-        style={{ opacity: CHAINS_OPACITY }}
-        aria-hidden
+        style={{ display: 'block' }}
+        animate={{
+          filter: [
+            'drop-shadow(0 0 2px rgba(243,225,166,0.55)) drop-shadow(0 1px 1px rgba(0,0,0,0.6))',
+            'drop-shadow(0 0 9px rgba(243,225,166,1)) drop-shadow(0 1px 1px rgba(0,0,0,0.6))',
+            'drop-shadow(0 0 2px rgba(243,225,166,0.55)) drop-shadow(0 1px 1px rgba(0,0,0,0.6))',
+          ],
+        }}
+        transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
       >
-        {/* 8 interlocking chain links in a circular pattern */}
-        {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => {
-          const rad = (angle * Math.PI) / 180;
-          const cx = 36 + Math.cos(rad) * 18;
-          const cy = 36 + Math.sin(rad) * 18;
-          const rot = angle + 90;
-          return (
-            <g key={i} transform={`translate(${cx}, ${cy}) rotate(${rot})`}>
-              <rect
-                x={-5}
-                y={-3}
-                width={10}
-                height={6}
-                rx={2.5}
-                stroke={CHAINS_COLOR}
-                strokeWidth="1.2"
-                fill="none"
-              />
-            </g>
-          );
-        })}
-        {/* Central binding circle */}
-        <circle cx={36} cy={36} r={6} stroke={CHAINS_COLOR} strokeWidth="1.2" fill="none" />
-        <circle cx={36} cy={36} r={2} fill={CHAINS_COLOR} opacity={0.6} />
-      </svg>
+        <defs>
+          <linearGradient id="chainMetal" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#f3e1a6" />
+            <stop offset="45%" stopColor="#c9a24b" />
+            <stop offset="100%" stopColor="#6f5526" />
+          </linearGradient>
+        </defs>
+
+        {/* Two strands crossing the whole card, anchored just inside the corners. */}
+        {strandLinks(12, 20, 88, 130, 'a')}
+        {strandLinks(88, 20, 12, 130, 'b')}
+
+        {/* Corner shackle bolts where the chains bite into the card. */}
+        {[[12, 20], [88, 20], [12, 130], [88, 130]].map(([cx, cy], i) => (
+          <circle key={`bolt-${i}`} cx={cx} cy={cy} r={3.4} fill="url(#chainMetal)" stroke="#4a3a18" strokeWidth={1} />
+        ))}
+
+        {/* Central padlock where the strands lock together. */}
+        <circle cx={50} cy={75} r={9} fill="#1b150a" stroke="url(#chainMetal)" strokeWidth={2.6} />
+        <path d="M45 71 a5 5 0 0 1 10 0 v3" fill="none" stroke="url(#chainMetal)" strokeWidth={2} />
+        <circle cx={50} cy={76} r={1.9} fill="#f3e1a6" />
+        <rect x={49} y={76} width={2} height={4} rx={1} fill="#f3e1a6" />
+      </motion.svg>
     </motion.div>
   );
 }

@@ -951,6 +951,7 @@ export class GameEngine {
     draft.table[tableIndex] = null;
 
     // Dispatch tarot:picked so fate-fated-card responder can intercept
+    const queueBefore = this.state.eventQueue.length;
     const { draft: dispatchedDraft } = this.dispatchAt('tarot:picked', {
       handIndex,
       tableIndex,
@@ -976,6 +977,11 @@ export class GameEngine {
         const j = Math.floor(Math.random() * (i + 1));
         [draft.deck[i], draft.deck[j]] = [draft.deck[j], draft.deck[i]];
       }
+
+      // The fated draw is narrated inline by TarotMinigame's Fate god-hand (it
+      // reads handCard.fated), so keep this report out of the InteractionSequencer
+      // — strip it from the queue but leave it in turnEffects for the run record.
+      this.state.eventQueue = this.state.eventQueue.slice(0, queueBefore);
     }
 
     this.notify();
