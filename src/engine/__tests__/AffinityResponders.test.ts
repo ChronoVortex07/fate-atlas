@@ -224,6 +224,36 @@ describe('fate-fated-card per-pick odds', () => {
   });
 });
 
+describe('emergent-upheaval', () => {
+  const find = () => buildAffinityResponders().find((r) => r.id === 'emergent-upheaval')!;
+  const baseAff = { chaos: 50, order: 50, fate: 50, will: 50, light: 50, shadow: 50 };
+  const mkCtx = (over: Partial<typeof baseAff>, draft: Record<string, unknown> = {}) => ({
+    trigger: 'dice:commit', affinities: { ...baseAff, ...over }, slots: [], hand: null, spread: [],
+    minigame: null, event: null, draft, rng: () => 0,
+  }) as unknown as Parameters<ReturnType<typeof find>['condition']>[0];
+
+  it('condition true at the extreme when no upheaval is active and not the last reading', () => {
+    expect(find().condition(mkCtx({ chaos: 96 }))).toBe(true);
+  });
+  it('condition false when no affinity is at the extreme', () => {
+    expect(find().condition(mkCtx({ chaos: 94 }))).toBe(false);
+  });
+  it('condition false when an upheaval is already active (guard)', () => {
+    expect(find().condition(mkCtx({ chaos: 96 }, { upheavalActive: true }))).toBe(false);
+  });
+  it('condition false on the last reading', () => {
+    expect(find().condition(mkCtx({ chaos: 96 }, { lastReading: true }))).toBe(false);
+  });
+  it('apply requests an invert-pair on the extreme affinity axis and returns an upheaval report', () => {
+    const c = mkCtx({ chaos: 96 });
+    const r = find().apply(c);
+    expect((c.draft as { requestUpheaval?: { transform: { transform: string; axis: string } } }).requestUpheaval)
+      .toEqual({ transform: { transform: 'invert-pair', axis: 'fortune' }, readings: 2, source: 'emergent:chaos' });
+    expect(r?.animation).toBe('upheaval');
+    expect(r?.label).toBe('Upheaval');
+  });
+});
+
 describe("Fool's Reroll across the spread", () => {
   it('fires when The Fool is any position in a committed spread', () => {
     const foolReroll = buildInteractionResponders().find((r) => r.id === 'fool-reroll')!;

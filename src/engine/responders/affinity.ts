@@ -1,7 +1,7 @@
 import type { Responder, PhaseContext, EffectReport } from '../events/types';
 import type { AffinityId, SlotResult, RollModifier, TarotResult, TarotCardFace } from '../types';
 import { bandRoll } from '../events/eligibility';
-import { TIER_BASE_CHANCE, bandOf, BAND_ORDER } from '../../data/affinities';
+import { TIER_BASE_CHANCE, bandOf, BAND_ORDER, AFFINITY_IDS, axisOf, EMERGENT_THRESHOLD, EMERGENT_CHANCE, EMERGENT_READINGS } from '../../data/affinities';
 import { buildFace, DECK_BY_ID, drawTarotCard, consolidateSpread, FULL_DECK } from '../../data/tarot';
 
 const T = TIER_BASE_CHANCE;
@@ -173,6 +173,24 @@ export function buildAffinityResponders(): Responder[] {
       apply: (c) => {
         c.draft.spawnSecond = (c.draft.outcome as SlotResult).type;
         return report('chaos-second-result', 'Chaos', 'Chaos surges — a second reading manifests.', 'second-result');
+      },
+    },
+    {
+      id: 'emergent-upheaval', source: 'affinity',
+      triggers: ['dice:commit', 'tarot:commit', 'iching:commit', 'strings:commit', 'astral:commit', 'rune:commit'],
+      group: { kind: 'exclusive', band: 'STRUCTURAL' },
+      // Extreme effective affinity AND no active upheaval AND a reading remains.
+      condition: (c) => c.draft.upheavalActive !== true && c.draft.lastReading !== true
+        && AFFINITY_IDS.some((id) => c.affinities[id] >= EMERGENT_THRESHOLD),
+      roll: (c) => c.rng() < EMERGENT_CHANCE,
+      apply: (c) => {
+        const extreme = AFFINITY_IDS.find((id) => c.affinities[id] >= EMERGENT_THRESHOLD)!;
+        c.draft.requestUpheaval = {
+          transform: { transform: 'invert-pair', axis: axisOf(extreme) },
+          readings: EMERGENT_READINGS,
+          source: `emergent:${extreme}`,
+        };
+        return report('emergent-upheaval', 'Upheaval', 'Reality strains against itself — the weave inverts.', 'upheaval');
       },
     },
     {

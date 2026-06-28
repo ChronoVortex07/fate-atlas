@@ -44,6 +44,7 @@ export class GameEngine {
   private listeners = new Set<(state: GameState) => void>();
   private usedHappeningIds = new Set<string>();
   private peekOverrideThisReading: 'guarantee' | 'deny' | null = null;
+  private pendingEmergentUpheaval: { transform: TransformPayload; readings: number; source: string } | null = null;
   private minigamesPerTurn: number;
   private pendingTransition: (() => void) | null = null;
   private pendingAdvance: (() => void) | null = null;
@@ -265,6 +266,7 @@ export class GameEngine {
     this.state.awaitingContinue = false;
     this.turnEffects = [];
     this.peekOverrideThisReading = null;
+    this.pendingEmergentUpheaval = null;
     this.happeningOfferedThisTurn = false;
 
     this.narrativeAssembler.resetRotation();
@@ -388,11 +390,19 @@ export class GameEngine {
     // Responders namespace dice as 'dice', not the data-layer 'd20' type.
     const commitFamily = result.type === 'd20' ? 'dice' : result.type;
     const commitTrigger = `${commitFamily}:commit`;
-    const { draft } = this.dispatchAt(commitTrigger, { outcome: result });
+    const { draft } = this.dispatchAt(commitTrigger, {
+      outcome: result,
+      upheavalActive: this.affinityEngine.hasActiveTransform(),
+      lastReading: completed >= this.minigamesPerTurn,
+    });
 
     if (result.type !== 'happening' && typeof draft.spawnSecond !== 'string'
         && this.consumeReadingEffect('spawn-second')) {
       draft.spawnSecond = result.type;
+    }
+
+    if (draft.requestUpheaval) {
+      this.pendingEmergentUpheaval = draft.requestUpheaval as { transform: TransformPayload; readings: number; source: string };
     }
 
     // Mutating responders (mirror/critical-resonance) operate in place on the
@@ -487,6 +497,15 @@ export class GameEngine {
       this.saveToStorage();
       this.notify();
       return;
+    }
+
+    // Apply any emergent upheaval requested at this reading's commit. Deferred to
+    // here (after tick, past the final-reading guard) so it stays active for its
+    // full `readings` and only when a subsequent reading exists.
+    if (this.pendingEmergentUpheaval) {
+      const u = this.pendingEmergentUpheaval;
+      this.pendingEmergentUpheaval = null;
+      this.affinityEngine.grantUpheaval(u.transform, u.readings, u.source);
     }
 
     // Between-minigame transition. Decoupled cadence decides whether a happening interrupts.
@@ -1409,6 +1428,7 @@ export class GameEngine {
     this.state.awaitingContinue = false;
     this.turnEffects = [];
     this.peekOverrideThisReading = null;
+    this.pendingEmergentUpheaval = null;
     this.happeningOfferedThisTurn = false;
     this.notify();
   }
@@ -1433,6 +1453,7 @@ export class GameEngine {
     this.state.history = saved.history;
     this.usedHappeningIds = new Set(saved.usedHappeningIds);
     this.peekOverrideThisReading = null;
+    this.pendingEmergentUpheaval = null;
     this.happeningOfferedThisTurn = false;
     this.bus.clear();
     this.saveToStorage();
@@ -1457,6 +1478,7 @@ export class GameEngine {
     this.state.history = history;
     this.usedHappeningIds = new Set(usedIds);
     this.peekOverrideThisReading = null;
+    this.pendingEmergentUpheaval = null;
     this.happeningOfferedThisTurn = false;
     this.bus.clear();
     this.saveToStorage();
