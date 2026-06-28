@@ -1297,6 +1297,7 @@ export class GameEngine {
     this.state.turnResults = stage.slots;
     this.state.questionType = this.state.questionType ?? 'self';
     this.state.debugConfig = { forced: scenario.forced, isolate: scenario.isolate };
+    if (stage.happening !== undefined) this.state.happening = stage.happening;
 
     if (this.state.screen === 'method-select') {
       // Use buildPool so select:draw triggers fire (shrouding, etc.) and shroudedMethods is set.

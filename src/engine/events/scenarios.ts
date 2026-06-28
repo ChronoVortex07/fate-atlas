@@ -1,4 +1,4 @@
-import type { AffinityId, SlotResult } from '../types';
+import type { AffinityId, SlotResult, HappeningResult } from '../types';
 import { defaultAffinityState } from '../../data/affinities';
 import { consolidateSpread, buildFace, DECK_BY_ID } from '../../data/tarot';
 import { consolidateCast } from '../../data/astromancy';
@@ -11,6 +11,7 @@ export interface ScenarioStage {
   screen: string;
   selectedMethod: string | null;
   slots: SlotResult[];
+  happening?: HappeningResult; // optional: pre-stage a happening for demo scenarios
 }
 
 export interface DebugScenario {
@@ -116,6 +117,19 @@ export const DEBUG_SCENARIOS: DebugScenario[] = [
     setup: (s) => { atTarot(s); s.slots = [criticalLowDie]; } },
   { id: 'iching-happening-boost', label: 'I Ching boosts the happening', group: 'Interaction', forced: ['iching-happening-boost'], isolate: true,
     setup: (s) => { s.screen = 'happening'; s.slots = [changingLinesHex]; } },
+  { id: 'happening-surge-cost', label: 'Happening: surge + cost choice', group: 'Interaction', forced: [], isolate: false,
+    setup: (s) => {
+      s.screen = 'happening';
+      s.happening = {
+        type: 'happening', id: 'falling-star',
+        scene: 'A star tears across the sky, brilliant and brief.',
+        choices: [
+          { text: 'Make a wish upon the falling light.', effects: [{ kind: 'surge', deltas: { chaos: 30 }, readings: 3 }, { kind: 'cost', affinity: 'order', amount: 10 }] },
+          { text: 'Look away; let it pass.', effects: [{ kind: 'shift', affinity: 'order', amount: 6 }] },
+        ],
+        tags: [], themes: [], dimensions: { favorability: 0, certainty: 0, volatility: 0 }, modifierRoles: [],
+      };
+    } },
   // ── Affinity (Task 13: new affinity responders) ──
   { id: 'chaos-wild-card', label: 'Chaos: wild card flips', group: 'Affinity', forced: ['chaos-wild-card'], isolate: true,
     setup: (s) => { atTarot(s); set(s, { chaos: 80 }); } },

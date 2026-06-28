@@ -15,7 +15,8 @@ the **meta-interactions** between divination results, and the **happenings**.
 > | Meta-interactions (responders) | [`src/engine/responders/interactions.ts`](../src/engine/responders/interactions.ts) |
 > | Roll-mode combine reducer | [`src/engine/events/reducers.ts`](../src/engine/events/reducers.ts) |
 > | Dispatch / band ordering / chance scaling | [`src/engine/events/EventDispatcher.ts`](../src/engine/events/EventDispatcher.ts), [`src/engine/events/eligibility.ts`](../src/engine/events/eligibility.ts) |
-> | Happenings | [`src/data/happenings.ts`](../src/data/happenings.ts) |
+> | Happenings — effect model, dominant-axis selection, cadence tuning | [`src/data/happenings.ts`](../src/data/happenings.ts) |
+> | Happening effect resolution + `pendingReadingEffects` consumption + cadence | [`src/engine/GameEngine.ts`](../src/engine/GameEngine.ts) |
 > | Debug scenarios | [`src/engine/events/scenarios.ts`](../src/engine/events/scenarios.ts) |
 > | Astromancy data tables (planets, signs, houses, aspects, dignity) | [`src/data/astromancy.ts`](../src/data/astromancy.ts) |
 > | Astromancy cast modes and affinity modifiers | [`src/engine/astral.ts`](../src/engine/astral.ts) |
@@ -111,7 +112,9 @@ across runs (localStorage `fate-atlas-save`); at the start of each run every aff
 
 Result-tag feeds grant `+5` per matching tag; action feeds grant `+6` (`+3` to a secondary
 axis). Happening *slots* do **not** feed affinity on reveal — only the **chosen** happening
-option shifts affinity.
+option shifts affinity. Happening choices may also grant **surges** (decaying temporary
+spikes) via `GameEngine.grantSurge` → `AffinityEngine.grantSurge` (see §7 and the
+base/effective split above).
 
 Fortune **tag** feeds (Chaos/Order from result tags **and** the spread/strings coherence bonuses) are capped at **+8 base per run** (`FORTUNE_TAG_CAP`); behavior feeds (player actions) are uncapped (diminishing returns still applies).
 
@@ -163,8 +166,8 @@ Combining the static effects above with the event-driven responders in §5:
 
 - **Chaos** — *stirring:* restless flavor. *ascendant:* at the tarot reveal, one random face
   may flip to the opposite orientation (`chaos-wild-card`, narrated inline as an emphasized
-  flip + chaos ring); a happening may interrupt between readings (`chaos-happening-interrupt`).
-  *dominant:* a committed result may spawn a second (`chaos-second-result`).
+  flip + chaos ring). *dominant:* a committed result may spawn a second
+  (`chaos-second-result`).
 - **Order** — *ascendant:* at the tarot reveal, all reversed faces straighten upright
   (`order-anchor`, narrated inline as a blue straightening glow). Otherwise steadier flavor
   and clarity as it rises; opposes Chaos via coupling.
@@ -395,7 +398,6 @@ higher bands (§1).
 | `chaos-second-result` | `dice/tarot/iching:commit` | SPAWN | Chaos dominant · major | Spawns a second result of the same type (targets the new fan slot) | `second-result` |
 | `chaos-line-cascade` | `iching:transform` | MUTATE | Chaos ascendant · notable | Adds one new changing line (chosen from the still lines) and recomputes the relating hexagram | `amplify` |
 | `order-still-hexagram` | `iching:transform` | MUTATE | Order ascendant · notable | Removes one changing line (chosen at random) and recomputes the relating hexagram | `anchor` |
-| `chaos-happening-interrupt` | `minigame:end` | SPAWN | Chaos ascendant · major | A happening interrupts before the next method (never on the last reading) | `interrupt` |
 | `light-advantage` | `dice:roll` | combine `roll-mode` | Light ascendant · ambient | Adds an **advantage** modifier | *(roll-mode)* |
 | `shadow-disadvantage` | `dice:roll` | combine `roll-mode` | Shadow ascendant · ambient | Adds a **disadvantage** modifier | *(roll-mode)* |
 | `will-choice` | `dice:roll` | combine `roll-mode` | Will dominant · major | Cast two dice, keep one (**choice**) | *(roll-mode)* |
@@ -434,6 +436,12 @@ Meta-interactions use two distinct scopes:
 All interaction responders are tag-matched (adding a new entity with the right tags
 automatically participates). All are deterministic (`roll → true`) except **Mirror** (85%).
 
+> **Note:** the `chaos-happening-interrupt` responder (previously a Chaos-ascendant SPAWN
+> at `minigame:end`) has been **removed**. Happenings are now offered by the decoupled
+> cadence logic in `GameEngine.shouldOfferHappening` (see §7). The `iching-happening-boost`
+> responder (`happening:start`) is **preserved** and unchanged — an I Ching with changing
+> lines still appends a hidden bonus choice when a happening fires.
+
 | Interaction | Trigger | Scope | Fires when… | Effect | Animation |
 |-------------|---------|-------|-------------|--------|-----------|
 | **Fool's Reroll** (`fool-reroll`) | `dice:commit` | cross-slot | The Fool (`major-arcana` + `fool-archetype`) is anywhere in the spread | Recasts the committed d20 (fresh draw) | `reroll` |
@@ -456,25 +464,83 @@ without blocking the cross-slot resolution flow.
 
 ## 7. Happenings
 
-Authored cryptic scenes that may appear between readings (triggered by
-`chaos-happening-interrupt`). Each presents 2–3 choices; **choosing** an option shifts
-Chaos and/or Order (the scene itself is affinity-neutral on reveal, and is filtered out of
-synthesis and run records).
+Authored cryptic scenes offered **at most once per turn**, in a between-reading gap, and
+**never after the final reading** (so any granted effect still has a reading to land on).
+The happening screen is filtered out of synthesis and run records; only the *chosen* option
+affects affinity/surges.
 
-`selectHappening` excludes already-seen IDs (resetting once all are used) and, as **Chaos**
-rises, weights the 3-choice happenings more heavily. An active I Ching with changing lines
-can append a hidden bonus choice (see §6).
+### 7a. Decoupled cadence
 
-| ID | Scene (gist) | Choices → affinity shift |
-|----|--------------|---------------------------|
-| `crossroads` | A path splits beneath the stars | Order +8 · Chaos +8 · (wait) Order +4/Chaos +4 |
-| `falling-star` | A star tears across the sky | Chaos +10 · Order +10 |
-| `veiled-moon` | Cloud drifts across the moon | Chaos +6 · Order +6 · (fix shapes) Order +3/Chaos +3 |
-| `whispering-thread` | A thread of starlight whispers | Chaos +7 · Order +7 |
-| `convergence` | Three constellations align | Order +9 · Chaos +9 |
-| `echo-of-past-reading` | A past divination resurfaces | Chaos +5 · Order +5 |
-| `dark-constellation` | A constellation of absence | Order +6 · Chaos +6 |
-| `many-threads` | Countless threads of fate shimmer | Order +7 · Chaos +7 |
+`GameEngine.shouldOfferHappening(completed)` runs after each minigame commit:
+
+- Returns `false` if a happening was already offered this turn (`happeningOfferedThisTurn`).
+- Returns `false` if no reading remains after this gap (`remaining ≤ 0`).
+- Returns `true` unconditionally when `remaining === 1` — **last eligible gap is
+  guaranteed**.
+- Otherwise fires with probability `HAPPENING_GAP_CHANCE` (default **0.5**).
+
+This replaces the old `chaos-happening-interrupt` responder entirely. Chaos no longer
+gates whether a happening appears — only the cadence constant and the once-per-turn floor
+matter.
+
+### 7b. Selection (`selectHappening`)
+
+Excludes already-seen IDs from `usedHappeningIds` (resets once all eight are exhausted),
+then applies **dominant-axis weighting**:
+
+```
+dominantAxis(affinities) → agency | information | fortune
+   agency      = |fate − will|
+   information = |light − shadow|
+   fortune     = |chaos − order|
+```
+
+Each scene whose `axes` array includes the player's widest polar pair receives
+`weight = 1 + AXIS_WEIGHT_BONUS` (default bonus **1**, so matching scenes are twice as
+likely). Non-matching scenes have `weight = 1`.
+
+### 7c. Effect model
+
+Each choice carries `effects: HappeningEffect[]`. Six kinds are defined:
+
+| Kind | What it does |
+|------|-------------|
+| `shift` | Permanent nudge — `AffinityEngine.shift(affinity, +amount)` |
+| `cost` | Drain — `AffinityEngine.shift(affinity, −Math.abs(amount))` (positive `amount` in data) |
+| `surge` | Decaying temporary spike — `GameEngine.grantSurge(deltas, readings)` → the Phase 1 base/effective surge layer (§2). Contributes to effective value for `readings` readings then expires. |
+| `reading` | Queues a `ReadingEffectId` onto `state.pendingReadingEffects`; consumed by the **next** reading then dropped. |
+| `gamble` | Weighted branch — exactly one outcome's `effects[]` resolve (chosen by `pickGambleOutcome`). |
+| `upheaval` | **Phase 3 — data-stubbed in Phase 2. No-op: `applyHappeningEffect` hits the `upheaval` case and returns without mutation.** Do not document or rely on upheaval resolution until Phase 3 is implemented. |
+
+### 7d. `ReadingEffectId` → engine vocabulary
+
+| ReadingEffectId | Consumed by | Engine effect |
+|----------------|-------------|---------------|
+| `widen-pool` | `buildPool` | pool target +1 (same path as `will-widen-pool`) |
+| `guarantee-peek` | `selectMethod` | sets `peekOverrideThisReading = 'guarantee'` → `peekAvailable: true` for one reading |
+| `deny-peek` | `selectMethod` | sets `peekOverrideThisReading = 'deny'` → `peekAvailable: false` for one reading |
+| `grant-reroll` | `planDiceRoll` | offers a reroll prompt (same path as `will-offer-reroll`) |
+| `spawn-second` | `completeMinigame` | sets `draft.spawnSecond` → spawns a second result of the same type |
+| `shroud-card` | `buildPool` | shrouds one extra method card (same path as `shadow-shroud`) |
+
+All six are consumed and removed from `pendingReadingEffects` the moment they take effect
+(the `consumeReadingEffect` helper removes exactly one occurrence per call).
+
+### 7e. Happening catalog
+
+| ID | Scene (gist) | Choices (summary) |
+|----|--------------|-------------------|
+| `crossroads` | A path splits beneath the stars | Order +6 shift · surge(chaos+25, 3r) + cost(order 8) · Fate +4 shift + reading(deny-peek) |
+| `falling-star` | A star tears across the sky | surge(chaos+30, 3r) + cost(order 10) · surge(light+25, 3r) + reading(guarantee-peek) · Order +6 shift |
+| `veiled-moon` | Cloud drifts across the moon | surge(shadow+22, 3r) + reading(shroud-card) · Order +6 shift · Light +4 + Order +3 shift |
+| `whispering-thread` | A thread of starlight whispers | gamble[surge(light+25,3r)+reading(guarantee-peek) OR cost(light 10)+reading(deny-peek)] · Shadow +6 shift |
+| `convergence` | Three constellations align | surge(order+25, 3r) · surge(chaos+22, 3r) + reading(spawn-second) |
+| `echo-of-past-reading` | A past divination resurfaces | surge(chaos+20, 3r) + reading(grant-reroll) · Fate +6 shift |
+| `dark-constellation` | A constellation of absence | surge(shadow+25, 3r) + reading(shroud-card) · surge(will+22, 3r) + cost(fate 8) |
+| `many-threads` | Countless threads of fate shimmer | surge(order+22, 3r) + reading(widen-pool) · upheaval(stub) + surge(chaos+20, 2r) |
+
+An active I Ching with changing lines (`iching-happening-boost` responder at
+`happening:start`) can append a hidden bonus choice to any happening — see §6.
 
 ---
 
@@ -1026,7 +1092,7 @@ Change by design. `ReadingPlanner` expands the path into one atomic signal per c
 | `woven-echo` | `strings:commit` | combine `weave` | deterministic | destination theme matches another slot → amplify dominant dim ×1.25 |
 | `chaos-second-result` | `strings:commit` (added) | SPAWN | Chaos dominant · major | spawns a second weave (reused) |
 
-`chaos-happening-interrupt` (`minigame:end`) already covers Strings.
+The decoupled cadence (`GameEngine.shouldOfferHappening`) covers Strings between-reading gaps exactly as it does Tarot, Dice, and I Ching — no per-method responder needed.
 
 > **Known limitation:** the three **pick-time** strings debug scenarios require a live
 > `strings:pick` draft, so they don't fire from a cold scenario load (like the
