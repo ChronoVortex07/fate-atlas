@@ -86,6 +86,30 @@ export const READING_FRAGMENTS = {
     ],
   } satisfies Record<ModifierRole, string[]>,
 
+  // ── Repeated-minigame framing (consumed by voices/index.ts) ──
+  // variantScaffolds: alternate single-draw subjects for the 2nd+ same-type draw.
+  //   {n} = the draw's identifying value (d20 result, hexagram number).
+  // group.lead: opener for an aggregated run of same-type, same-role draws.
+  // group.seqLast / listLast / mid: list connectives (structural glue).
+  drawFraming: {
+    variantScaffolds: {
+      d20: ['the cast that lands on {n}', 'a later throw reading {n}', 'the roll that shows {n}'],
+      iching: ['Hexagram {n} answering in turn', 'a further cast, Hexagram {n}'],
+    } as Record<string, string[]>,
+    group: {
+      lead: {
+        d20: 'the dice fall in turn —',
+        iching: 'the hexagrams answer in sequence —',
+        tarot: 'the cards arrive together —',
+        strings: 'the threads gather —',
+        generic: 'together —',
+      } as Record<string, string>,
+      seqLast: ', then ',
+      listLast: ', and ',
+      mid: ', ',
+    },
+  },
+
   connectives: {
     additive: [' and so ', ', and ', ' — and ', '; ', ', where '],
     contrast: [' — yet ', ', and still ', ' — but beneath this, ', ', though '],
