@@ -292,7 +292,7 @@ The synthesis is falsified in-place on `state.synthesis`; the underlying result 
 A **phantom line** — player-aware, hostile, lowercase — surfaces at **virulent+** after each completed reading. `GameEngine.maybeIntrude()` is called post-commit (after the rupture guard):
 
 - **Gate:** band must be `virulent` or `pinnacle`.
-- **Chance:** `intrusionChance(value)` = 0 below 67 (spreading boundary); at 67 it is 8%; it ramps linearly to 33% at 99. Formula: `0.08 + ((value − 67) / (99 − 67)) × 0.25`.
+- **Chance:** `intrusionChance(value)` = 0 below virulent (< 67, the virulent boundary — spreading is 35–66); at 67 it is 8%; it ramps linearly to 33% at 99. Formula: `0.08 + ((value − 67) / (99 − 67)) × 0.25`.
 - **Forced guarantee:** if no intrusion has fired yet this corruption event and `value ≥ NEAR_PINNACLE` (90), the intrusion fires unconditionally (`forced = true`), regardless of the chance roll.
 - **Delivery:** `state.intrusion = { text }` (one of five `INTRUSION_PHRASES`); the React `IntrusionOverlay` renders it and auto-clears after 2.4 s via `engine.clearIntrusion()`.
 - **Reset:** `intrusion` is cleared at the start of each new minigame (`selectMethod`). The `hasIntruded` flag on `CorruptionEngine` resets when corruption decays to 0 (starve-to-zero), so each new corruption event earns its own guaranteed intrusion near the pinnacle.
