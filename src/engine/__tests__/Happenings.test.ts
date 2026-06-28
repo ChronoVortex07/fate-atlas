@@ -124,3 +124,52 @@ describe('resolveHappening effect resolution', () => {
     expect(engine.getState().pendingReadingEffects).toEqual([]);
   });
 });
+
+describe('pendingReadingEffects consumption', () => {
+  it('widen-pool grows the next draw by one method and is then consumed', () => {
+    const engine = new GameEngine();
+    engine.startTurn('self');
+    const before = engine.getState().availableMethods.length;
+    engine.loadState({ pendingReadingEffects: ['widen-pool'] });
+    // Re-deal the pool the way the between-reading flow does. buildPool is private
+    // and does not call notify(); flush the snapshot with a no-op loadState call.
+    (engine as unknown as { buildPool: (b: object, r: boolean) => void }).buildPool({}, true);
+    engine.loadState({}); // flush snapshot so getState() reflects the new pool
+    const s = engine.getState();
+    expect(s.availableMethods.length).toBe(before + 1);
+    expect(s.pendingReadingEffects).not.toContain('widen-pool');
+  });
+
+  it('guarantee-peek forces the peek gate open for the next reading regardless of Light', () => {
+    const engine = new GameEngine();
+    engine.startTurn('self'); // base Light 50 → peek normally unavailable
+    expect(engine.getState().affinityEffects.peekAvailable).toBe(false);
+    engine.loadState({ pendingReadingEffects: ['guarantee-peek'] });
+    const idx = engine.getState().availableMethods.findIndex((m) => m !== 'happening');
+    engine.selectMethod(idx);
+    expect(engine.getState().affinityEffects.peekAvailable).toBe(true);
+    expect(engine.getState().pendingReadingEffects).not.toContain('guarantee-peek');
+  });
+
+  it('deny-peek forces the peek gate shut even when Light would allow it', () => {
+    const engine = new GameEngine();
+    engine.startTurn('self');
+    // Lift Light above the peek gate with a surge (public, deterministic) so the
+    // override has something to override: effective light 80 → peekAvailable true.
+    engine.grantSurge({ light: 30 }, 3, 'test');
+    expect(engine.getState().affinityEffects.peekAvailable).toBe(true);
+    engine.loadState({ pendingReadingEffects: ['deny-peek'] });
+    const idx = engine.getState().availableMethods.findIndex((m) => m !== 'happening');
+    engine.selectMethod(idx);
+    expect(engine.getState().affinityEffects.peekAvailable).toBe(false);
+  });
+
+  it('grant-reroll makes the next dice roll offer a reroll', () => {
+    const engine = new GameEngine();
+    engine.startTurn('self');
+    engine.loadState({ pendingReadingEffects: ['grant-reroll'] });
+    const plan = engine.planDiceRoll();
+    expect(plan.offerReroll).toBe(true);
+    expect(engine.getState().pendingReadingEffects).not.toContain('grant-reroll');
+  });
+});

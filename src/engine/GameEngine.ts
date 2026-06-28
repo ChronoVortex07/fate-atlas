@@ -1,4 +1,4 @@
-import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, RollMode, DivinationType, TarotCardFace, TableCard, TarotDraftState, AstralCast, IChingResult, HandCard, HappeningEffect } from './types';
+import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, TarotResult, DiceResult, RunRecord, RollMode, DivinationType, TarotCardFace, TableCard, TarotDraftState, AstralCast, IChingResult, HandCard, HappeningEffect, ReadingEffectId } from './types';
 import { FULL_DECK, buildFace, pickOrientation, DECK_BY_ID, consolidateSpread, reverseSpread } from '../data/tarot';
 import { EventBus } from './EventBus';
 import { AffinityEngine } from './AffinityEngine';
@@ -43,6 +43,7 @@ export class GameEngine {
   private cachedSnapshot: GameState;
   private listeners = new Set<(state: GameState) => void>();
   private usedHappeningIds = new Set<string>();
+  private peekOverrideThisReading: 'guarantee' | 'deny' | null = null;
   private minigamesPerTurn: number;
   private pendingTransition: (() => void) | null = null;
   private pendingAdvance: (() => void) | null = null;
@@ -97,6 +98,8 @@ export class GameEngine {
     this.state.affinities = this.affinityEngine.getState();
     this.state.affinityBase = this.affinityEngine.getBase();
     this.state.affinityEffects = this.affinityEngine.getEffects();
+    if (this.peekOverrideThisReading === 'guarantee') this.state.affinityEffects = { ...this.state.affinityEffects, peekAvailable: true };
+    else if (this.peekOverrideThisReading === 'deny') this.state.affinityEffects = { ...this.state.affinityEffects, peekAvailable: false };
     this.state.eventLog = this.bus.getHistory();
     this.cachedSnapshot = JSON.parse(JSON.stringify(this.state)) as GameState;
     this.listeners.forEach((fn) => fn(this.cachedSnapshot));
@@ -205,7 +208,8 @@ export class GameEngine {
 
     const startDraft: PhaseDraft = { poolTarget: baseCount };
     const { reports: startReports } = this.dispatchAt('select:draw:start', startDraft);
-    const target = (startDraft.poolTarget as number) ?? baseCount;
+    let target = (startDraft.poolTarget as number) ?? baseCount;
+    if (this.consumeReadingEffect('widen-pool')) target += 1;
 
     const affinities = this.affinityEngine.getState();
     const pool = refill
@@ -219,6 +223,13 @@ export class GameEngine {
     this.state.shroudedMethods = Array.isArray(endDraftPool.shrouded)
       ? (endDraftPool.shrouded as number[])
       : [];
+
+    if (this.consumeReadingEffect('shroud-card')) {
+      const free = this.state.availableMethods
+        .map((_, i) => i)
+        .find((i) => !this.state.shroudedMethods.includes(i));
+      if (free !== undefined) this.state.shroudedMethods = [...this.state.shroudedMethods, free];
+    }
 
     // The draw-phase effects (widen/thin/shroud) are narrated INSIDE the card
     // spread by MethodSelect (EventBanner + in-spread animation), not by the
@@ -252,6 +263,7 @@ export class GameEngine {
     this.state.eventQueue = [];
     this.state.awaitingContinue = false;
     this.turnEffects = [];
+    this.peekOverrideThisReading = null;
 
     this.narrativeAssembler.resetRotation();
 
@@ -269,6 +281,9 @@ export class GameEngine {
     if (!this.state.availableMethods[index]) {
       throw new Error(`Method index ${index} out of bounds`);
     }
+    // Consume any happening-granted peek override for the reading about to start.
+    if (this.consumeReadingEffect('guarantee-peek')) this.peekOverrideThisReading = 'guarantee';
+    else if (this.consumeReadingEffect('deny-peek')) this.peekOverrideThisReading = 'deny';
     const queueBefore = this.state.eventQueue.length;
     const { draft, reports } = this.dispatchAt('select:pick', {
       methodIndex: index,
@@ -373,6 +388,11 @@ export class GameEngine {
     const commitTrigger = `${commitFamily}:commit`;
     const { draft } = this.dispatchAt(commitTrigger, { outcome: result });
 
+    if (result.type !== 'happening' && typeof draft.spawnSecond !== 'string'
+        && this.consumeReadingEffect('spawn-second')) {
+      draft.spawnSecond = result.type;
+    }
+
     // Mutating responders (mirror/critical-resonance) operate in place on the
     // spread, so the committed slot reflects any orientation flip.
     if (draft.outcome && draft.outcome !== result) {
@@ -455,6 +475,7 @@ export class GameEngine {
     // mandate; each later commit weakens it toward 1.0.
     this.affinityEngine.decayMandate();
     this.affinityEngine.tickModifiers(); // decay/expire surges once per completed reading
+    this.peekOverrideThisReading = null; // peek override lasts exactly one reading
 
     // Final reading?
     if (completed >= this.minigamesPerTurn) {
@@ -600,6 +621,17 @@ export class GameEngine {
     this.notify();
   }
 
+  // Removes one queued reading effect and reports whether it was present.
+  private consumeReadingEffect(id: ReadingEffectId): boolean {
+    const i = this.state.pendingReadingEffects.indexOf(id);
+    if (i < 0) return false;
+    this.state.pendingReadingEffects = [
+      ...this.state.pendingReadingEffects.slice(0, i),
+      ...this.state.pendingReadingEffects.slice(i + 1),
+    ];
+    return true;
+  }
+
   // Routes one happening effect to its engine primitive. Recursive for `gamble`.
   private applyHappeningEffect(effect: HappeningEffect, source: string): void {
     switch (effect.kind) {
@@ -700,10 +732,11 @@ export class GameEngine {
     // DC + Bless/Bane from the slots already committed this turn (the active dice
     // slot is not appended until completeMinigame, so turnResults == prior slots).
     const check = planDiceCheck(this.state.turnResults);
+    const offerReroll = (draft.offerReroll ?? false) || this.consumeReadingEffect('grant-reroll');
     this.notify();
     return {
       mode: draft.rollMode ?? 'single',
-      offerReroll: draft.offerReroll ?? false,
+      offerReroll,
       dc: check.dc, bless: check.bless, bane: check.bane, sources: check.sources,
       reports,
     };
