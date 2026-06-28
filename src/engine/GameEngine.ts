@@ -127,6 +127,8 @@ export class GameEngine {
     const cband = this.corruptionEngine.getBand();
     if (cband === 'dormant') return null;
 
+    // DELIBERATE: reads the EFFECTIVE (upheaval-bent) Light band — the warning reflects
+    // what Light perceives, so a distortion of perception is part of the effect.
     const lightIdx = BAND_ORDER.indexOf(this.affinityEngine.bandOf('light'));
     if (lightIdx < BAND_ORDER.indexOf('ascendant')) return null;
 
@@ -1529,6 +1531,7 @@ export class GameEngine {
     this.peekOverrideThisReading = null;
     this.pendingEmergentUpheaval = null;
     this.happeningOfferedThisTurn = false;
+    this.selectedMethodInfected = false;
     this.notify();
   }
 
@@ -1554,6 +1557,7 @@ export class GameEngine {
     this.peekOverrideThisReading = null;
     this.pendingEmergentUpheaval = null;
     this.happeningOfferedThisTurn = false;
+    this.selectedMethodInfected = false;
     this.bus.clear();
     this.saveToStorage();
     this.notify();
@@ -1579,6 +1583,7 @@ export class GameEngine {
     this.peekOverrideThisReading = null;
     this.pendingEmergentUpheaval = null;
     this.happeningOfferedThisTurn = false;
+    this.selectedMethodInfected = false;
     this.bus.clear();
     this.saveToStorage();
     this.notify();

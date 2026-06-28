@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { GameEngine } from '../GameEngine';
+import { infectedCountForBand } from '../../data/corruption';
 
 describe('minigame infection — infected method data', () => {
   it('marks no methods when corruption is dormant', () => {
@@ -32,5 +33,9 @@ describe('minigame infection — infected method data', () => {
     const infected = e.getState().infectedMethods;
     expect(infected).toHaveLength(2);
     expect(new Set(infected).size).toBe(2); // distinct
+  });
+
+  it('infectedCountForBand returns 2 at pinnacle (same as virulent)', () => {
+    expect(infectedCountForBand('pinnacle')).toBe(2);
   });
 });
