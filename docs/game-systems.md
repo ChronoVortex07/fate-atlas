@@ -120,6 +120,16 @@ option shifts affinity.
   60% of the realized gain and each of the other four loses 35%.
 - **Penalties** (negative deltas) apply directly with **no** fan-out.
 
+### Base vs. effective + surges
+
+Each affinity has a permanent **base** (persisted, drifts toward baseline at turn start)
+and a run-scoped list of **surge** modifiers. The **effective** value the game acts on is
+`base + Σ surge contributions`, clamped 0–100. A surge carries a per-affinity delta and a
+lifetime in **readings**; its contribution decays step-down (`readingsRemaining /
+initialReadings`, e.g. 100% → 66% → 33% → gone) and expires. Surges survive turn
+boundaries within a session and are **not** serialized (only base persists). `getState()`
+and all bands/effects/hints read **effective**; `getBase()` exposes the permanent values.
+
 ---
 
 ## 3. Effects of each band

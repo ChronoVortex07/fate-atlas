@@ -24,6 +24,7 @@ import {
 export class AffinityEngine {
   private base: Record<AffinityId, number>;
   private modifiers: AffinityModifier[] = [];
+  private modSeq = 0;
   private feedsThisRun: Record<AffinityId, number>;
   private peeksThisRun = 0;
   private peekLocked = false;
@@ -77,6 +78,34 @@ export class AffinityEngine {
 
   getBase(): Record<AffinityId, number> {
     return { ...this.base };
+  }
+
+  // ── Temporary surge layer ──
+  grantSurge(deltas: Partial<Record<AffinityId, number>>, readings: number, source: string): void {
+    if (readings <= 0) return;
+    this.modifiers.push({
+      id: `surge:${source}:${this.modSeq++}`,
+      kind: 'surge',
+      deltas: { ...deltas },
+      readingsRemaining: readings,
+      initialReadings: readings,
+      source,
+    });
+  }
+
+  // Advance every modifier one reading; drop the expired ones. Called once per
+  // completed reading by the GameEngine (Task 5).
+  tickModifiers(): void {
+    for (const m of this.modifiers) m.readingsRemaining -= 1;
+    this.modifiers = this.modifiers.filter((m) => m.readingsRemaining > 0);
+  }
+
+  clearModifiers(): void {
+    this.modifiers = [];
+  }
+
+  getModifiers(): AffinityModifier[] {
+    return this.modifiers.map((m) => ({ ...m, deltas: { ...m.deltas } }));
   }
 
   // ── The single mutation chokepoint ──
