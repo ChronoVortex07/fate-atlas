@@ -2,6 +2,7 @@ import { useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
 import RunicBand from '../shared/RunicBand';
+import { choiceCue } from '../../data/happenings';
 
 export default function HappeningScene() {
   const { state, engine } = useGameEngine();
@@ -95,7 +96,12 @@ export default function HappeningScene() {
                 whileTap={{ scale: 0.98 }}
                 onClick={() => handleChoice(i)}
               >
-                <span style={choiceTextStyle}>{choice.text}</span>
+                <span style={choiceInnerStyle}>
+                  <span style={choiceTextStyle}>{choice.text}</span>
+                  {choiceCue(choice.effects) && (
+                    <span style={cueStyle}>{CUE_TEXT[choiceCue(choice.effects)!]}</span>
+                  )}
+                </span>
               </motion.button>
             ))}
           </motion.div>
@@ -104,6 +110,12 @@ export default function HappeningScene() {
     </motion.div>
   );
 }
+
+const CUE_TEXT: Record<'price' | 'tear' | 'fortune', string> = {
+  price: 'a price will be paid',
+  tear: 'the weave may tear',
+  fortune: 'fortune decides',
+};
 
 // ── Styles ──
 
@@ -177,4 +189,17 @@ const choiceCardStyle: React.CSSProperties = {
 
 const choiceTextStyle: React.CSSProperties = {
   color: '#7b9ec7',
+};
+
+const choiceInnerStyle: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem',
+};
+
+const cueStyle: React.CSSProperties = {
+  fontFamily: "'Cormorant Garamond', serif",
+  fontStyle: 'italic',
+  fontSize: 'clamp(0.7rem, 1.5vw, 0.85rem)',
+  color: '#5a6b8c',
+  letterSpacing: '0.08em',
+  opacity: 0.85,
 };
