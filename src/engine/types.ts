@@ -492,6 +492,7 @@ export interface RunRecord {
   synthesis: SynthesisResult;
   happening?: HappeningResult;
   happeningChoice?: number; // index of chosen happening option
+  corrupted?: boolean;
 }
 
 // ── Tarot Draft State (card-drafting minigame) ──

@@ -7,7 +7,7 @@ import { TurnOrchestrator } from './TurnOrchestrator';
 import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
 import { AFFINITY_DEFINITIONS, defaultAffinityState, AFFINITY_IDS, BAND_ORDER } from '../data/affinities';
-import { RUPTURE_RESET, rollInfectedCount, INFECTION_GAIN_MULT, CORRUPTED_TAG, CORRUPTION_BANDS, SIGHT_COST, LIE_OFFSET, NEAR_PINNACLE, INTRUSION_PHRASES, intrusionChance } from '../data/corruption';
+import { RUPTURE_RESET, rollInfectedCount, INFECTION_GAIN_MULT, CORRUPTED_TAG, CORRUPTION_BANDS, SIGHT_COST, LIE_OFFSET, NEAR_PINNACLE, INTRUSION_PHRASES, intrusionChance, isVisibleCorruption } from '../data/corruption';
 import { corruptionTextLevel, corruptSynthesis, corruptText } from './CorruptionGlitch';
 import { selectHappening, HAPPENING_GAP_CHANCE } from '../data/happenings';
 import { dispatch } from './events/EventDispatcher';
@@ -680,6 +680,7 @@ export class GameEngine {
       synthesis: this.state.synthesis!,
       happening: this.state.happening ?? undefined,
       happeningChoice: this.state.selectedHappeningChoice ?? undefined,
+      corrupted: isVisibleCorruption(this.corruptionEngine.getBand()),
     };
     this.state.history = [...this.state.history, run].slice(-10);
   }

@@ -81,6 +81,10 @@ export function intrusionChance(value: number): number {
   return 0.08 + ((value - 67) / (99 - 67)) * 0.25;
 }
 
+export function isVisibleCorruption(band: CorruptionBand): boolean {
+  return band === 'spreading' || band === 'virulent' || band === 'pinnacle';
+}
+
 export const CORRUPTED_TAG = 'corrupted'; // marks a result the player can tell was tampered with
 
 export const SIGHT_COST = 6;   // corruption added on the first forbidden-sight use per minigame
