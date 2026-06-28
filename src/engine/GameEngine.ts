@@ -681,7 +681,7 @@ export class GameEngine {
     if (cLevel > 0) {
       this.state.synthesis = corruptSynthesis(this.state.synthesis, cLevel, Math.random);
     }
-    this.bus.emit('synthesis-complete', { result: synthesisResult });
+    this.bus.emit('synthesis-complete', { result: this.state.synthesis });
   }
 
   // Decoupled cadence: at most one happening per turn, in a between-reading gap,
