@@ -349,10 +349,14 @@ describe('spread coherence feeds', () => {
     const orig = Math.random; Math.random = () => 0.99;
     e.completeMinigame(spread, { revealedAsDrawn: true });
     Math.random = orig;
-    // With coherence feed: expected Order = 60 (tag +5 → coupling → coherence +6).
+    // With coherence feed: expected Order = 62 (tag +5 → coupling → coherence +6 → Fate coupling).
+    // Recomputed with new constants: COUPLING_OPPOSITE=0.35, COUPLING_OTHER=0.15, DR_STEP=0.05, DR_FLOOR=0.5.
+    // Step 1: feedFortuneTag('order',5): dr=1.0, jitter=1.147, gain=5.735 → order=56.
+    // Step 2: shift('order',6) coherence: dr=0.95, gain=6.538 → order=63.
+    // Step 3: shift('fate',6) reveal-as-drawn: dr=1.0, gain=6.882 → order -= 6.882*0.15=1.032 → order=round(61.97)=62.
     // ('random' no longer feeds Chaos, so Order is no longer reduced by that coupling.)
-    // Without coherence feed: Order would be 54.
-    expect(e.getState().affinities.order).toBe(60);
+    // Without coherence feed: Order would be 55.
+    expect(e.getState().affinities.order).toBe(62);
   });
 
   it('committing an all-reversed spread boosts Chaos above tag-feed baseline', () => {
@@ -366,10 +370,14 @@ describe('spread coherence feeds', () => {
     const orig = Math.random; Math.random = () => 0.99;
     e.completeMinigame(spread, { revealedAsDrawn: true });
     Math.random = orig;
-    // With coherence feed: expected Chaos = 60 (tag +5 → coupling → coherence +6).
+    // With coherence feed: expected Chaos = 62 (tag +5 → coupling → coherence +6 → Fate coupling).
+    // Recomputed with new constants: COUPLING_OPPOSITE=0.35, COUPLING_OTHER=0.15, DR_STEP=0.05, DR_FLOOR=0.5.
+    // Step 1: feedFortuneTag('chaos',5): dr=1.0, jitter=1.147, gain=5.735 → chaos=56.
+    // Step 2: shift('chaos',6) coherence: dr=0.95, gain=6.538 → chaos=63.
+    // Step 3: shift('fate',6) reveal-as-drawn: dr=1.0, gain=6.882 → chaos -= 6.882*0.15=1.032 → chaos=round(61.97)=62.
     // ('random' no longer feeds Chaos; only 'reversed' matches now.)
-    // Without coherence feed: Chaos would be 56.
-    expect(e.getState().affinities.chaos).toBe(60);
+    // Without coherence feed: Chaos would be 55.
+    expect(e.getState().affinities.chaos).toBe(62);
   });
 
   it('a mixed-orientation spread does not get a coherence boost', () => {
@@ -384,9 +392,13 @@ describe('spread coherence feeds', () => {
     e.completeMinigame(spread, { revealedAsDrawn: true });
     Math.random = orig;
     // Mixed spread: Order should NOT benefit from the extra +6 coherence.
+    // Recomputed with new constants: COUPLING_OPPOSITE=0.35, COUPLING_OTHER=0.15, DR_STEP=0.05, DR_FLOOR=0.5.
+    // Step 1: feedFortuneTag('order',5): dr=1.0, jitter=1.147, gain=5.735 → order=56.
+    // Step 2: no coherence (mixed orientation).
+    // Step 3: shift('fate',6) reveal-as-drawn: dr=1.0, gain=6.882 → order -= 6.882*0.15=1.032 → order=round(54.97)=55.
     // Tag feed gives Order ~5; no Chaos coupling from 'random' (removed); no coherence.
     // ('random' no longer feeds Chaos, so Order gains back the coupling penalty it used to take.)
-    expect(e.getState().affinities.order).toBe(54);
+    expect(e.getState().affinities.order).toBe(55);
   });
 });
 

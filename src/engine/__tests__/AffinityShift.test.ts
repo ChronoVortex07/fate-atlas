@@ -60,29 +60,28 @@ describe('AffinityEngine.shift pipeline', () => {
     expect(e.getState().chaos).toBe(70); // effective == base when no modifiers
   });
 
-  it('a gain applies coupling: opposite -0.6g, others -0.35g (rounded, clamped)', () => {
+  it('a gain applies coupling: opposite -0.35g, others -0.15g (rounded, clamped)', () => {
     const e = make();
     noJitter(() => e.shift('chaos', 10, 'test')); // dr=1, jitter=1 → g=10
     const s = e.getState();
-    expect(s.chaos).toBe(60);            // 50 + 10
-    expect(s.order).toBe(44);            // 50 - 6  (opposite)
-    expect(s.fate).toBe(47);             // 50 - 3.5 → round 47
-    expect(s.will).toBe(47);
-    expect(s.light).toBe(47);
-    expect(s.shadow).toBe(47);
+    expect(s.chaos).toBe(60);  // 50 + 10
+    expect(s.order).toBe(47);  // 50 - 10×0.35 = 46.5 → round 47 (opposite)
+    expect(s.fate).toBe(49);   // 50 - 10×0.15 = 48.5 → round 49 (other)
+    expect(s.will).toBe(49);
+    expect(s.light).toBe(49);
+    expect(s.shadow).toBe(49);
   });
 
-  it('diminishing returns shrink successive same-run gains and floor at 0.3', () => {
+  it('diminishing returns shrink successive same-run gains and floor at 0.5', () => {
     const e = make();
     const g1 = noJitter(() => e.shift('chaos', 10, 't')); // dr=1.00 → 10
-    const g2 = noJitter(() => e.shift('chaos', 10, 't')); // dr=0.92 → 9.2
-    const g3 = noJitter(() => e.shift('chaos', 10, 't')); // dr=0.84 → 8.4
+    const g2 = noJitter(() => e.shift('chaos', 10, 't')); // dr=0.95 → 9.5
+    const g3 = noJitter(() => e.shift('chaos', 10, 't')); // dr=0.90 → 9.0
     expect(g1).toBeGreaterThan(g2);
     expect(g2).toBeGreaterThan(g3);
-    // floor: after many feeds, dr never drops below 0.3 → gain >= 10*0.3
     let last = 0;
     for (let i = 0; i < 50; i++) last = noJitter(() => e.shift('chaos', 10, 't'));
-    expect(last).toBeGreaterThanOrEqual(3 - 0.001);
+    expect(last).toBeGreaterThanOrEqual(5 - 0.001); // floor 0.5 → 10 × 0.5
   });
 
   it('jitter keeps realized gain within +/-15% of the diminished base', () => {
@@ -137,12 +136,12 @@ describe('bands, reach-up, and run boundary', () => {
     Math.random = orig;
   });
 
-  it('beginRun drifts 33% toward 50 (rounded)', () => {
+  it('beginRun drifts 12% toward 50 (rounded)', () => {
     const e = make();
     e.setState({ chaos: 80, order: 20 });
     e.beginRun();
-    expect(e.getState().chaos).toBe(70); // round(80 + (50-80)*0.33) = round(70.1)
-    expect(e.getState().order).toBe(30); // round(20 + (50-20)*0.33) = round(29.9)
+    expect(e.getState().chaos).toBe(76); // round(80 + (50-80)×0.12) = round(76.4)
+    expect(e.getState().order).toBe(24); // round(20 + (50-20)×0.12) = round(23.6)
   });
 
   it('beginRun resets diminishing-returns counters so the next gain is full', () => {

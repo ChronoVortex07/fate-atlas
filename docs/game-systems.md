@@ -76,7 +76,7 @@ Base chances by tier (`TIER_BASE_CHANCE`): **ambient 0.50**, **notable 0.22**, *
 Six hidden affinities form three opposed pairs. Values are **0–100**, baseline **50**, and
 are **never shown directly** — only hinted through atmospheric flavor text. They persist
 across runs (localStorage `fate-atlas-save`); at the start of each run every affinity
-**drifts 33% back toward baseline**.
+**drifts 12% back toward baseline**.
 
 | Pair | Affinity | Theme | Opposite |
 |------|----------|-------|----------|
@@ -117,9 +117,9 @@ Fortune **tag** feeds (Chaos/Order from result tags **and** the spread/strings c
 
 ### Shift mechanics (`AffinityEngine.shift`)
 
-- **Gains** pass through *diminishing returns* (−8% per prior feed this run, floored at 30%),
+- **Gains** pass through *diminishing returns* (−5% per prior feed this run, floored at 50%),
   then random *jitter* (×0.85–1.15), then **coupling fan-out**: the opposite affinity loses
-  60% of the realized gain and each of the other four loses 35%.
+  **35%** of the realized gain and each of the other four loses **15%**.
 - **Penalties** (negative deltas) apply directly with **no** fan-out.
 
 ### Base vs. effective + surges
