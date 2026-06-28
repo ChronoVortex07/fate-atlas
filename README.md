@@ -73,7 +73,7 @@ as a **physical smash-down**: two d20s crash into the bowl simultaneously, the u
 die settling visually suppressed. **Will dominant** grants **choice** — both dice settle
 and you pick which result stands.
 
-See [`docs/game-systems.md §12`](docs/game-systems.md) for the full DC formula, Bless/Bane
+See [`docs/game-systems.md §15`](docs/game-systems.md) for the full DC formula, Bless/Bane
 rules, and affinity responder details.
 
 ---
@@ -138,7 +138,7 @@ Affinities shape the throw in two ways — as physical forces and as cast modes:
 - **Shadow ascendant** → `clouded` mode: two casts drawn; the lower-favorability result is kept automatically.
 - **Will stirring** → may offer a free recast prompt (probabilistic, same chance as the dice reroll offer).
 
-See [`docs/game-systems.md §8`](docs/game-systems.md) for the full data tables and responder catalogue.
+See [`docs/game-systems.md §13`](docs/game-systems.md) for the full data tables and responder catalogue.
 
 ---
 
