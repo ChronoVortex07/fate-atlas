@@ -105,7 +105,7 @@ export default function GameTable() {
       {state.screen === 'minigame' && state.awaitingContinue && state.eventQueue.length === 0 && (
         <ContinueBar />
       )}
-      {state.forbiddenSightAvailable && showTableau && (
+      {state.forbiddenSightAvailable && state.screen === 'minigame' && (
         <CorruptionRift onSummon={() => setGlimpse(engine.useForbiddenSight())} />
       )}
       {glimpse && <ForceRadarOverlay glimpse={glimpse} onDismiss={() => setGlimpse(null)} />}
