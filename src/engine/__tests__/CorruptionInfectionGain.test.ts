@@ -33,25 +33,28 @@ describe('CorruptionEngine.tick infection multiplier', () => {
 });
 
 describe('infected games amplify corruption growth (GameEngine)', () => {
-  // Math.random pinned to 0.99: deterministic pool, infected = [2], all rolls suppressed.
+  // Math.random pinned to 0.1: < INFECT_SPLIT (0.5) → spreading count=1,
+  // Math.floor(0.1 * poolSize) = 0 → infectedMethods = [0].
   function setup(): GameEngine {
     const e = new GameEngine(3);
-    e.setCorruption(50);      // spreading → 1 infected method
-    e.startTurn('self');      // buildPool computes infectedMethods = [2]
+    e.setCorruption(50);      // spreading → chance-based 0 or 1 infected method
+    e.startTurn('self');      // buildPool computes infectedMethods with rng=0.1 → [0]
     e.loadState({ affinities: { chaos: 100, order: 100, fate: 50, will: 50, light: 50, shadow: 50 } });
     return e;
   }
 
   it('an infected selection grows corruption more than an uninfected one', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    // Pin Math.random to 0.1: rollInfectedCount gets 0.1 < 0.5 → count=1;
+    // index pick Math.floor(0.1*3)=0 → infectedMethods=[0].
+    vi.spyOn(Math, 'random').mockReturnValue(0.1);
 
     const infectedEngine = setup();
-    expect(infectedEngine.getState().infectedMethods).toEqual([2]);
-    infectedEngine.selectMethod(2); // infected
+    expect(infectedEngine.getState().infectedMethods).toEqual([0]);
+    infectedEngine.selectMethod(0); // infected
     oneReading(infectedEngine);
 
     const controlEngine = setup();
-    controlEngine.selectMethod(0); // not infected
+    controlEngine.selectMethod(1); // not infected (index 1 ≠ 0)
     oneReading(controlEngine);
 
     expect(infectedEngine.getState().corruption.value)

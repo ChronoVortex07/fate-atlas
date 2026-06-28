@@ -54,6 +54,19 @@ export function infectedCountForBand(band: CorruptionBand): number {
   }
 }
 
+export const INFECT_SPLIT = 0.5; // P(higher count) at spreading/virulent
+
+// Chance-based taint count. Seeded shows nothing (gestation); Spreading 0–1;
+// Virulent/Pinnacle 1–2. rng < INFECT_SPLIT picks the higher of the two.
+export function rollInfectedCount(band: CorruptionBand, rng: () => number): number {
+  switch (band) {
+    case 'spreading': return rng() < INFECT_SPLIT ? 1 : 0;
+    case 'virulent':
+    case 'pinnacle':  return rng() < INFECT_SPLIT ? 2 : 1;
+    default:          return 0; // dormant, seeded
+  }
+}
+
 export const CORRUPTED_TAG = 'corrupted'; // marks a result the player can tell was tampered with
 
 export const SIGHT_COST = 6;   // corruption added on the first forbidden-sight use per minigame

@@ -7,7 +7,7 @@ import { TurnOrchestrator } from './TurnOrchestrator';
 import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
 import { AFFINITY_DEFINITIONS, defaultAffinityState, AFFINITY_IDS, BAND_ORDER } from '../data/affinities';
-import { RUPTURE_RESET, infectedCountForBand, INFECTION_GAIN_MULT, CORRUPTED_TAG, CORRUPTION_BANDS, SIGHT_COST, LIE_OFFSET } from '../data/corruption';
+import { RUPTURE_RESET, rollInfectedCount, INFECTION_GAIN_MULT, CORRUPTED_TAG, CORRUPTION_BANDS, SIGHT_COST, LIE_OFFSET } from '../data/corruption';
 import { selectHappening, HAPPENING_GAP_CHANCE } from '../data/happenings';
 import { dispatch } from './events/EventDispatcher';
 import { buildAffinityResponders } from './responders/affinity';
@@ -256,7 +256,7 @@ export class GameEngine {
   // Pick which offered methods corruption taints this draw — count scales with the
   // corruption band; indices are distinct and within the pool.
   private rollInfectedMethods(poolSize: number): number[] {
-    const count = Math.min(poolSize, infectedCountForBand(this.corruptionEngine.getBand()));
+    const count = Math.min(poolSize, rollInfectedCount(this.corruptionEngine.getBand(), Math.random));
     if (count <= 0) return [];
     const chosen: number[] = [];
     while (chosen.length < count) {
