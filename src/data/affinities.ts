@@ -8,12 +8,12 @@ export const BAND_ORDER: AffinityBand[] = ['latent', 'stirring', 'ascendant', 'd
 // ── Pipeline tuning (playtest defaults) ──
 export const REACH_UP_CHANCE = 0.12;
 export const COUPLING_OPPOSITE = 0.35;
-export const COUPLING_OTHER = 0.15;
+export const COUPLING_OTHER = 0.09;    // was 0.15 — corruption now polices excess
 export const DR_STEP = 0.05;
-export const DR_FLOOR = 0.5;
+export const DR_FLOOR = 0.67;          // was 0.5 — sustained building stays rewarding
 export const JITTER_MIN = 0.85;
 export const JITTER_MAX = 1.15;
-export const RUN_DRIFT = 0.12;
+export const RUN_DRIFT = 0.08;         // was 0.12 — highs persist longer, still decay
 export const FEED_PER_MATCH = 5;
 export const FEED_PER_ACTION = 6;        // base affinity gain per agency/information action
 export const FORTUNE_TAG_CAP = 8; // max base Fortune gain from result tags + coherence per run
