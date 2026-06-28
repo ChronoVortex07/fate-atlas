@@ -1,0 +1,29 @@
+/* Signature corruption visual language — reused by forbidden-sight, force-the-weave, and Phase 3. */
+
+/* White-hot text: clean by default; chromatic split only on the periodic pulse. */
+.cx-glitch-text { fill: #fff; filter: drop-shadow(0 0 3px rgba(255,45,74,.55)); animation: cx-pab 3.2s infinite; }
+@keyframes cx-pab {
+  0%,91%,100% { filter: drop-shadow(0 0 3px rgba(255,45,74,.55)); }
+  94% { filter: drop-shadow(-3px 0 #ff003c) drop-shadow(3px 0 #00e5ff); }
+  97% { filter: drop-shadow(3px 0 #ff003c) drop-shadow(-3px 0 #00e5ff); }
+}
+/* The lie: same look, pulse a hair off-beat. */
+.cx-desync { animation: cx-pab 3.05s infinite; }
+
+/* Eye (rift). */
+.cx-eye-iris { transform-box: fill-box; transform-origin: center; animation: cx-gaze 6s ease-in-out infinite; }
+@keyframes cx-gaze { 0%,100%{transform:translate(0,0)} 30%{transform:translate(1.2px,.8px)} 60%{transform:translate(-1.2px,-.8px)} }
+.cx-eye-glow { animation: cx-eglow 2.8s ease-in-out infinite; }
+@keyframes cx-eglow { 0%,100%{opacity:.5} 50%{opacity:.95} }
+.cx-eye-lid { transform-box: fill-box; transform-origin: center; animation: cx-blink 6s infinite; }
+@keyframes cx-blink { 0%,95.5%,100%{transform:scaleY(0)} 97.5%{transform:scaleY(1)} }
+
+/* Corruption haze (radar): soft breathing, behind the web. */
+.cx-haze { animation: cx-breathe 5s ease-in-out infinite; transform-origin: center; }
+@keyframes cx-breathe { 0%,100%{opacity:.5;transform:scale(1)} 50%{opacity:.72;transform:scale(1.06)} }
+
+/* Data-stream segments: wink in/out on slow, staggered, stepped rhythms. */
+.cx-fa{animation:cx-fk 2.6s steps(1) infinite}.cx-fb{animation:cx-fk 3.2s steps(1) infinite}.cx-fc{animation:cx-fk 3.8s steps(1) infinite}.cx-fd{animation:cx-fk 4.6s steps(1) infinite}.cx-fe{animation:cx-fk 3.0s steps(1) infinite}
+@keyframes cx-fk { 0%{opacity:0} 10%{opacity:1} 30%{opacity:.4} 48%{opacity:.95} 66%{opacity:0} 100%{opacity:0} }
+.cx-tk1{animation:cx-tw 2.4s steps(1) infinite}.cx-tk2{animation:cx-tw 3.0s steps(1) infinite}.cx-tk3{animation:cx-tw 2.0s steps(1) infinite}.cx-tk4{animation:cx-tw 3.4s steps(1) infinite}
+@keyframes cx-tw { 0%,45%,100%{opacity:0} 52%{opacity:1} 62%{opacity:.3} 72%{opacity:.9} 82%{opacity:0} }

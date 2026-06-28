@@ -60,6 +60,13 @@ export interface CorruptionWarning {
   text: string;       // diegetic flavor line for the UI
 }
 
+// A corruption glimpse of the six forces. `forces` already contains the falsified
+// value at `lieId`; corruption itself is never included.
+export interface ForbiddenGlimpse {
+  forces: Record<AffinityId, number>;
+  lieId: AffinityId;
+}
+
 export interface AffinityState {
   id: AffinityId;
   value: number; // 0–100
@@ -579,6 +586,7 @@ export interface GameState {
   affinityBase: Record<AffinityId, number>;   // permanent base only (for surge transparency/debug)
   corruption: CorruptionSnapshot;
   corruptionWarning: CorruptionWarning | null;
+  forbiddenSightAvailable: boolean; // corruption Virulent+ — the watching eye may be summoned
   questionType: QuestionType | null;
   availableMethods: DivinationType[];
   shroudedMethods: number[];

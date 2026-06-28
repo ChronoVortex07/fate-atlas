@@ -256,6 +256,17 @@ is exempt from coupling, diminishing returns, pairing, and baseline-drift.
   after the danger is already obvious). The catch-22: Light high enough to warn you
   is itself excess that feeds corruption, so its guidance can never remove the threat.
 
+### Forbidden-sight (Phase 2b-i)
+
+At the **virulent** band, a watching tear (`CorruptionRift`, top-right) can be summoned.
+It calls `GameEngine.useForbiddenSight()`, which charges corruption **once per minigame**
+(`SIGHT_COST`) and returns a `ForbiddenGlimpse` — the six effective forces with exactly
+one (`lieId`) shifted by `LIE_OFFSET`. The `ForceRadarOverlay` renders them as a hex
+radar; corruption is a soft haze *behind* the web and never shown; the lie is betrayed
+only by a label pulsing a hair off-beat. Following the glimpse can guide the player, but
+the act of looking feeds corruption — and the Light high enough to keep glimpsing is
+itself the excess that sustains it.
+
 ---
 
 ## 5. Tarot spreads & consolidation
