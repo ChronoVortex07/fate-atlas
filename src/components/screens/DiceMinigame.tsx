@@ -149,12 +149,26 @@ export default function DiceMinigame() {
               onChoiceReady={onChoiceReady}
               onModifiersResolved={onModifiersResolved}
             />
-            {/* Non-interactive hint — the flick is captured on the canvas itself. */}
+            {/* Non-interactive hint — the swipe is captured on the canvas itself. */}
             {phase === 'idle' && (
-              <div style={flickHintStyle}>
-                <span style={{ fontSize: '1.6rem' }}>{String.fromCodePoint(0x2685)}</span>
-                <span style={tapHintStyle}>Drag back &amp; release to flick</span>
-              </div>
+              <motion.div style={flickHintStyle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6 }}>
+                <motion.span
+                  aria-hidden
+                  style={{ fontSize: '1.1rem', color: '#d4a854', lineHeight: 1 }}
+                  animate={reduce ? undefined : { y: [3, -7, 3], opacity: [0.35, 0.9, 0.35] }}
+                  transition={{ duration: 1.9, repeat: Infinity, ease: 'easeInOut' }}
+                >
+                  ⌃
+                </motion.span>
+                <motion.span
+                  style={{ fontSize: '1.9rem', lineHeight: 1 }}
+                  animate={reduce ? undefined : { scale: [1, 1.08, 1] }}
+                  transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
+                >
+                  {String.fromCodePoint(0x2685)}
+                </motion.span>
+                <span style={tapHintStyle}>Swipe to cast</span>
+              </motion.div>
             )}
             {/* Ghost numbers lift off the settled dice and feed the tally below. */}
             {phase === 'tally' && breakdown && !reduce && <DiceGhosts breakdown={breakdown} />}

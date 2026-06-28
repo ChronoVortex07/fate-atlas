@@ -194,6 +194,40 @@ describe('TurnOrchestrator strings', () => {
   });
 });
 
+describe('generateWeave final convergence', () => {
+  // out-degrees of the penultimate band (the fork right before the destinations)
+  const finalForks = (g: WeaveGraph): number[] =>
+    g.nodes
+      .filter((n) => n.band === g.bandCount - 2)
+      .map((n) => g.edges.filter((e) => e.from === n.id).length);
+
+  it('funnels each penultimate node to a single destination at baseline Will', () => {
+    const plan = planWeave(baseAff);
+    expect(plan.finalWidth).toBe(1);
+    for (let i = 0; i < 25; i++) {
+      const g = generateWeave('relationship', plan, () => (i * 0.37 + 0.13) % 1);
+      for (const deg of finalForks(g)) expect(deg).toBe(1);
+      // every destination must still be reachable despite the funnel
+      expect(reaches(g)).toBe(true);
+    }
+  });
+
+  it('Will reopens the final fork: ascendant → 2, dominant → 3', () => {
+    const asc = planWeave({ ...baseAff, will: 70 });
+    const dom = planWeave({ ...baseAff, will: 90 });
+    expect(asc.finalWidth).toBe(2);
+    expect(dom.finalWidth).toBe(3);
+    for (let i = 0; i < 25; i++) {
+      const ga = generateWeave('relationship', asc, () => (i * 0.41 + 0.07) % 1);
+      for (const deg of finalForks(ga)) expect(deg).toBe(2);
+      const gd = generateWeave('relationship', dom, () => (i * 0.41 + 0.07) % 1);
+      for (const deg of finalForks(gd)) expect(deg).toBe(3);
+      expect(reaches(ga)).toBe(true);
+      expect(reaches(gd)).toBe(true);
+    }
+  });
+});
+
 import { ReadingPlanner } from '../ReadingPlanner';
 
 describe('ReadingPlanner strings expansion', () => {

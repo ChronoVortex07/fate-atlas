@@ -32,6 +32,9 @@ export function planWeave(affinities: Record<string, number>): WeavePlan {
   return {
     bandCount: chaosI >= 3 ? 5 : 4,
     width,
+    // The fork right before the destinations funnels to a single thread so the
+    // ending can't be freely cherry-picked; Will reopens it (ascendant 2, dominant 3).
+    finalWidth: willI >= 3 ? 3 : (willI >= 2 ? 2 : 1),
     veil,
     clarity,
     lookAhead: lightI >= 3 ? 2 : (lightI >= 2 ? 1 : 0),
@@ -107,19 +110,24 @@ export function generateWeave(question: QuestionType, plan: WeavePlan, rng: () =
   })();
   bands.push(destIds.map((id, i) => placeNode(id, bandCount - 1, i, destIds.length, bandCount, jitter, rng)));
 
-  // edges: every next-band node gets ≥1 incoming (round-robin), every source gets
-  // up to crossingDensity distinct forward targets (≥2 when available).
+  // edges: every next-band node gets ≥1 incoming (round-robin coverage), then each
+  // source gets up to `cap` distinct forward targets. Crossing bands keep a dense
+  // fork (crossingDensity, ≥2 when available); the final transition into the
+  // destinations funnels to `finalWidth` (base 1, Will reopens) so the ending
+  // converges — while coverage still guarantees every destination stays reachable.
   const edges: WovenEdge[] = [];
   for (let b = 0; b < bandCount - 1; b++) {
     const from = bands[b], to = bands[b + 1];
-    const wanted = Math.min(plan.crossingDensity, to.length);
-    const minPer = Math.min(Math.max(2, 1), to.length); // ≥2 when possible
+    const isFinal = b === bandCount - 2;
+    const cap = isFinal
+      ? Math.min(plan.finalWidth, to.length)
+      : Math.max(Math.min(plan.crossingDensity, to.length), Math.min(2, to.length));
     to.forEach((t, i) => edges.push({ from: from[i % from.length].id, to: t.id })); // coverage
     for (const src of from) {
       const have = new Set(edges.filter((e) => e.from === src.id).map((e) => e.to));
       const targets = [...to].sort(() => rng() - 0.5);
       for (const t of targets) {
-        if (have.size >= Math.max(wanted, minPer)) break;
+        if (have.size >= cap) break;
         if (!have.has(t.id)) { have.add(t.id); edges.push({ from: src.id, to: t.id }); }
       }
     }

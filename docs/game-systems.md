@@ -945,6 +945,10 @@ bands (4 nodes each), and the final **destination** band (3 nodes drawn from the
 that answer the current question). Edges connect adjacent bands only; every node has ≥1
 forward edge and a path origin→destination always exists. Nodes are placed in a radial
 bloom (origin centre, bands as orbit-rings). Base path length is **4 nodes / 3 picks**.
+The **final fork** (penultimate band → destinations) funnels to a single thread per node
+at baseline (`plan.finalWidth` = 1) so the ending can't be freely cherry-picked; coverage
+still guarantees every destination stays reachable. Will reopens it (ascendant → 2,
+dominant → 3).
 
 ### 11b. Surface-hint reveal (Light/Shadow is the core lever)
 
@@ -960,6 +964,7 @@ full identity resolves on arrival.
 |---|---|
 | `bandCount` (path length) | Chaos dominant → 5, else 4 |
 | `width` (pickable candidates) | Will ascendant+ → 4 · Fate ascendant+ → 2 · else 3 |
+| `finalWidth` (forks into destinations) | Will dominant → 3 · ascendant → 2 · else 1 (funnel) |
 | `veil` (unpickable shown) | Shadow ascendant 1 · dominant 2 |
 | `clarity` | Shadow ascendant → silhouette · Light ascendant → themes · dominant → laid-bare · else mood |
 | `lookAhead` | Light ascendant 1 · dominant 2 |

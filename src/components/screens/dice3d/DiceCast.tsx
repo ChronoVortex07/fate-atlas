@@ -57,7 +57,7 @@ const DiceCast = forwardRef<DiceCastHandle, Props>(function DiceCast(
     rollModifiers: (bless, bane) => sceneRef.current?.rollModifiers(bless, bane),
   }), []);
 
-  // ── Flick gesture: press → drag back → release maps to a throw vector. ──
+  // ── Swipe gesture: press → swipe → release maps to a throw vector. ──
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     if (!cbs.current.idle) return;
     drag.current = { x: e.clientX, y: e.clientY, t: performance.now() };
@@ -70,8 +70,9 @@ const DiceCast = forwardRef<DiceCastHandle, Props>(function DiceCast(
     const dy = e.clientY - drag.current.y;
     const dt = Math.max(16, performance.now() - drag.current.t);
     const power = Math.min(1, Math.hypot(dx, dy) / 200);
-    // Screen drag → bowl plane. Pulling DOWN on screen (dy>0) throws AWAY (−z).
-    // Clamp each axis so a fast flick can't fling a die off the (invisible) ring.
+    // Screen swipe → bowl plane, 1:1: screen-x → vx, screen-y → vz (down = toward
+    // you/+z, up = into the board/−z). The scene launches the die along this vector.
+    // Clamp each axis so a fast swipe can't fling a die off the (invisible) ring.
     const clamp = (n: number, m: number) => Math.max(-m, Math.min(m, n));
     const flick: FlickVector = {
       vx: clamp((dx / dt) * 6, 9),

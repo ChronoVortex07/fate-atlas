@@ -320,6 +320,20 @@ export default function TarotMinigame() {
     return activeTableCards.map((_, i) => ({ rest: rest[i], center: live[i] }));
   }, [activeTableCards.length, fan, containerWidth]);
 
+  // The single card nearest the cursor gets the hover lift + glow. Driven off the
+  // fan math (recomputed every move, cleared when fan.active goes false on
+  // mouseleave) rather than framer's whileHover — which gets stuck when a card
+  // slides out from under the pointer as the fan shifts, never firing pointerleave.
+  const focusedTableIndex = (!handFull && fan.active)
+    ? fanCenters.reduce(
+        (best, fc, i) => {
+          const d = Math.abs((fc?.center ?? Infinity) - fan.centerX);
+          return d < best.d ? { i, d } : best;
+        },
+        { i: -1, d: Infinity },
+      )
+    : { i: -1, d: Infinity };
+
   // During the review beat the screen stays mounted in the committing phase.
   // Surface the committed Past/Present/Future faces face-up in the hand row.
   const committedSlot =
@@ -417,6 +431,11 @@ export default function TarotMinigame() {
                 const isPicking = animatingPick?.tableIndex === card.originIndex;
                 const lightBand = bandOf(state.affinities.light);
                 const glowShadow = majorGlow(card.cardId, lightBand);
+                const isFocused = i === focusedTableIndex.i && focusedTableIndex.d < FAN_RADIUS;
+                // Major-glow cards keep their glow at rest; others fade a transparent
+                // shadow up to the gold hover glow only while focused.
+                const restShadow = glowShadow ?? '0 0 0px rgba(212,168,84,0)';
+                const focusShadow = glowShadow ?? '0 0 14px rgba(212,168,84,0.5)';
 
                 return (
                   <motion.div
@@ -432,18 +451,16 @@ export default function TarotMinigame() {
                       borderColor: glowShadow
                         ? GLOW_BORDER_COLORS[MAJOR_GLOW_FAMILY[card.cardId]!]
                         : card.faceUp ? '#7b9ec7' : '#1a2440',
-                      boxShadow: glowShadow
-                        ? glowShadow
-                        : card.faceUp ? 'none' : undefined,
+                      boxShadow: restShadow,
                       cursor: handFull ? 'default' : 'pointer',
                     }}
-                    whileHover={!handFull ? { y: -3, boxShadow: glowShadow ?? '0 0 14px rgba(212,168,84,0.5)' } : {}}
                     onClick={() => !handFull && !animatingPick && handlePick(card.originIndex)}
                     initial={shuffleKey > 0 ? { opacity: 0, y: -30 } : { opacity: 0, y: -20 }}
                     animate={
                       isPicking
                         ? { opacity: 0, y: 40, x: dx, scale: 0.5 }
-                        : { opacity: handFull ? 0.5 : 1, y: 0, x: dx, scale }
+                        : { opacity: handFull ? 0.5 : 1, y: isFocused ? -3 : 0, x: dx, scale,
+                            boxShadow: isFocused ? focusShadow : restShadow }
                     }
                     exit={{ opacity: 0, y: -30, scale: 0.8, transition: { duration: 0.2 } }}
                     transition={{
@@ -452,6 +469,7 @@ export default function TarotMinigame() {
                       // owns the transform so it never fights an inline style.transform.
                       x: { type: 'tween', duration: 0.07, ease: 'easeOut' },
                       scale: { type: 'tween', duration: 0.07, ease: 'easeOut' },
+                      boxShadow: { type: 'tween', duration: 0.12, ease: 'easeOut' },
                       default: {
                         type: 'spring',
                         stiffness: 300,

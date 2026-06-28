@@ -285,7 +285,7 @@ export default function RuneMinigame() {
 
 // ── Styles ──
 const containerStyle: React.CSSProperties = { width: '100%', maxWidth: '560px', padding: '1.5rem' };
-const contentStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.1rem' };
+const contentStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'clamp(0.5rem, 2vh, 1.1rem)' };
 const headingStyle: React.CSSProperties = {
   fontFamily: "'Cormorant Garamond', serif", fontWeight: 700, fontSize: 'clamp(1.4rem, 4vw, 1.9rem)',
   color: '#c8d8f0', letterSpacing: '0.12em', margin: 0, textAlign: 'center',
@@ -317,9 +317,12 @@ const bagHintStyle: React.CSSProperties = {
   fontFamily: "'Inter', sans-serif", fontWeight: 300, fontSize: '0.62rem',
   letterSpacing: '0.12em', textTransform: 'uppercase', color: '#5b7290',
 };
-const resultStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', textAlign: 'center' };
+// The reading block is the flexible element: its font sizes and gaps are driven by
+// viewport height (vh), so on a short screen the rune text shrinks first instead of
+// pushing the cloth or heading off-screen.
+const resultStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'clamp(0.2rem, 1vh, 0.5rem)', textAlign: 'center' };
 const resultNameStyle: React.CSSProperties = {
-  fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontSize: 'clamp(1.05rem, 2.5vw, 1.3rem)',
+  fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontSize: 'clamp(0.95rem, 3.2vh, 1.3rem)',
   color: '#c8d8f0', letterSpacing: '0.06em',
 };
 const ringLabelStyle: React.CSSProperties = {
@@ -330,8 +333,8 @@ const omenBadgeStyle: React.CSSProperties = {
   padding: '0.3rem 0.8rem', border: '1px solid #d4a854', borderRadius: '3px', color: '#d4a854',
 };
 const interpStyle: React.CSSProperties = {
-  fontFamily: "'Cormorant Garamond', serif", fontWeight: 400, fontSize: 'clamp(0.85rem, 1.6vw, 1rem)',
-  color: '#7b9ec7', fontStyle: 'italic', lineHeight: 1.5, margin: '0.2rem 0 0', maxWidth: '360px',
+  fontFamily: "'Cormorant Garamond', serif", fontWeight: 400, fontSize: 'clamp(0.72rem, 2.1vh, 1rem)',
+  color: '#7b9ec7', fontStyle: 'italic', lineHeight: 1.4, margin: 'clamp(0.05rem, 0.6vh, 0.2rem) 0 0', maxWidth: '360px',
 };
 const agencyRowStyle: React.CSSProperties = { display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.4rem' };
 const actionBtnStyle: React.CSSProperties = {

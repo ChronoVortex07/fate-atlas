@@ -120,11 +120,16 @@ export function createDiceScene(opts: {
 
   const throwDie = (d: DiceDie, dx: number, flick?: FlickVector) => {
     d.object.visible = true;
-    // Spawn well inside the ring so dice settle in frame.
-    d.body.position.set(dx, 6 + Math.random() * 1.2, BOARD_RADIUS * 0.35);
+    // Spawn near the bowl centre (vs. the old +z front edge) so the die has room
+    // to travel in whatever direction the swipe sends it before meeting a wall.
+    d.body.position.set(dx, 6 + Math.random() * 1.2, BOARD_RADIUS * 0.15);
     const s = tuning.scatter;
+    // A flick launches the die along the actual swipe vector — direction AND speed:
+    // screen-x → world-x, screen-y → world-z (swipe up = into the board, −z;
+    // swipe down = toward you, +z) — scaled by the swipe's power. No flick (the
+    // randomized fallback path) keeps the old toss away from the camera.
     const fx = flick ? flick.vx * (1 + flick.power) : (Math.random() - 0.5) * 3 * s;
-    const fz = flick ? -2 - flick.power * 4 : -3 - Math.random() * 2 * s;
+    const fz = flick ? flick.vz * (1 + flick.power) : -3 - Math.random() * 2 * s;
     d.body.velocity.set(clampH(fx), -2 - Math.random() * 2, clampH(fz));
     d.body.angularVelocity.set((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12);
     d.body.quaternion.setFromEuler(Math.random() * 6, Math.random() * 6, Math.random() * 6);

@@ -313,6 +313,7 @@ export interface WeaveGraph {
 export interface WeavePlan {
   bandCount: number;     // 4 base; Chaos dominant → 5
   width: number;         // pickable candidates per step (base 3; Fate −1 floor 2; Will +1)
+  finalWidth: number;    // forks into the destination band (base 1; Will ascendant 2, dominant 3)
   veil: number;          // candidates shown but unpickable (Shadow ascendant 1, dominant 2)
   clarity: 'silhouette' | 'mood' | 'themes' | 'laid-bare';
   lookAhead: number;     // bands of silhouette look-ahead (Light)
