@@ -538,7 +538,7 @@ export class GameEngine {
 
   triggerHappening(): void {
     const affinities = this.affinityEngine.getState();
-    const data = selectHappening(Array.from(this.usedHappeningIds), affinities.chaos);
+    const data = selectHappening(Array.from(this.usedHappeningIds), affinities);
     this.usedHappeningIds.add(data.id);
 
     this.state.happening = {
