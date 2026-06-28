@@ -20,6 +20,7 @@ import { AnchorProvider } from '../../context/AnchorRegistry';
 import ParticleField from '../overlays/ParticleField';
 import CorruptionRift from '../overlays/corruption/CorruptionRift';
 import ForceRadarOverlay from '../overlays/corruption/ForceRadarOverlay';
+import IntrusionOverlay from '../overlays/corruption/IntrusionOverlay';
 import type { ForbiddenGlimpse } from '../../engine/types';
 
 export default function GameTable() {
@@ -109,6 +110,7 @@ export default function GameTable() {
         <CorruptionRift onSummon={() => setGlimpse(engine.useForbiddenSight())} />
       )}
       {glimpse && <ForceRadarOverlay glimpse={glimpse} onDismiss={() => setGlimpse(null)} />}
+      <IntrusionOverlay />
       <ParticleField />
     </div>
     </AnchorProvider>
