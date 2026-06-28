@@ -243,7 +243,8 @@ is exempt from coupling, diminishing returns, pairing, and baseline-drift.
 - **Minigame infection.** At each draw, corruption taints offered methods
   (`state.infectedMethods`): one at *spreading*, two at *virulent+*. Playing an
   infected method amplifies that reading's corruption growth (`INFECTION_GAIN_MULT`)
-  — farming spends the hoard into corruption rather than growing affinities.
+  — the affinity gain proceeds as normal, but the corruption tick runs inflated on top
+  of it, so farming hoarded affinities feeds corruption faster.
 - **Corrupted-variant effects** (`src/engine/responders/corruption.ts`) fire at
   *virulent+*: e.g. `corruption-extra-result` (an unbidden extra, garbled result)
   and `corruption-false-orientation` (the spread turns wrong). Anything they touch
