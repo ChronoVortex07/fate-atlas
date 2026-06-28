@@ -18,10 +18,14 @@ import InteractionSequencer from '../overlays/InteractionSequencer';
 import { InteractionFocusProvider } from '../../context/InteractionFocusContext';
 import { AnchorProvider } from '../../context/AnchorRegistry';
 import ParticleField from '../overlays/ParticleField';
+import CorruptionRift from '../overlays/corruption/CorruptionRift';
+import ForceRadarOverlay from '../overlays/corruption/ForceRadarOverlay';
+import type { ForbiddenGlimpse } from '../../engine/types';
 
 export default function GameTable() {
-  const { state } = useGameEngine();
+  const { state, engine } = useGameEngine();
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [glimpse, setGlimpse] = useState<ForbiddenGlimpse | null>(null);
 
   const showTableau = state.screen !== 'title' && state.screen !== 'question' && state.screen !== 'result';
 
@@ -101,6 +105,10 @@ export default function GameTable() {
       {state.screen === 'minigame' && state.awaitingContinue && state.eventQueue.length === 0 && (
         <ContinueBar />
       )}
+      {state.forbiddenSightAvailable && showTableau && (
+        <CorruptionRift onSummon={() => setGlimpse(engine.useForbiddenSight())} />
+      )}
+      {glimpse && <ForceRadarOverlay glimpse={glimpse} onDismiss={() => setGlimpse(null)} />}
       <ParticleField />
     </div>
     </AnchorProvider>
