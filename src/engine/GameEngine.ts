@@ -151,6 +151,7 @@ export class GameEngine {
     return {
       trigger,
       affinities: this.affinityEngine.getState(),
+      corruption: { value: this.corruptionEngine.getValue(), band: this.corruptionEngine.getBand() },
       slots,
       hand,
       spread: hand ? [...slots, ...hand] : slots,

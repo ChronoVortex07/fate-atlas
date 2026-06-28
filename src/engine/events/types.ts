@@ -1,4 +1,4 @@
-import type { AffinityId, SlotResult, MinigameState, RollModifier, RollMode } from '../types';
+import type { AffinityId, SlotResult, MinigameState, RollModifier, RollMode, CorruptionSnapshot } from '../types';
 
 export type TriggerPoint = string; // namespaced: 'select:draw:end', 'dice:roll', 'tarot:commit'
 
@@ -36,6 +36,7 @@ export interface PhaseDraft {
 export interface PhaseContext {
   trigger: TriggerPoint;
   affinities: Record<AffinityId, number>;
+  corruption?: CorruptionSnapshot; // optional: absent in unit-test contexts → treated as dormant
   slots: SlotResult[];        // committed results this round
   hand: SlotResult[] | null;  // current uncommitted pool/hand
   spread: SlotResult[];       // slots + hand
