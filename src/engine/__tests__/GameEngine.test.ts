@@ -146,11 +146,16 @@ describe('GameEngine — new lifecycle', () => {
     if (idx === -1) return;
     engine.selectMethod(idx);
     if (engine.getState().screen !== 'minigame') return;
+    // Keep Math.random suppressed through continueAfterReview so the between-reading
+    // cadence (shouldOfferHappening) does not fire the early-gap chance (0.99 >= 0.5).
     const orig = Math.random; Math.random = () => 0.99;
-    engine.completeMinigame(dieResult());
-    Math.random = orig;
-    engine.continueAfterReview();
-    expect(engine.getState().screen).toBe('method-select');
+    try {
+      engine.completeMinigame(dieResult());
+      engine.continueAfterReview();
+      expect(engine.getState().screen).toBe('method-select');
+    } finally {
+      Math.random = orig;
+    }
   });
 
   it('completeMinigame holds a review beat; continueAfterReview advances to method-select', () => {
