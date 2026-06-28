@@ -29,6 +29,7 @@ export class AffinityEngine {
   private modSeq = 0;
   private feedsThisRun: Record<AffinityId, number>;
   private fortuneTagFeedThisRun = 0;
+  private realizedGainsThisReading = 0;
   private peeksThisRun = 0;
   private peekLocked = false;
   private definitions: AffinityDefinition[];
@@ -172,6 +173,7 @@ export class AffinityEngine {
     // clear (reset paths) zeroes them together so the Fortune cap / diminishing-returns
     // state can't leak across a reset that doesn't pass back through beginRun().
     this.fortuneTagFeedThisRun = 0;
+    this.realizedGainsThisReading = 0;
     for (const id of AFFINITY_IDS) this.feedsThisRun[id] = 0;
   }
 
@@ -202,6 +204,7 @@ export class AffinityEngine {
     const gain = baseDelta * dr * jitter;
 
     this.base[id] = this.clamp(this.base[id] + gain);
+    this.realizedGainsThisReading += gain;
 
     const opp = AFFINITY_PAIRS[id];
     this.base[opp] = this.clamp(this.base[opp] - gain * COUPLING_OPPOSITE);
@@ -228,6 +231,24 @@ export class AffinityEngine {
     this.shift(feed.primary, FEED_PER_ACTION, `action:${action}`);
     if (feed.secondary) {
       this.shift(feed.secondary, FEED_PER_ACTION * SECONDARY_FEED_FACTOR, `action:${action}`);
+    }
+  }
+
+  // Total positive realized gain since the last consume; resets the accumulator.
+  // The CorruptionEngine reads this each reading to apply its skim-on-gain.
+  consumeRealizedGains(): number {
+    const g = this.realizedGainsThisReading;
+    this.realizedGainsThisReading = 0;
+    return g;
+  }
+
+  // Direct, lawless subtraction from base — no coupling, no mandate, no fan-out.
+  // Corruption drains hoarded affinities through this; the world's laws do not apply.
+  erode(deltas: Partial<Record<AffinityId, number>>): void {
+    for (const [id, mag] of Object.entries(deltas)) {
+      if (typeof mag === 'number') {
+        this.base[id as AffinityId] = this.clamp(this.base[id as AffinityId] - mag);
+      }
     }
   }
 
@@ -298,6 +319,7 @@ export class AffinityEngine {
     this.peeksThisRun = 0;
     this.peekLocked = false;
     this.fortuneTagFeedThisRun = 0;
+    this.realizedGainsThisReading = 0;
     this.clearMandate();
     // NOTE: modifiers are intentionally NOT cleared here — surges decay per reading
     // and survive turn boundaries within a session.
