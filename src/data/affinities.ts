@@ -108,7 +108,6 @@ export const CHAOS_AFFINITY: AffinityDefinition = {
   },
   bandedEffects: [
     { id: 'wild-surge', tier: 'major', band: 'dominant', description: 'A result can spawn a second.' },
-    { id: 'happening-interrupt', tier: 'major', band: 'dominant', description: 'A happening can interrupt a minigame.' },
   ],
 };
 

@@ -660,6 +660,10 @@ export class GameEngine {
       case 'upheaval':
         // Phase 3 wires this into the unified modifier list as a `transform`. No-op here.
         break;
+      default: {
+        const _exhaustive: never = effect;
+        void _exhaustive;
+      }
     }
   }
 
@@ -1396,6 +1400,8 @@ export class GameEngine {
     this.state.eventQueue = [];
     this.state.awaitingContinue = false;
     this.turnEffects = [];
+    this.peekOverrideThisReading = null;
+    this.happeningOfferedThisTurn = false;
     this.notify();
   }
 
@@ -1418,6 +1424,8 @@ export class GameEngine {
     this.state.affinities = this.affinityEngine.getState();
     this.state.history = saved.history;
     this.usedHappeningIds = new Set(saved.usedHappeningIds);
+    this.peekOverrideThisReading = null;
+    this.happeningOfferedThisTurn = false;
     this.bus.clear();
     this.saveToStorage();
     this.notify();
@@ -1440,6 +1448,8 @@ export class GameEngine {
     this.state.affinities = this.affinityEngine.getState();
     this.state.history = history;
     this.usedHappeningIds = new Set(usedIds);
+    this.peekOverrideThisReading = null;
+    this.happeningOfferedThisTurn = false;
     this.bus.clear();
     this.saveToStorage();
     this.notify();
