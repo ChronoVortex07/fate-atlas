@@ -103,12 +103,22 @@ describe('AffinityEngine.shift pipeline', () => {
     expect(s.chaos).toBe(50);   // others untouched
   });
 
-  it('applyResultTags raises chaos for a reversed/random result', () => {
+  it('applyResultTags raises chaos for a reversed result; random no longer feeds it', () => {
     const e = make();
+    // 'random' is on nearly every draw and no longer feeds Chaos — only 'reversed' counts.
     const reversed = { tags: ['draw', 'random', 'reversed', 'reversible'] } as TarotResult;
-    noJitter(() => e.applyResultTags(reversed)); // matches 'random' + 'reversed' = 2 × 5 = 10
-    expect(e.getState().chaos).toBe(60);
-    expect(e.getState().order).toBe(44);
+    noJitter(() => e.applyResultTags(reversed)); // 1 match ('reversed') × 5 = 5
+    expect(e.getState().chaos).toBe(55);
+    expect(e.getState().order).toBeLessThan(50); // coupling taxes the opposite
+  });
+
+  it('caps Fortune tag feeds at +8 per run; beginRun resets the cap', () => {
+    const e = make();
+    noJitter(() => e.feedFortuneTag('chaos', 5, 't')); // +5 (counter 5)
+    noJitter(() => e.feedFortuneTag('chaos', 5, 't')); // +3 (counter hits 8)
+    expect(noJitter(() => e.feedFortuneTag('chaos', 5, 't'))).toBe(0); // cap exhausted
+    e.beginRun();
+    expect(noJitter(() => e.feedFortuneTag('chaos', 5, 't'))).toBeGreaterThan(0); // reset
   });
 });
 

@@ -19,6 +19,7 @@ import {
   FEED_PER_ACTION,
   SECONDARY_FEED_FACTOR,
   ACTION_FEEDS,
+  FORTUNE_TAG_CAP,
 } from '../data/affinities';
 
 export class AffinityEngine {
@@ -26,6 +27,7 @@ export class AffinityEngine {
   private modifiers: AffinityModifier[] = [];
   private modSeq = 0;
   private feedsThisRun: Record<AffinityId, number>;
+  private fortuneTagFeedThisRun = 0;
   private peeksThisRun = 0;
   private peekLocked = false;
   private definitions: AffinityDefinition[];
@@ -142,7 +144,7 @@ export class AffinityEngine {
     for (const def of this.definitions) {
       if (def.feeds.tags.length === 0) continue;
       const matches = def.feeds.tags.filter((t) => result.tags.includes(t)).length;
-      if (matches > 0) this.shift(def.id, matches * FEED_PER_MATCH, `result:${def.id}`);
+      if (matches > 0) this.feedFortuneTag(def.id, matches * FEED_PER_MATCH, `result:${def.id}`);
     }
   }
 
@@ -154,6 +156,18 @@ export class AffinityEngine {
     if (feed.secondary) {
       this.shift(feed.secondary, FEED_PER_ACTION * SECONDARY_FEED_FACTOR, `action:${action}`);
     }
+  }
+
+  // Capped entry point for Fortune (Chaos/Order) tag + coherence feeds. Bounds how
+  // much passive RNG outcomes can move Fortune per run; behavior feeds (applyAction)
+  // bypass this cap. Non-Fortune ids fall back to a plain shift. Returns realized gain.
+  feedFortuneTag(id: AffinityId, amount: number, source: string): number {
+    if (id !== 'chaos' && id !== 'order') return this.shift(id, amount, source);
+    const remaining = Math.max(0, FORTUNE_TAG_CAP - this.fortuneTagFeedThisRun);
+    const allowed = Math.min(amount, remaining);
+    if (allowed <= 0) return 0;
+    this.fortuneTagFeedThisRun += allowed;
+    return this.shift(id, allowed, source);
   }
 
   // ── Peek (Light-only foresight) ──
@@ -210,6 +224,7 @@ export class AffinityEngine {
     }
     this.peeksThisRun = 0;
     this.peekLocked = false;
+    this.fortuneTagFeedThisRun = 0;
     this.clearMandate();
     // NOTE: modifiers are intentionally NOT cleared here — surges decay per reading
     // and survive turn boundaries within a session.

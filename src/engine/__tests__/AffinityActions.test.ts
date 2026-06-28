@@ -31,6 +31,12 @@ describe('AffinityEngine.applyAction', () => {
     expect(s.chaos).toBeGreaterThan(s.order); // chaos fed, order not
   });
 
+  it('take-reroll also feeds Chaos as a secondary (courting a swing)', () => {
+    const e = make();
+    noJitter(() => e.applyAction('take-reroll'));
+    expect(e.getState().chaos).toBeGreaterThan(50);
+  });
+
   it('use-peek feeds Light, decline-peek feeds Shadow', () => {
     const a = make(); noJitter(() => a.applyAction('use-peek'));
     expect(a.getState().light).toBeGreaterThan(50);

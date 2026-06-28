@@ -16,6 +16,7 @@ export const JITTER_MAX = 1.15;
 export const RUN_DRIFT = 0.33;
 export const FEED_PER_MATCH = 5;
 export const FEED_PER_ACTION = 6;        // base affinity gain per agency/information action
+export const FORTUNE_TAG_CAP = 8; // max base Fortune gain from result tags + coherence per run
 export const SECONDARY_FEED_FACTOR = 0.5; // secondary axis (e.g. Chaos when reversing) feeds at half
 export const BAND_POWER_STEP = 0.7;       // event-resolved chance scales +70% per band above the gate
 
@@ -55,7 +56,7 @@ export const ACTION_FEEDS: Record<AffinityAction, ActionFeed> = {
   'keep-roll':       { primary: 'fate' },
   'decline-reroll':  { primary: 'fate' },
   'reverse':         { primary: 'will', secondary: 'chaos' },
-  'take-reroll':     { primary: 'will' },
+  'take-reroll':     { primary: 'will', secondary: 'chaos' },
   'swap-method':     { primary: 'will' },
   'set-orientation': { primary: 'will' },
   'use-peek':        { primary: 'light' },
@@ -98,7 +99,7 @@ export const CHAOS_AFFINITY: AffinityDefinition = {
   name: 'Chaos',
   opposite: 'order',
   description: 'Fueled by randomness, reversals, and changing patterns. Volatile, swingy outcomes.',
-  feeds: { tags: ['random', 'reversed', 'changing-lines'], actions: [] },
+  feeds: { tags: ['reversed', 'changing-lines'], actions: [] },
   hints: {
     latent: [],
     stirring: ['The air carries a faint restlessness...'],

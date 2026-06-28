@@ -102,16 +102,18 @@ across runs (localStorage `fate-atlas-save`); at the start of each run every aff
 
 | Affinity | Fed by (result tags) | Fed by (player actions) |
 |----------|----------------------|--------------------------|
-| **Chaos** | `random`, `reversed`, `changing-lines` | *(secondary, from `reverse`)* |
+| **Chaos** | `reversed`, `changing-lines` | *(secondary, from `reverse`; secondary, from `take-reroll`)* |
 | **Order** | `upright`, `neutral`, `stable` | — |
 | **Fate** | — | `reveal-as-drawn`, `keep-roll`, `decline-reroll` |
-| **Will** | — | `reverse` (+Chaos), `take-reroll`, `swap-method`, `set-orientation` |
+| **Will** | — | `reverse` (+Chaos), `take-reroll` **(+Chaos)**, `swap-method`, `set-orientation` |
 | **Light** | — | `use-peek`, `seek-pattern` |
 | **Shadow** | — | `decline-peek`, `embrace-mystery` |
 
 Result-tag feeds grant `+5` per matching tag; action feeds grant `+6` (`+3` to a secondary
 axis). Happening *slots* do **not** feed affinity on reveal — only the **chosen** happening
 option shifts affinity.
+
+Fortune **tag** feeds (Chaos/Order from result tags **and** the spread/strings coherence bonuses) are capped at **+8 base per run** (`FORTUNE_TAG_CAP`); behavior feeds (player actions) are uncapped (diminishing returns still applies).
 
 ### Shift mechanics (`AffinityEngine.shift`)
 
