@@ -1,8 +1,11 @@
 import type {
   AggregatedReading, SlotResult, QuestionType, ModifierRole, AffinityEffects,
 } from '../types';
-import type { Beat, FavBand } from './types';
-import { describeDraw, favBandOf } from './drawVoice';
+import type { Beat, FavBand, DrawVoice } from './types';
+import { favBandOf } from './drawVoice';
+import type { DrawOccurrence } from './voices/types';
+import { voiceFor } from './voices/index';
+import type { DivinationType } from '../types';
 
 export interface ComposeInput {
   aggregated: AggregatedReading;
@@ -61,10 +64,41 @@ export class ReadingComposer {
     }
     for (const role of ROLE_ORDER) byRole[role].sort((a, b) => rankIn(role, a) - rankIn(role, b));
 
+    // ── Occurrence pass: ordinal of each force-eligible draw among its type ──
+    // Narration order = role order, then the sort already applied within each role.
+    const narrationOrder: SlotResult[] = [];
+    for (const role of ROLE_ORDER) {
+      for (const r of byRole[role]) if (!isMultiSpread(r)) narrationOrder.push(r);
+    }
+    const totals = new Map<DivinationType, number>();
+    for (const r of narrationOrder) totals.set(r.type, (totals.get(r.type) ?? 0) + 1);
+    const occMap = new Map<SlotResult, DrawOccurrence>();
+    const running = new Map<DivinationType, number>();
+    for (const r of narrationOrder) {
+      const index = running.get(r.type) ?? 0;
+      occMap.set(r, { index, total: totals.get(r.type) ?? 1 });
+      running.set(r.type, index + 1);
+    }
+
+    // ── Force beats: group each role's draws by type; aggregate runs of ≥2 ──
     let forceBeats: Beat[] = [];
     for (const role of ROLE_ORDER) {
-      const draws = byRole[role].filter((r) => !isMultiSpread(r)).map((r) => describeDraw(r, role));
-      if (draws.length > 0) forceBeats.push({ kind: 'force', role, draws });
+      const eligible = byRole[role].filter((r) => !isMultiSpread(r));
+      if (eligible.length === 0) continue;
+      const groups: SlotResult[][] = [];
+      const byType = new Map<DivinationType, SlotResult[]>();
+      for (const r of eligible) {
+        let g = byType.get(r.type);
+        if (!g) { g = []; byType.set(r.type, g); groups.push(g); }
+        g.push(r);
+      }
+      const draws: DrawVoice[] = groups.map((g) => {
+        const voice = voiceFor(g[0].type);
+        return g.length >= 2
+          ? voice.describeGroup(g, role, occMap.get(g[0])!.index)
+          : voice.describeOne(g[0], role, occMap.get(g[0])!);
+      });
+      forceBeats.push({ kind: 'force', role, draws });
     }
     if (terse) forceBeats = forceBeats.slice(0, 1);
 

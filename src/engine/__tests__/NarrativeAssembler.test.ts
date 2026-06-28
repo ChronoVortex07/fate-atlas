@@ -13,7 +13,7 @@ const makeSlot = (type: string, overrides: Record<string, unknown> = {}): SlotRe
     return { id: 'test', name: 'The Fool', number: 0, orientation: 'upright' as const, symbol: '☉', meaningUpright: 'New beginnings', meaningReversed: 'Recklessness', ...base } as unknown as SlotResult;
   }
   if (type === 'd20') {
-    return { ...base, result: 10, threshold: 'neutral' as const, interpretation: 'Steady' } as unknown as SlotResult;
+    return { result: 10, threshold: 'neutral' as const, interpretation: 'Steady', ...base } as unknown as SlotResult;
   }
   if (type === 'iching') {
     return { ...base, hexagramNumber: 1, name: 'Creative', symbol: '䷀', judgment: 'Success', changingLines: [] } as unknown as SlotResult;
@@ -280,6 +280,47 @@ describe('NarrativeAssembler', () => {
     expect(prompt).toContain('(veiled)');
     expect(prompt).toContain('Divinations');
     expect(prompt).toContain('Instructions');
+  });
+
+  it('aggregates three same-role d20 draws into one combined mention', () => {
+    const mk = (result: number) => makeSlot('d20', { result, modifierRoles: ['effect' as ModifierRole],
+      dimensions: { favorability: 0.0, certainty: 0, volatility: 0 } });
+    const agg = {
+      ...baseAggregated,
+      modifierAssignments: { subject: [], action: [], effect: [mk(5), mk(12), mk(18)] },
+    };
+    const result = assembler.assemble(agg, [], 'future', { chaos: 40, order: 50 });
+    const body = result.paragraphs.join('\n');
+    // one combined scaffold, not three "settling on" repeats
+    expect((body.match(/the dice/g) ?? []).length).toBe(1);
+    expect(body).toContain('the dice fall in turn');
+    expect(body).toContain('5');
+    expect(body).toContain('12');
+    expect(body).toContain('18');
+  });
+
+  it('varies framing for the same type split across two roles', () => {
+    const subj = makeSlot('d20', { result: 4, modifierRoles: ['subject' as ModifierRole],
+      dimensions: { favorability: 0, certainty: 0, volatility: 0 } });
+    const eff = makeSlot('d20', { result: 19, modifierRoles: ['effect' as ModifierRole],
+      dimensions: { favorability: 0, certainty: 0, volatility: 0 } });
+    const agg = { ...baseAggregated, modifierAssignments: { subject: [subj], action: [], effect: [eff] } };
+    const result = assembler.assemble(agg, [], 'decision', { chaos: 40, order: 50 });
+    const body = result.paragraphs.join('\n');
+    // the 2nd occurrence uses a variant scaffold, so "settling on" appears at most once
+    expect((body.match(/settling on/g) ?? []).length).toBeLessThanOrEqual(1);
+    expect(body).toContain('4');
+    expect(body).toContain('19');
+  });
+
+  it('remains deterministic with repeated minigames', () => {
+    const mk = (result: number) => makeSlot('d20', { result, modifierRoles: ['effect' as ModifierRole] });
+    const agg = { ...baseAggregated, modifierAssignments: { subject: [], action: [], effect: [mk(5), mk(12), mk(18)] } };
+    const a = new NarrativeAssembler(); a.resetRotation();
+    const r1 = a.assemble(agg, [], 'future', { chaos: 40, order: 50 });
+    const b = new NarrativeAssembler(); b.resetRotation();
+    const r2 = b.assemble(agg, [], 'future', { chaos: 40, order: 50 });
+    expect(r2.paragraphs).toEqual(r1.paragraphs);
   });
 });
 
