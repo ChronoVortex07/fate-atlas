@@ -211,7 +211,7 @@ At rare extremes the weave can **invert or scramble the displayed affinities** f
 
 Two triggers: **opt-in** (a risky happening choice explicitly marked "the weave may tear" will invert one polar pair, invert all three pairs, or shuffle all six values by a fixed permutation for a set number of readings) and **emergent** (if any effective affinity reaches 95 or above and no upheaval is already active, there is a small per-reading chance the weave spontaneously inverts). Progression is preserved underneath — you are not losing your affinities, only temporarily seeing them through a distorted lens.
 
-See [`docs/game-systems.md §8`](docs/game-systems.md) for the full upheaval mechanic reference.
+See [`docs/game-systems.md §9`](docs/game-systems.md) for the full upheaval mechanic reference.
 
 ---
 

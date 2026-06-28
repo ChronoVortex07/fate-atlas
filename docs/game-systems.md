@@ -113,7 +113,7 @@ across runs (localStorage `fate-atlas-save`); at the start of each run every aff
 Result-tag feeds grant `+5` per matching tag; action feeds grant `+6` (`+3` to a secondary
 axis). Happening *slots* do **not** feed affinity on reveal — only the **chosen** happening
 option shifts affinity. Happening choices may also grant **surges** (decaying temporary
-spikes) via `GameEngine.grantSurge` → `AffinityEngine.grantSurge` (see §8 and the
+spikes) via `GameEngine.grantSurge` → `AffinityEngine.grantSurge` (see §9 and the
 base/effective split above).
 
 Fortune **tag** feeds (Chaos/Order from result tags **and** the spread/strings coherence bonuses) are capped at **+8 base per run** (`FORTUNE_TAG_CAP`); behavior feeds (player actions) are uncapped (diminishing returns still applies).
@@ -145,7 +145,7 @@ and all bands/effects/hints read **effective**; `getBase()` exposes the permanen
 ## 3. Effects of each band
 
 Two kinds of effect derive from a band: **static** modifiers (always on at that band, no
-roll) and **event-driven** effects (probabilistic responders, see §5).
+roll) and **event-driven** effects (probabilistic responders, see §6).
 
 > **Effective value:** Bands are read from the **transformed effective** value (`base + surges`,
 > then transform modifiers applied in list order — §2 upheaval layer). An active upheaval
@@ -241,7 +241,7 @@ The tarot overhaul introduced a full 78-card deck (22 Major + 56 Minor Arcana), 
 three-card Past/Present/Future spread, procedural consolidation into a single game slot,
 and SVG-based sigils.
 
-### 4a. Deck composition
+### 5a. Deck composition
 
 - **Major Arcana** (22 cards): hand-authored, each with unique archetype, themes, dimensions,
   and modifier roles. Tags include `major-arcana` plus the card's archetype tag (e.g.
@@ -269,7 +269,7 @@ Empress, Temperance, Lovers, Hierophant, Magician. *Challenging* (5): Tower, Dea
 Hanged Man, Moon. *Neutral* (8): Fool, Justice, Chariot, Hermit, High Priestess, Emperor,
 Wheel of Fortune, Judgement.
 
-### 4b. The card-drafting minigame
+### 5b. The card-drafting minigame
 
 When the player chooses Tarot, a **card-drafting minigame** begins:
 
@@ -304,7 +304,7 @@ All mutations route through `GameEngine` methods that call `notify()`.
    `GameEngine.continueAfterReview()`) applies to all three minigames and to the final commit
    before the Result page.
 
-### 4c. New event triggers
+### 5c. New event triggers
 
 The draft minigame introduces seven new event dispatch points for meta-interactions:
 
@@ -321,7 +321,7 @@ The draft minigame introduces seven new event dispatch points for meta-interacti
 Responders can hook into these to trigger meta-interactions during the draft phase (e.g.,
 Chaos responder at `tarot:picked` could force a different card).
 
-### 4d. Consolidation (`consolidateSpread`)
+### 5d. Consolidation (`consolidateSpread`)
 
 After the player confirms the spread, the three faces are **consolidated into one
 `TarotResult` slot** via `consolidateSpread`:
@@ -339,7 +339,7 @@ After the player confirms the spread, the three faces are **consolidated into on
 6. The spread's individual faces remain accessible on the result as `result.spread` (an
    array of `{ position, card }` objects), used by spread-internal responders.
 
-### 4e. Balance rationale
+### 5e. Balance rationale
 
 Consolidating the spread into one slot keeps the slot model uniform (one result per
 method) and integrates with existing responders without structural changes. Dimension
@@ -360,7 +360,7 @@ per spread (instead of re-listing the spread inside the modifier frames), and na
 result under **exactly one** modifier role (disjoint frames — the role where it ranks
 strongest).
 
-### 4f. SVG sigils
+### 5f. SVG sigils
 
 Sigil **resolution** lives in the pure, framework-free module `src/data/sigils.ts`
 (`resolveSigil`), which the engine test suite covers (`src/engine/__tests__/Sigils.test.ts`
@@ -383,7 +383,7 @@ Tarot no longer renders the emoji `symbol` data field — the Result page sub-ca
 standardized **constellation-crest** `CardBack`. Sigils appear in the fan (method select),
 slot views (Past/Present/Future), history tiles, and result readings.
 
-### 4g. Spread coherence affinity feeds
+### 5g. Spread coherence affinity feeds
 
 When a tarot spread is committed, `completeMinigame` checks every face's orientation:
 
@@ -395,7 +395,7 @@ These are **flat shifts** applied on top of the normal tag-based feeds (which ad
 `upright` or `reversed` tag), rewarding consistent spreads with a predictable affinity
 bonus.
 
-### 4h. Display touchpoints
+### 5h. Display touchpoints
 
 The spread composition is visible at every display surface:
 
@@ -505,7 +505,7 @@ Authored cryptic scenes offered **at most once per turn**, in a between-reading 
 The happening screen is filtered out of synthesis and run records; only the *chosen* option
 affects affinity/surges.
 
-### 7a. Decoupled cadence
+### 8a. Decoupled cadence
 
 `GameEngine.shouldOfferHappening(completed)` runs after each minigame commit:
 
@@ -519,7 +519,7 @@ This replaces the old `chaos-happening-interrupt` responder entirely. Chaos no l
 gates whether a happening appears — only the cadence constant and the once-per-turn floor
 matter.
 
-### 7b. Selection (`selectHappening`)
+### 8b. Selection (`selectHappening`)
 
 Excludes already-seen IDs from `usedHappeningIds` (resets once all eight are exhausted),
 then applies **dominant-axis weighting**:
@@ -535,7 +535,7 @@ Each scene whose `axes` array includes the player's widest polar pair receives
 `weight = 1 + AXIS_WEIGHT_BONUS` (default bonus **1**, so matching scenes are twice as
 likely). Non-matching scenes have `weight = 1`.
 
-### 7c. Effect model
+### 8c. Effect model
 
 Each choice carries `effects: HappeningEffect[]`. Six kinds are defined:
 
@@ -548,7 +548,7 @@ Each choice carries `effects: HappeningEffect[]`. Six kinds are defined:
 | `gamble` | Weighted branch — exactly one outcome's `effects[]` resolve (chosen by `pickGambleOutcome`). |
 | `upheaval` | Temporary transform — `GameEngine.grantUpheaval(transform, readings)` → the Phase 3 transform/upheaval layer (§9). Bends the effective vector for `readings` readings then snap-back (cliff expiry — no step-down). |
 
-### 7d. `ReadingEffectId` → engine vocabulary
+### 8d. `ReadingEffectId` → engine vocabulary
 
 | ReadingEffectId | Consumed by | Engine effect |
 |----------------|-------------|---------------|
@@ -562,7 +562,7 @@ Each choice carries `effects: HappeningEffect[]`. Six kinds are defined:
 All six are consumed and removed from `pendingReadingEffects` the moment they take effect
 (the `consumeReadingEffect` helper removes exactly one occurrence per call).
 
-### 7e. Happening catalog
+### 8e. Happening catalog
 
 | ID | Scene (gist) | Choices (summary) |
 |----|--------------|-------------------|
@@ -576,7 +576,7 @@ All six are consumed and removed from `pendingReadingEffects` the moment they ta
 | `many-threads` | Countless threads of fate shimmer | surge(order+22, 3r) + reading(widen-pool) · upheaval(invert-pair:fortune, 2r) + surge(chaos+20, 2r) |
 
 An active I Ching with changing lines (`iching-happening-boost` responder at
-`happening:start`) can append a hidden bonus choice to any happening — see §6.
+`happening:start`) can append a hidden bonus choice to any happening — see §7.
 
 ---
 
@@ -589,7 +589,7 @@ shuffling them by a fixed permutation. The base values are **never touched**; on
 effective layer is distorted. When the upheaval expires, the effective vector snaps back
 instantly (cliff expiry — no step-down) and progression resumes from where it was.
 
-### 8a. The three transforms
+### 9a. The three transforms
 
 | Transform | Description |
 |-----------|-------------|
@@ -597,21 +597,21 @@ instantly (cliff expiry — no step-down) and progression resumes from where it 
 | `invert-all` | Flips all three polar pairs simultaneously: every effective value becomes `100 − v`. |
 | `scramble` | Redistributes effective values by a random **permutation** fixed at the moment the upheaval is granted (so the scramble is consistent across readings for its lifetime). |
 
-### 8b. The base-untouched invariant
+### 9b. The base-untouched invariant
 
 `AffinityEngine.shift()` always writes to **base**. During an upheaval the player's
 actions still feed their intended affinities normally — only the *display* and the
 *effect-resolution layer* see the bent values. When the upheaval expires the real values
 resurface without any correction step.
 
-### 8c. Expiry (cliff)
+### 9c. Expiry (cliff)
 
 A transform modifier carries a `readingsRemaining` counter decremented by
 `tickModifiers()` at each reading boundary. It contributes at full strength until it
 reaches zero, then is removed. There is no step-down decay (unlike surges) — the upheaval
 holds completely until the cliff, then vanishes.
 
-### 8d. Trigger: opt-in (happening choice)
+### 9d. Trigger: opt-in (happening choice)
 
 A happening choice with `{ kind: 'upheaval', transform, readings }` in its `effects[]`
 calls `GameEngine.grantUpheaval(payload, readings, source)`, which calls
@@ -620,7 +620,7 @@ time. Resolution is **silent** — no sequencer report is emitted for the grant 
 These choices are telegraphed in the happening scene by the "the weave may tear" cue
 (Phase 2 scene fiction) so the player has narrative warning of the risk.
 
-### 8e. Trigger: emergent upheaval
+### 9e. Trigger: emergent upheaval
 
 The `emergent-upheaval` responder sits at the six `*:commit` triggers in the `STRUCTURAL`
 exclusive band. Its condition:
@@ -641,7 +641,7 @@ The grant is narrated through the normal report→sequencer pipeline
 Active-upheaval hints and band-derived effects reflect the inverted reality automatically
 because they all read the transformed effective value.
 
-### 8f. Tuning constants
+### 9f. Tuning constants
 
 | Constant | Value | Meaning |
 |----------|-------|---------|
@@ -685,7 +685,7 @@ Sources of truth: [`src/data/astromancy.ts`](../src/data/astromancy.ts),
 [`src/engine/astral.ts`](../src/engine/astral.ts),
 [`src/engine/responders/astral.ts`](../src/engine/responders/astral.ts).
 
-### 10a. Planet die (12 planets)
+### 11a. Planet die (12 planets)
 
 | Planet | Glyph | Theme | Modifier role | Favorability | Certainty | Volatility |
 |--------|-------|-------|---------------|:------------:|:---------:|:----------:|
@@ -702,7 +702,7 @@ Sources of truth: [`src/data/astromancy.ts`](../src/data/astromancy.ts),
 | North Node | ☊ | renewal | action | +1.0 | −0.5 | +0.5 |
 | South Node | ☋ | surrender | effect | −1.0 | 0 | 0 |
 
-### 10b. Sign die (12 signs)
+### 11b. Sign die (12 signs)
 
 Signs contribute **element lean** and **modality lean** to the combined dimensions; their
 element and modality also supply theme candidates.
@@ -728,7 +728,7 @@ Element dimension leans: **fire** +0.5 vol/+0.5 fav · **earth** +0.5 cer/−0.5
 Modality dimension leans: **cardinal** +0.5 vol · **fixed** +0.5 cer/−0.5 vol ·
 **mutable** +0.5 vol/−0.5 cer.
 
-### 10c. House board (12 houses)
+### 11c. House board (12 houses)
 
 The Planet die's landing house determines the arena. The Sign die's landing house is used only
 to compute the aspect (see §11d).
@@ -748,7 +748,7 @@ to compute the aspect (see §11d).
 | 11 | Community | renewal |
 | 12 | The Hidden | mystery |
 
-### 10d. Aspects
+### 11d. Aspects
 
 `aspectBetween(houseA, houseB)` computes the minimum arc (0–6 steps of 30°) between the two
 landing houses and maps it to an aspect name. A step of 6 is opposition (180°).
@@ -762,7 +762,7 @@ landing houses and maps it to an aspect name. A step of 6 is opposition (180°).
 | 6 | opposition | 0 | +1.0 | +1.0 | upheaval |
 | 1, 5 | minor | 0 | −0.5 | +0.5 | mystery |
 
-### 10e. How `consolidateCast` combines the four signals
+### 11e. How `consolidateCast` combines the four signals
 
 1. **Dimensions** — sum planet + element lean + modality lean + aspect dims, then halve and
    clamp to −2 … +2 (in 0.5 steps).
@@ -772,7 +772,7 @@ landing houses and maps it to an aspect name. A step of 6 is opposition (180°).
    `house-<N>`, `element-<element>`, `aspect-<name>`, `dignified` or `debilitated`
    (if applicable), plus any omen tags from the cast.
 
-### 10f. Dignity and debility
+### 11f. Dignity and debility
 
 A planet is **dignified** when it lands in one of its home signs; **debilitated** in a hostile
 sign. Both tag the result and activate dedicated responders (§11h).
@@ -792,7 +792,7 @@ sign. Both tag the result and activate dedicated responders (§11h).
 | North Node | *(none)* | *(none)* |
 | South Node | *(none)* | *(none)* |
 
-### 10g. Cast modes (affinity-driven)
+### 11g. Cast modes (affinity-driven)
 
 Before the dice are thrown `planAstralCast` resolves a cast mode from the current affinities.
 A **separate** probabilistic check (`shouldOfferRecast`) may additionally offer the player a
@@ -812,7 +812,7 @@ order wins (Will dominant checked first, then Light ascendant, then Shadow ascen
 `bandRoll('will', 'stirring', T.notable)` — Will stirring minimum, notable tier base chance
 (0.22), scaling +70% per band above gate.
 
-### 10h. Symbolic-resonance + omen responders
+### 11h. Symbolic-resonance + omen responders
 
 All eight responders trigger at `astral:commit`. All are deterministic (`roll → true`).
 Seven compete in the `MUTATE` exclusive band; the eighth (`astral-errant-star`) is in
@@ -871,7 +871,7 @@ Sources of truth: [`src/data/iching.ts`](../src/data/iching.ts),
 [`src/engine/iching.ts`](../src/engine/iching.ts),
 [`src/engine/responders/iching.ts`](../src/engine/responders/iching.ts).
 
-### 11a. Authentic coin-cast (`drawHexagramCast`)
+### 12a. Authentic coin-cast (`drawHexagramCast`)
 
 Each of the six lines is determined by summing three virtual coin tosses (heads=3, tails=2),
 producing a line value of **6, 7, 8, or 9**:
@@ -891,7 +891,7 @@ to its opposite, revealing where the situation is heading.
 (stable) line is promoted to its changing counterpart (Chaos ×0.2 probability). This makes
 changing lines more frequent as Chaos rises.
 
-### 11b. King Wen mapping
+### 12b. King Wen mapping
 
 Primary and relating hexagrams are identified by mapping the six bits (bottom→top,
 yang=`1`, yin=`0`) against the **King Wen binary table** (`HEX_BY_BINARY` in
@@ -899,7 +899,7 @@ yang=`1`, yin=`0`) against the **King Wen binary table** (`HEX_BY_BINARY` in
 (favorability, certainty, volatility in −2 … +2) and 1–3 themes drawn from the shared
 theme vocabulary.
 
-### 11c. Primary → Relating transformation
+### 12c. Primary → Relating transformation
 
 When a cast has no changing lines, only the primary hexagram is produced. When changing
 lines exist, the relating hexagram is also computed. The player's choice of which to commit
@@ -923,7 +923,7 @@ Tags emitted by `consolidateHexagram`:
 > Note: `reversible` and `changing-lines` are emitted together and only when the cast
 > actually produced changing lines — they are not always present on an I Ching result.
 
-### 11d. Resolution modes (`planHexagramResolution`)
+### 12d. Resolution modes (`planHexagramResolution`)
 
 The UI offers different choices depending on which affinities are ascendant. Will takes
 priority over Fate when both qualify.
@@ -939,7 +939,7 @@ When there are no changing lines, `mode` is always `unaligned` and no re-cast is
 After a successful re-cast the affinity feed action `viaReroll` applies (`take-reroll`
 → Will).
 
-### 11e. New event triggers
+### 12e. New event triggers
 
 | Trigger | Fires when |
 |---------|-----------|
@@ -947,7 +947,7 @@ After a successful re-cast the affinity feed action `viaReroll` applies (`take-r
 | `iching:transform` | Before commit — `chaos-line-cascade` and `order-still-hexagram` compete here to mutate the changing-line set |
 | `iching:commit` | The governing hexagram is committed — `mirror`, `iching-resonant-change`, and `chaos-second-result` fire here |
 
-### 11f. The Mandate of Change
+### 12f. The Mandate of Change
 
 When an I Ching result is committed, two effects are applied to the `AffinityEngine`:
 
@@ -1005,7 +1005,7 @@ Multiple tilt conditions stack multiplicatively (applied in order above).
 - **Secrecy:** the mandate values are not exposed in the game UI. Only atmospheric flavor
   text hints at the hexagram's influence on the reading.
 
-### 11g. Line-mutation responders (`iching:transform`)
+### 12g. Line-mutation responders (`iching:transform`)
 
 Before the result is committed, `GameEngine.runHexagramTransform` dispatches the
 `iching:transform` trigger, allowing Chaos or Order to alter the cast:
@@ -1036,14 +1036,14 @@ stones land face-up, how they are oriented, and where they fall. Data lives in
 [`src/engine/runes.ts`](../src/engine/runes.ts); responders in
 [`src/engine/responders/runes.ts`](../src/engine/responders/runes.ts).
 
-### 12a. The rune dataset (24 staves, 3 aettir)
+### 13a. The rune dataset (24 staves, 3 aettir)
 
 Each `RuneDef` carries a glyph, aett (`freyr` / `heimdall` / `tyr`), `reversible` flag, a theme,
 a modifier role, upright `dimensions`, and upright/merkstave meanings. The eight **symmetric**
 runes — **Gebo, Hagalaz, Isa, Jera, Eihwaz, Sowilo, Ingwaz, Dagaz** — are `reversible: false`:
 they never fall merkstave and are tagged `non-reversible`.
 
-### 12b. The cloth and the scatter fall (`resolveScatter`)
+### 13b. The cloth and the scatter fall (`resolveScatter`)
 
 The cloth has three concentric rings by normalized radius `r = hypot(x, y)`: **Heart**
 (`r < 0.33`), **Field** (`0.33 ≤ r < 0.75`), **Margin** (`r ≥ 0.75`); a stone past `r > 1.1` is
@@ -1055,7 +1055,7 @@ tightened by Order**, then lerped toward the Heart by the Fate **drift**), a `fa
 face-up stone nearest the Heart (a stone is force-revealed if all land silent). `drawRuneScatter`
 wraps this with no aim for engine-spawned results (spawn-second / reroll).
 
-### 12c. Consolidation (`consolidateScatter`)
+### 13c. Consolidation (`consolidateScatter`)
 
 - **Governing** stone (nearest the Heart): full `dimensions` + theme + modifier role. A merkstave
   governing first takes the fixed shadow transform **favor −1.0, volatility +0.5, certainty −0.5**.
@@ -1069,7 +1069,7 @@ wraps this with no aim for engine-spawned results (spawn-second / reroll).
 `orientation-<upright|merkstave>`, then `upright` **or** `reversed` (feeds Order vs Chaos),
 `reversible` **or** `non-reversible`, plus any scatter omen tags.
 
-### 12d. Plan modes (`planRuneCast`)
+### 13d. Plan modes (`planRuneCast`)
 
 | Mode | Affinity required | What happens |
 |------|-------------------|--------------|
@@ -1085,7 +1085,7 @@ by band). **Offer-recast** is `shouldOfferRecast(will) && mode !== 'claim' && fa
 favored/clouded (by `stoneBrightness` = favorability with a merkstave penalty); single/claim keep
 the default.
 
-### 12e. Scatter-omen + cross-type responders
+### 13e. Scatter-omen + cross-type responders
 
 Eight rune responders trigger at `rune:commit`; all are deterministic (`roll → true`). Six compete
 in the `MUTATE` exclusive band; `rune-errant` and `rune-perthro` are in `SPAWN` (Perthro carries
@@ -1128,7 +1128,7 @@ Sources of truth: [`src/data/strings.ts`](../src/data/strings.ts),
 [`src/engine/strings.ts`](../src/engine/strings.ts),
 [`src/engine/responders/strings.ts`](../src/engine/responders/strings.ts).
 
-### 13a. The weave (layered DAG under a radial bloom)
+### 14a. The weave (layered DAG under a radial bloom)
 
 `generateWeave` builds a layered DAG: band 0 = a single origin, the middle **crossing**
 bands (4 nodes each), and the final **destination** band (3 nodes drawn from the concepts
@@ -1140,7 +1140,7 @@ at baseline (`plan.finalWidth` = 1) so the ending can't be freely cherry-picked;
 still guarantees every destination stays reachable. Will reopens it (ascendant → 2,
 dominant → 3).
 
-### 13b. Surface-hint reveal (Light/Shadow is the core lever)
+### 14b. Surface-hint reveal (Light/Shadow is the core lever)
 
 `revealFrom` exposes up to `plan.width` pickable candidates from the active node. Clarity
 ladders **silhouette → mood → themes → laid-bare** (Shadow … Light). Shadow additionally
@@ -1148,7 +1148,7 @@ ladders **silhouette → mood → themes → laid-bare** (Shadow … Light). Sha
 **foresight** (fully un-veil one candidate). The mood word is the only hint at baseline;
 full identity resolves on arrival.
 
-### 13c. Plan levers (`planWeave`, by affinity band)
+### 14c. Plan levers (`planWeave`, by affinity band)
 
 | Lever | Driven by |
 |---|---|
@@ -1162,7 +1162,7 @@ full identity resolves on arrival.
 | `foresight` | Light ascendant+ |
 | `extremeBias` / `crossingDensity` | Chaos widens (extreme concepts, more crossings) · Order narrows (mild concepts, reconvergence) |
 
-### 13d. Affinity feeds
+### 14d. Affinity feeds
 
 Per-step player choices feed via `applyAction`: accept a hinted step → **Fate**
 (`reveal-as-drawn`); a blind silhouette accept → **Shadow** (`embrace-mystery`);
@@ -1170,7 +1170,7 @@ backtrack / re-draw → **Will** (`take-reroll`); foresight → **Light** (`use-
 commit, **path coherence** mirrors the tarot rule: a coherent thread → **Order +6**, a
 tangled (opposed-theme) thread → **Chaos +6**. The result's `random` tag also feeds Chaos.
 
-### 13e. Consolidation (`consolidatePath`)
+### 14e. Consolidation (`consolidatePath`)
 
 Destination-governed: destination weight ×2, origin & crossings ×1. Dimensions are the
 weighted average (clamped ±2 @ 0.5); themes are weighted-frequency with the destination's
@@ -1180,7 +1180,7 @@ destination `effect`). Tags: `draw random strings weave` + each concept's
 path has no orientation, so Strings stays out of Mirror / Critical Resonance / Resonant
 Change by design. `ReadingPlanner` expands the path into one atomic signal per concept.
 
-### 13f. Event triggers & responders
+### 14f. Event triggers & responders
 
 | Trigger | Fires when |
 |---|---|
@@ -1222,7 +1222,7 @@ Source of truth: [`src/engine/dice.ts`](../src/engine/dice.ts) (`planDiceCheck`,
 [`src/data/dice.ts`](../src/data/dice.ts) (`rollD20`), which is unchanged by the
 skill-check layer.
 
-### 14a. The check loop
+### 15a. The check loop
 
 1. **Plan** — before the player throws, `planDiceCheck` reads the slots already committed
    this turn and computes the **DC** and the **Bless/Bane** d4 pool.
@@ -1233,7 +1233,7 @@ skill-check layer.
 4. **Commit** — the tier (`Threshold`) enters the spread and dispatches `dice:commit` exactly
    as before, so all existing dice meta-interactions fire unchanged.
 
-### 14b. Difficulty Class
+### 15b. Difficulty Class
 
 The DC is derived from the **magnitude-weighted mean favorability** of the reading so far:
 
@@ -1250,7 +1250,7 @@ d20.
 > Magnitude-weighting (squaring then restoring sign) gives stronger poles more influence
 > than a flat average would, matching the same weighting used in `ReadingPlanner.aggregate`.
 
-### 14c. Bless and Bane
+### 15c. Bless and Bane
 
 After the DC is set, `planDiceCheck` scans the committed slots for modifiers:
 
@@ -1261,7 +1261,7 @@ At most one Bless and one Bane are applied (the first qualifying slot of each ki
 The d4s are rolled at resolve time and their values are added to / subtracted from the
 natural d20 before comparing to the DC.
 
-### 14d. Relative tiers
+### 15d. Relative tiers
 
 The margin `= total − DC` (where `total = d20 + Bless d4s − Bane d4s`) maps to one of the
 five standard tiers:
@@ -1279,7 +1279,7 @@ that key off `critical-high`, `high`, `neutral`, `low`, or `critical-low` dice r
 as before — the committed tier is now relative to the DC rather than absolute, but the
 tag contract is unchanged.
 
-### 14e. Criticals (natural 20 and natural 1)
+### 15e. Criticals (natural 20 and natural 1)
 
 Natural rolls override the DC entirely:
 
@@ -1291,7 +1291,7 @@ Criticals are determined from the raw natural d20; the Bless/Bane d4s still reso
 are shown in the breakdown for narrative texture, but they do not affect the tier when a
 critical fires.
 
-### 14f. Roll modes (affinity-gated, unchanged)
+### 15f. Roll modes (affinity-gated, unchanged)
 
 The roll-mode system is unchanged. Responders gate on the same affinities and fire at the
 same `dice:roll` trigger before the player throws:
