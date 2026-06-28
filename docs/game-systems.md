@@ -233,8 +233,27 @@ is exempt from coupling, diminishing returns, pairing, and baseline-drift.
 - **Carryover:** corruption persists across `reset`/`returnToTitle` and the save,
   worsening game-over-game; only `clearHistory` and the Rupture clear it.
 
-> Tuning lives in `src/data/corruption.ts`. The player-facing effects, exploits,
-> Light early-warning, and the Rupture interstitial are built in later plans.
+> Tuning lives in `src/data/corruption.ts`. The Rupture interstitial and
+> force-the-weave / forbidden-sight player actions are built in later plans.
+
+### Automatic corruption effects (Phase 2)
+
+- **Visible to the effect system.** Corruption rides on `PhaseContext.corruption`;
+  responders gate on it via `corruptionRoll` (the corruption analog of `bandRoll`).
+- **Minigame infection.** At each draw, corruption taints offered methods
+  (`state.infectedMethods`): one at *spreading*, two at *virulent+*. Playing an
+  infected method amplifies that reading's corruption growth (`INFECTION_GAIN_MULT`)
+  — farming spends the hoard into corruption rather than growing affinities.
+- **Corrupted-variant effects** (`src/engine/responders/corruption.ts`) fire at
+  *virulent+*: e.g. `corruption-extra-result` (an unbidden extra, garbled result)
+  and `corruption-false-orientation` (the spread turns wrong). Anything they touch
+  carries the `corrupted` tag — potent but visibly wrong, double-edged (curse at
+  high bands, farmable payoff in infected games).
+- **Light early-warning** (`state.corruptionWarning`). Below Ascendant Light: nothing.
+  Ascendant: a vague "something is wrong". Dominant: names the tainted methods. At
+  *virulent+* the warning is itself corrupted (terminal lucidity — false reassurance
+  after the danger is already obvious). The catch-22: Light high enough to warn you
+  is itself excess that feeds corruption, so its guidance can never remove the threat.
 
 ---
 

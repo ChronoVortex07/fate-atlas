@@ -204,6 +204,9 @@ the stars takes notice — a red, glitching wrongness that feeds on imbalance an
 erodes what you've hoarded. It cannot be fought head-on, only starved by letting
 your strongest forces fall. Left unchecked it builds to a Rupture that tears the
 reading apart and leaves the world low and quiet again, as if nothing happened.
+As it grows, corruption begins to taint the methods you're offered — and if your
+inner Light burns bright enough, you may catch a warning of where the wrongness
+festers, though heeding it will never be enough to drive corruption out.
 
 ### Upheavals
 
