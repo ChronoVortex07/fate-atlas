@@ -2,10 +2,12 @@ import type { GameState, QuestionType, AffinityId, MinigameMeta, SlotResult, Tar
 import { FULL_DECK, buildFace, pickOrientation, DECK_BY_ID, consolidateSpread, reverseSpread } from '../data/tarot';
 import { EventBus } from './EventBus';
 import { AffinityEngine } from './AffinityEngine';
+import { CorruptionEngine } from './CorruptionEngine';
 import { TurnOrchestrator } from './TurnOrchestrator';
 import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
-import { AFFINITY_DEFINITIONS, defaultAffinityState } from '../data/affinities';
+import { AFFINITY_DEFINITIONS, defaultAffinityState, AFFINITY_IDS } from '../data/affinities';
+import { RUPTURE_RESET } from '../data/corruption';
 import { selectHappening, HAPPENING_GAP_CHANCE } from '../data/happenings';
 import { dispatch } from './events/EventDispatcher';
 import { buildAffinityResponders } from './responders/affinity';
@@ -34,6 +36,7 @@ const STORAGE_KEY = 'fate-atlas-save';
 export class GameEngine {
   private bus: EventBus;
   private affinityEngine: AffinityEngine;
+  private corruptionEngine: CorruptionEngine;
   private orchestrator: TurnOrchestrator;
   private readingPlanner: ReadingPlanner;
   private narrativeAssembler: NarrativeAssembler;
@@ -55,6 +58,7 @@ export class GameEngine {
     this.minigamesPerTurn = minigamesPerTurn;
     this.bus = new EventBus();
     this.affinityEngine = new AffinityEngine(AFFINITY_DEFINITIONS);
+    this.corruptionEngine = new CorruptionEngine();
     this.orchestrator = new TurnOrchestrator(this.bus);
     this.readingPlanner = new ReadingPlanner();
     this.narrativeAssembler = new NarrativeAssembler();
@@ -70,6 +74,7 @@ export class GameEngine {
       screen: 'title',
       affinities: defaultAffinityState(),
       affinityBase: defaultAffinityState(),
+      corruption: { value: 0, band: 'dormant' },
       questionType: null,
       availableMethods: [],
       shroudedMethods: [],
@@ -100,6 +105,7 @@ export class GameEngine {
     this.state.affinities = this.affinityEngine.getState();
     this.state.affinityBase = this.affinityEngine.getBase();
     this.state.affinityEffects = this.affinityEngine.getEffects();
+    this.state.corruption = { value: this.corruptionEngine.getValue(), band: this.corruptionEngine.getBand() };
     if (this.peekOverrideThisReading === 'guarantee') this.state.affinityEffects = { ...this.state.affinityEffects, peekAvailable: true };
     else if (this.peekOverrideThisReading === 'deny') this.state.affinityEffects = { ...this.state.affinityEffects, peekAvailable: false };
     this.state.eventLog = this.bus.getHistory();
@@ -487,6 +493,7 @@ export class GameEngine {
     // mandate; each later commit weakens it toward 1.0.
     this.affinityEngine.decayMandate();
     this.affinityEngine.tickModifiers(); // decay/expire surges once per completed reading
+    this.applyCorruptionTick();
     this.peekOverrideThisReading = null; // peek override lasts exactly one reading
 
     // Final reading?
@@ -521,6 +528,34 @@ export class GameEngine {
     this.buildPool(bias, true);
     this.state.screen = 'method-select';
     this.state.selectedMethod = null;
+    this.notify();
+  }
+
+  // Once per completed reading: grow/seed/starve corruption off the current
+  // imbalance, bleed the hoarded affinities down, and fire the Rupture at the pinnacle.
+  private applyCorruptionTick(): void {
+    const gains = this.affinityEngine.consumeRealizedGains();
+    const tick = this.corruptionEngine.tick(this.affinityEngine.getState(), gains);
+    if (Object.keys(tick.drains).length > 0) this.affinityEngine.erode(tick.drains);
+    if (tick.ruptured) this.performRupture();
+  }
+
+  // The Rupture: reality tears, the world re-forms low, and corruption vanishes
+  // without a trace. (The between-worlds interstitial is UI, handled in a later plan.)
+  private performRupture(): void {
+    const reset = AFFINITY_IDS.reduce(
+      (acc, id) => ((acc[id] = RUPTURE_RESET), acc),
+      {} as Record<AffinityId, number>,
+    );
+    this.affinityEngine.setState(reset);
+    this.affinityEngine.clearModifiers();
+    this.corruptionEngine.clear();
+    this.bus.emit('corruption-ruptured', {});
+  }
+
+  // Debug/test setter for the corruption scalar.
+  setCorruption(value: number): void {
+    this.corruptionEngine.setValue(value);
     this.notify();
   }
 
@@ -1322,6 +1357,7 @@ export class GameEngine {
 
     this.affinityEngine.setState(stage.affinities);
     this.affinityEngine.clearModifiers();
+    this.corruptionEngine.clear();
     this.state.affinities = this.affinityEngine.getState();
     this.state.screen = stage.screen as GameState['screen'];
     this.state.selectedMethod = stage.selectedMethod as GameState['selectedMethod'];

@@ -450,7 +450,8 @@ export type EventType =
   | 'affinity-changed'
   | 'minigame-complete'
   | 'pool-refilled'
-  | 'state-loaded';
+  | 'state-loaded'
+  | 'corruption-ruptured';
 
 export interface GameEvent {
   type: EventType;
@@ -568,6 +569,7 @@ export interface GameState {
   screen: Screen;
   affinities: Record<AffinityId, number>;     // effective (base + surges)
   affinityBase: Record<AffinityId, number>;   // permanent base only (for surge transparency/debug)
+  corruption: CorruptionSnapshot;
   questionType: QuestionType | null;
   availableMethods: DivinationType[];
   shroudedMethods: number[];
