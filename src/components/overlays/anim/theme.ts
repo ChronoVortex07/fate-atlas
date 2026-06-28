@@ -27,6 +27,7 @@ const PRIMITIVE_BY_ANIMATION: Record<string, Primitive> = {
   interrupt: 'interrupt',
   amplify: 'amplify',
   anchor: 'glow',
+  upheaval: 'mirror',
 };
 
 export function primitiveFor(animation: string): Primitive {
@@ -63,7 +64,8 @@ const AFFINITY: Record<string, Theme> = {
   Shadow: { palette: ['#9b6bb0', '#1a0f2e'], model: 'falling', key: 'shadow' },
   Light:  { palette: ['#e6d8a8', '#fffbe8'], model: 'radial',  key: 'light' },
   Chaos:  { palette: ['#c75b4a', '#ff7a4a'], model: 'shard',   key: 'chaos' },
-  Order:  { palette: ['#5b7ec7', '#aac4ff'], model: 'implode', key: 'order' },
+  Order:    { palette: ['#5b7ec7', '#aac4ff'], model: 'implode', key: 'order' },
+  Upheaval: { palette: ['#7a2d8c', '#c75b4a'], model: 'shard',   key: 'upheaval' },
 };
 
 // Element palettes for meta-interactions themed off the triggering card.
