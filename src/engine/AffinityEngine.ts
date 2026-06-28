@@ -1,4 +1,4 @@
-import type { AffinityId, AffinityBand, AffinityAction, AffinityEffects, Taggable, AffinityMandate } from './types';
+import type { AffinityId, AffinityBand, AffinityAction, AffinityEffects, Taggable, AffinityMandate, AffinityModifier } from './types';
 import type { AffinityDefinition } from '../data/affinities';
 import {
   AFFINITY_IDS,
@@ -22,7 +22,8 @@ import {
 } from '../data/affinities';
 
 export class AffinityEngine {
-  private state: Record<AffinityId, number>;
+  private base: Record<AffinityId, number>;
+  private modifiers: AffinityModifier[] = [];
   private feedsThisRun: Record<AffinityId, number>;
   private peeksThisRun = 0;
   private peekLocked = false;
@@ -34,10 +35,10 @@ export class AffinityEngine {
   constructor(definitions: AffinityDefinition[]) {
     this.definitions = definitions;
     this.defById = {};
-    this.state = {} as Record<AffinityId, number>;
+    this.base = {} as Record<AffinityId, number>;
     this.feedsThisRun = {} as Record<AffinityId, number>;
     for (const id of AFFINITY_IDS) {
-      this.state[id] = BASELINE;
+      this.base[id] = BASELINE;
       this.feedsThisRun[id] = 0;
     }
     for (const def of definitions) this.defById[def.id] = def;
@@ -61,6 +62,23 @@ export class AffinityEngine {
     return this.mandate.gainMult[id] ?? this.mandate.globalMult;
   }
 
+  // Effective value = permanent base + active surge contributions (step-down decayed).
+  // Phase 3 will apply transform modifiers here, after surges.
+  private eff(id: AffinityId): number {
+    let v = this.base[id];
+    for (const m of this.modifiers) {
+      if (m.kind === 'surge') {
+        const factor = m.readingsRemaining / m.initialReadings;
+        v += (m.deltas[id] ?? 0) * factor;
+      }
+    }
+    return this.clamp(v);
+  }
+
+  getBase(): Record<AffinityId, number> {
+    return { ...this.base };
+  }
+
   // ── The single mutation chokepoint ──
   // Returns the realized delta actually applied to `id` (signed).
   shift(id: AffinityId, baseDelta: number, _sourceId: string): number {
@@ -69,7 +87,7 @@ export class AffinityEngine {
 
     // Penalty: direct subtraction, no fan-out.
     if (baseDelta < 0) {
-      this.state[id] = this.clamp(this.state[id] + baseDelta);
+      this.base[id] = this.clamp(this.base[id] + baseDelta);
       return baseDelta;
     }
 
@@ -79,13 +97,13 @@ export class AffinityEngine {
     const jitter = JITTER_MIN + Math.random() * (JITTER_MAX - JITTER_MIN);
     const gain = baseDelta * dr * jitter;
 
-    this.state[id] = this.clamp(this.state[id] + gain);
+    this.base[id] = this.clamp(this.base[id] + gain);
 
     const opp = AFFINITY_PAIRS[id];
-    this.state[opp] = this.clamp(this.state[opp] - gain * COUPLING_OPPOSITE);
+    this.base[opp] = this.clamp(this.base[opp] - gain * COUPLING_OPPOSITE);
     for (const other of AFFINITY_IDS) {
       if (other === id || other === opp) continue;
-      this.state[other] = this.clamp(this.state[other] - gain * COUPLING_OTHER);
+      this.base[other] = this.clamp(this.base[other] - gain * COUPLING_OTHER);
     }
     return gain;
   }
@@ -112,7 +130,7 @@ export class AffinityEngine {
   // ── Peek (Light-only foresight) ──
   peekAvailable(): boolean {
     if (this.peekLocked) return false;
-    return BAND_ORDER.indexOf(bandOf(this.state.light)) >= BAND_ORDER.indexOf('ascendant');
+    return BAND_ORDER.indexOf(bandOf(this.eff('light'))) >= BAND_ORDER.indexOf('ascendant');
   }
 
   // Resolves a peek attempt: escalating fail chance, lockout + Light penalty on failure,
@@ -131,9 +149,9 @@ export class AffinityEngine {
 
   // Static, band-derived modifiers (no per-event roll). Carried in the snapshot.
   getEffects(): AffinityEffects {
-    const willIdx   = bandIndex(bandOf(this.state.will));
-    const lightIdx  = bandIndex(bandOf(this.state.light));
-    const shadowIdx = bandIndex(bandOf(this.state.shadow));
+    const willIdx   = bandIndex(bandOf(this.eff('will')));
+    const lightIdx  = bandIndex(bandOf(this.eff('light')));
+    const shadowIdx = bandIndex(bandOf(this.eff('shadow')));
 
     const info = lightIdx - shadowIdx; // -3..3
     const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -158,32 +176,34 @@ export class AffinityEngine {
   // Run boundary: drift toward baseline, reset per-run counters. Reshuffle hook.
   beginRun(): void {
     for (const id of AFFINITY_IDS) {
-      this.state[id] = this.clamp(this.state[id] + (BASELINE - this.state[id]) * RUN_DRIFT);
+      this.base[id] = this.clamp(this.base[id] + (BASELINE - this.base[id]) * RUN_DRIFT);
       this.feedsThisRun[id] = 0;
     }
     this.peeksThisRun = 0;
     this.peekLocked = false;
     this.clearMandate();
+    // NOTE: modifiers are intentionally NOT cleared here — surges decay per reading
+    // and survive turn boundaries within a session.
   }
 
   bandOf(id: AffinityId): AffinityBand {
-    return bandOf(this.state[id]);
+    return bandOf(this.eff(id));
   }
 
   // Soft reach-up: ~12% chance to act one band higher (never lower, never two up).
   resolveBand(id: AffinityId): AffinityBand {
-    const base = bandOf(this.state[id]);
-    const idx = BAND_ORDER.indexOf(base);
+    const cur = bandOf(this.eff(id));
+    const idx = BAND_ORDER.indexOf(cur);
     if (idx < BAND_ORDER.length - 1 && Math.random() < REACH_UP_CHANCE) {
       return BAND_ORDER[idx + 1];
     }
-    return base;
+    return cur;
   }
 
   // Top 1–2 forces only, keyed to each one's current band hint pool.
   // Light (clarity >= 2) names the force; Shadow (clarity <= -2) renders it opaque.
   getActiveHints(max = 2, clarity = 0): string[] {
-    const sorted = [...AFFINITY_IDS].sort((a, b) => this.state[b] - this.state[a]);
+    const sorted = [...AFFINITY_IDS].sort((a, b) => this.eff(b) - this.eff(a));
     const hints: string[] = [];
     for (const id of sorted.slice(0, max)) {
       const base = this.getHint(id);
@@ -198,23 +218,26 @@ export class AffinityEngine {
   getHint(id: AffinityId): string | null {
     const def = this.defById[id];
     if (!def) return null;
-    const pool = def.hints[bandOf(this.state[id])];
+    const pool = def.hints[bandOf(this.eff(id))];
     if (!pool || pool.length === 0) return null;
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
   getState(): Record<AffinityId, number> {
-    return { ...this.state };
+    return AFFINITY_IDS.reduce(
+      (acc, id) => ((acc[id] = this.eff(id)), acc),
+      {} as Record<AffinityId, number>,
+    );
   }
 
   setState(values: Partial<Record<AffinityId, number>>): void {
     for (const [id, val] of Object.entries(values)) {
-      if (typeof val === 'number') this.state[id as AffinityId] = this.clamp(val);
+      if (typeof val === 'number') this.base[id as AffinityId] = this.clamp(val);
     }
   }
 
   serialize(): string {
-    return JSON.stringify(this.state);
+    return JSON.stringify(this.base);
   }
 
   // Migration: any value <= 1 is an old 0–1 figure (×100); missing ids default to baseline.
@@ -223,9 +246,9 @@ export class AffinityEngine {
     for (const id of AFFINITY_IDS) {
       const v = parsed[id];
       if (typeof v === 'number') {
-        this.state[id] = this.clamp(v <= 1 ? v * 100 : v);
+        this.base[id] = this.clamp(v <= 1 ? v * 100 : v);
       } else {
-        this.state[id] = BASELINE;
+        this.base[id] = BASELINE;
       }
     }
   }

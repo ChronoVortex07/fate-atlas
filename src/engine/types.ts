@@ -15,6 +15,19 @@ export interface AffinityMandate {
   source: string;
 }
 
+// A run-scoped temporary modifier on the affinity reading. Phase 1 defines the
+// additive `surge`; Phase 3 will extend the union with an upheaval `transform`.
+export interface AffinitySurgeModifier {
+  id: string;
+  kind: 'surge';
+  deltas: Partial<Record<AffinityId, number>>;
+  readingsRemaining: number;
+  initialReadings: number;
+  source: string;
+}
+
+export type AffinityModifier = AffinitySurgeModifier;
+
 export type AffinityBand = 'latent' | 'stirring' | 'ascendant' | 'dominant';
 
 export interface AffinityState {

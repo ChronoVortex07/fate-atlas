@@ -53,6 +53,13 @@ describe('AffinityEngine.shift pipeline', () => {
     expect(Object.values(s)).toEqual([50, 50, 50, 50, 50, 50]);
   });
 
+  it('getBase returns the permanent values; with no surges effective equals base', () => {
+    const e = make();
+    e.setState({ chaos: 70 });
+    expect(e.getBase().chaos).toBe(70);
+    expect(e.getState().chaos).toBe(70); // effective == base when no modifiers
+  });
+
   it('a gain applies coupling: opposite -0.6g, others -0.35g (rounded, clamped)', () => {
     const e = make();
     noJitter(() => e.shift('chaos', 10, 'test')); // dr=1, jitter=1 → g=10
