@@ -44,6 +44,14 @@ export type AffinityModifier = AffinitySurgeModifier | AffinityTransformModifier
 
 export type AffinityBand = 'latent' | 'stirring' | 'ascendant' | 'dominant';
 
+// ── Corruption (a predator from beyond the six affinities; not an AffinityId) ──
+export type CorruptionBand = 'dormant' | 'seeded' | 'spreading' | 'virulent' | 'pinnacle';
+
+export interface CorruptionSnapshot {
+  value: number;       // 0–100 scalar
+  band: CorruptionBand;
+}
+
 export interface AffinityState {
   id: AffinityId;
   value: number; // 0–100
