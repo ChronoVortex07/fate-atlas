@@ -7,7 +7,7 @@ import { TurnOrchestrator } from './TurnOrchestrator';
 import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
 import { AFFINITY_DEFINITIONS, defaultAffinityState, AFFINITY_IDS, BAND_ORDER } from '../data/affinities';
-import { RUPTURE_RESET, infectedCountForBand, INFECTION_GAIN_MULT, CORRUPTED_TAG, CORRUPTION_BANDS } from '../data/corruption';
+import { RUPTURE_RESET, infectedCountForBand, INFECTION_GAIN_MULT, CORRUPTED_TAG, CORRUPTION_BANDS, SIGHT_COST, LIE_OFFSET } from '../data/corruption';
 import { selectHappening, HAPPENING_GAP_CHANCE } from '../data/happenings';
 import { dispatch } from './events/EventDispatcher';
 import { buildAffinityResponders } from './responders/affinity';
@@ -55,6 +55,7 @@ export class GameEngine {
   private turnEffects: EffectReport[] = []; // per-turn accumulator of all reports (for RunRecord)
   private happeningOfferedThisTurn = false;
   private selectedMethodInfected = false;
+  private forbiddenSightUsedThisMinigame = false;
 
   constructor(minigamesPerTurn = 3) {
     this.minigamesPerTurn = minigamesPerTurn;
@@ -388,6 +389,7 @@ export class GameEngine {
   confirmSelection(): void {
     const pending = this.state.drawPhase?.pendingSelection;
     if (!pending) return;
+    this.forbiddenSightUsedThisMinigame = false; // each minigame allows one charged glimpse
     this.selectedMethodInfected = this.state.infectedMethods.includes(pending.finalIndex);
     this.state.selectedMethod = pending.method;
     this.state.activeSlotIndex = null;
@@ -941,6 +943,22 @@ export class GameEngine {
   declinePeek(): void {
     this.affinityEngine.applyAction('decline-peek');
     this.notify();
+  }
+
+  // Corruption's glimpse of the six forces. Charges corruption once per minigame,
+  // shows the true effective forces with exactly one (the lie) shifted by LIE_OFFSET,
+  // and never includes corruption itself. `rng` is injectable for tests.
+  useForbiddenSight(rng: () => number = Math.random): import('./types').ForbiddenGlimpse {
+    if (!this.forbiddenSightUsedThisMinigame) {
+      this.corruptionEngine.add(SIGHT_COST);
+      this.forbiddenSightUsedThisMinigame = true;
+    }
+    const forces = this.affinityEngine.getState(); // fresh effective vector (safe to mutate the copy)
+    const lieId = AFFINITY_IDS[Math.floor(rng() * AFFINITY_IDS.length)];
+    const dir = rng() < 0.5 ? -1 : 1;
+    forces[lieId] = Math.max(0, Math.min(100, forces[lieId] + dir * LIE_OFFSET));
+    this.notify();
+    return { forces, lieId };
   }
 
   private describeLeaning(preview?: SlotResult): string {
