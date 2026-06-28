@@ -98,4 +98,22 @@ describe('GameEngine corruption lifecycle', () => {
     expect(afterBase.chaos).toBeLessThan(100); // eroded — base was the real hoard
     expect(afterBase.order).toBe(20);           // untouched — base was never high
   });
+
+  it('resets hasIntruded when corruption starves to 0', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // suppress procs + seeding noise
+    const e = new GameEngine(3);
+    e.startTurn('self');
+    // Balanced world — no food, so corruption starves
+    e.loadState({ affinities: { chaos: 50, order: 50, fate: 50, will: 50, light: 50, shadow: 50 } });
+    // Set corruption at a low level near starvation and mark it as already intruded
+    e.setCorruption(8); // DECAY_RATE=8, one reading will hit 0
+    e.corruptionEngineForTest().markIntruded();
+    expect(e.corruptionEngineForTest().getHasIntruded()).toBe(true);
+
+    oneReading(e);
+
+    // After starving to 0, hasIntruded should reset for the next corruption event
+    expect(e.getState().corruption.value).toBe(0);
+    expect(e.corruptionEngineForTest().getHasIntruded()).toBe(false);
+  });
 });

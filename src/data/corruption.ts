@@ -67,6 +67,20 @@ export function rollInfectedCount(band: CorruptionBand, rng: () => number): numb
   }
 }
 
+export const NEAR_PINNACLE = 90; // force a guaranteed intrusion past here if none yet this event
+export const INTRUSION_PHRASES = [
+  'i see you counting them.',
+  'you keep feeding me.',
+  'there is so much of you here.',
+  'stop looking away.',
+  'i was here before the stars.',
+];
+// Virulent-only; low base, ramping toward the pinnacle.
+export function intrusionChance(value: number): number {
+  if (value < 67) return 0;
+  return 0.08 + ((value - 67) / (99 - 67)) * 0.25;
+}
+
 export const CORRUPTED_TAG = 'corrupted'; // marks a result the player can tell was tampered with
 
 export const SIGHT_COST = 6;   // corruption added on the first forbidden-sight use per minigame

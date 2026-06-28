@@ -7,7 +7,7 @@ import { TurnOrchestrator } from './TurnOrchestrator';
 import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
 import { AFFINITY_DEFINITIONS, defaultAffinityState, AFFINITY_IDS, BAND_ORDER } from '../data/affinities';
-import { RUPTURE_RESET, rollInfectedCount, INFECTION_GAIN_MULT, CORRUPTED_TAG, CORRUPTION_BANDS, SIGHT_COST, LIE_OFFSET } from '../data/corruption';
+import { RUPTURE_RESET, rollInfectedCount, INFECTION_GAIN_MULT, CORRUPTED_TAG, CORRUPTION_BANDS, SIGHT_COST, LIE_OFFSET, NEAR_PINNACLE, INTRUSION_PHRASES, intrusionChance } from '../data/corruption';
 import { corruptionTextLevel, corruptSynthesis, corruptText } from './CorruptionGlitch';
 import { selectHappening, HAPPENING_GAP_CHANCE } from '../data/happenings';
 import { dispatch } from './events/EventDispatcher';
@@ -85,6 +85,7 @@ export class GameEngine {
       availableMethods: [],
       shroudedMethods: [],
       infectedMethods: [],
+      intrusion: null,
       drawPhase: null,
       selectedMethod: null,
       turnResults: [],
@@ -162,6 +163,7 @@ export class GameEngine {
 
   getReadingPlanner(): ReadingPlanner { return this.readingPlanner; }
   getNarrativeAssembler(): NarrativeAssembler { return this.narrativeAssembler; }
+  corruptionEngineForTest(): CorruptionEngine { return this.corruptionEngine; }
 
   /**
    * Compute a synthesis preview without consuming template rotation state.
@@ -391,6 +393,7 @@ export class GameEngine {
     const pending = this.state.drawPhase?.pendingSelection;
     if (!pending) return;
     this.forbiddenSightUsedThisMinigame = false; // each minigame allows one charged glimpse
+    this.state.intrusion = null; // clear any stale intrusion from the previous reading
     this.selectedMethodInfected = this.state.infectedMethods.includes(pending.finalIndex);
     this.state.selectedMethod = pending.method;
     this.state.activeSlotIndex = null;
@@ -561,6 +564,7 @@ export class GameEngine {
     this.affinityEngine.decayMandate();
     this.affinityEngine.tickModifiers(); // decay/expire surges once per completed reading
     this.applyCorruptionTick();
+    this.maybeIntrude(); // B6 inserts a rupture guard above this call
     this.peekOverrideThisReading = null; // peek override lasts exactly one reading
 
     // Final reading?
@@ -610,6 +614,26 @@ export class GameEngine {
     this.selectedMethodInfected = false; // applies to exactly one reading
     if (Object.keys(tick.drains).length > 0) this.affinityEngine.erode(tick.drains);
     if (tick.ruptured) this.performRupture();
+  }
+
+  // Surfaces a transient phantom intrusion line at virulent+, with a once-per-corruption-event
+  // guarantee: forced if the event hasn't produced one yet and value >= NEAR_PINNACLE.
+  // B6 will insert a rupture guard ABOVE this call in advanceAfterCommit.
+  private maybeIntrude(rng: () => number = Math.random): void {
+    const band = this.corruptionEngine.getBand();
+    if (band !== 'virulent' && band !== 'pinnacle') return;
+    const value = this.corruptionEngine.getValue();
+    const forced = !this.corruptionEngine.getHasIntruded() && value >= NEAR_PINNACLE;
+    if (!forced && rng() >= intrusionChance(value)) return;
+    const text = INTRUSION_PHRASES[Math.floor(rng() * INTRUSION_PHRASES.length)];
+    this.state.intrusion = { text };
+    this.corruptionEngine.markIntruded();
+  }
+
+  clearIntrusion(): void {
+    if (!this.state.intrusion) return;
+    this.state.intrusion = null;
+    this.notify();
   }
 
   // The Rupture: reality tears, the world re-forms low, and corruption vanishes
