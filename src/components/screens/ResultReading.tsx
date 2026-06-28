@@ -46,7 +46,7 @@ export default function ResultReading() {
 
   return (
     <motion.div style={containerStyle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }}>
-      <div ref={shareRef} data-share-container style={cardStyle} className={corrupted ? 'cx-results' : undefined}>
+      <div ref={shareRef} data-share-container style={corrupted ? { ...cardStyle, position: 'relative', overflow: 'hidden' } : cardStyle} className={corrupted ? 'cx-results' : undefined}>
         {corrupted && <>
           <div className="cx-scan"/>
           <div className="cx-vignette"/>
@@ -140,8 +140,6 @@ const cardStyle: React.CSSProperties = {
   background: '#070a12',
   border: '1px solid #1a2440',
   borderRadius: '8px',
-  position: 'relative',
-  overflow: 'hidden',
 };
 
 const titleStyle: React.CSSProperties = {
