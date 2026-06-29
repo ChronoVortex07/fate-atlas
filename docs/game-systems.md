@@ -469,7 +469,7 @@ At `virulent` or `pinnacle` band, a subset of tile sigils receive the `.cx-sig` 
 
 The `GlitchText` renderer (in `ResultReading.tsx`) consumes `state.synthesisSegments` (the `CorruptedSynthesis` built by `corruptSynthesisSegments` — see §4 "Reading falsification"). Segments styled `hot` or `ca-fast` are the "loudest" corruption words (white-hot glow / fast chromatic pulse, see the §4 level table). At virulent+ these segments additionally receive live **word-swap** animation: the word alternates between the original text (`.cx-v0`) and a garbled variant (`.cx-v1`, produced by `garbleWord` — injecting Unicode combining-strikethrough characters at every third character). Three phase lanes (`a`, `b`, `c`, cycling `swapN % 3`) stagger the swaps so they don't all flip in sync. The word is always readable between swaps; the dread comes from catching it mid-change.
 
-> This word-swap layer is applied **only in the live UI** — the LLM prompt (`generateLLMPrompt`) receives the pre-garble `segmentsToText` version, and the share image (below) is a static frozen snapshot taken before any swap animation.
+> This word-swap layer is applied **only in the live UI** — the LLM prompt (`generateLLMPrompt`) receives the pre-garble `segmentsToText` version, and the share image (below) is a static frame — the `ShareCard` renders no animation classes, so no swap or aberration effects appear in the captured image.
 
 #### 4:5 share image (clean + frozen corrupted variant)
 
