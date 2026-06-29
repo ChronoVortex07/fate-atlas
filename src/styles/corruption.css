@@ -405,3 +405,55 @@
 /* ── taunt lead-in: Light's cut-off line that precedes corruption's taunt ── */
 .cx-intrusion .cx-lead{display:block;font-style:italic;font-weight:500;color:#dfe8ff;text-shadow:0 0 6px #9fc0ff66;opacity:.85;margin-bottom:.5rem;font-size:clamp(1.05rem,3.4vw,1.4rem);animation:cx-lead-in 2.4s ease-out forwards}
 @keyframes cx-lead-in{0%{opacity:0}10%{opacity:.9}55%{opacity:.9}70%{opacity:.25}100%{opacity:0}}
+
+/* ════════ Light's WARD SEAL (overlay on a tainted method card) ════════ */
+.cx-ward{position:absolute;inset:0;z-index:3;pointer-events:none;border-radius:8px;overflow:visible}
+
+/* gestating embryo, revealed behind the seal */
+.cx-emb{position:absolute;top:46%;left:50%;width:62%;height:46%;transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(circle,#ff5a6e 0%,#ff2d4a 26%,#c20f2255 50%,transparent 72%);
+  filter:drop-shadow(0 0 12px #ff2d4a88);animation:cx-emb-beat 2s ease-in-out infinite}
+@keyframes cx-emb-beat{0%,100%{transform:translate(-50%,-50%) scale(.8);opacity:.7}16%{transform:translate(-50%,-50%) scale(1.02);opacity:1}30%{transform:translate(-50%,-50%) scale(.9);opacity:.82}48%{transform:translate(-50%,-50%) scale(1.06);opacity:1}64%{transform:translate(-50%,-50%) scale(.82);opacity:.72}}
+.cx-emb-nucleus{position:absolute;top:46%;left:50%;width:13px;height:13px;transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(circle,#fff 0%,#ffd2d8 35%,#ff2d4a 70%,transparent 100%);filter:drop-shadow(0 0 6px #fff);animation:cx-emb-beat 2s ease-in-out infinite}
+.cx-emb-tendril{position:absolute;top:46%;left:50%;width:2px;height:40%;background:linear-gradient(#ff2d4abb,transparent);transform-origin:top center;opacity:.45}
+.cx-emb-tendril.t1{transform:translate(-50%,0) rotate(28deg);animation:cx-emb-writhe 3.6s ease-in-out infinite}
+.cx-emb-tendril.t2{transform:translate(-50%,0) rotate(150deg);animation:cx-emb-writhe 4.1s ease-in-out infinite .5s}
+.cx-emb-tendril.t3{transform:translate(-50%,0) rotate(250deg);animation:cx-emb-writhe 3.2s ease-in-out infinite .9s}
+@keyframes cx-emb-writhe{0%,100%{opacity:.3}50%{opacity:.6}}
+
+/* the warded pane: frame + lattice + sheen + scattered runes + central lock */
+.cx-ward-frame{position:absolute;inset:5px;border:1.5px solid #cfe0ff;border-radius:6px;opacity:.7;box-shadow:inset 0 0 14px #cfe0ff22}
+.cx-ward-lattice{position:absolute;inset:5px;border-radius:6px;opacity:.16;background:repeating-linear-gradient(45deg,#cfe0ff 0 1px,transparent 1px 13px),repeating-linear-gradient(-45deg,#cfe0ff 0 1px,transparent 1px 13px)}
+.cx-ward-sheen{position:absolute;top:-30%;left:-50%;width:55%;height:170%;transform:rotate(12deg);background:linear-gradient(100deg,transparent,#dce9ff44,transparent);animation:cx-ward-sheen 5s ease-in-out infinite}
+@keyframes cx-ward-sheen{0%,72%,100%{left:-50%;opacity:0}80%{opacity:.8}92%{left:130%;opacity:0}}
+.cx-ward-rune{position:absolute;color:#eef5ff;font-size:.85rem;text-shadow:0 0 6px #cfe0ffaa;opacity:.82}
+.cx-ward-ring{position:absolute;top:46%;left:50%;width:62%;height:44%;transform:translate(-50%,-50%);border-radius:50%;border:1px dashed #aebfe6;opacity:.45;animation:cx-ward-spin 18s linear infinite}
+@keyframes cx-ward-spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+.cx-ward-lock{position:absolute;top:46%;left:50%;width:30px;height:30px;transform:translate(-50%,-50%);border-radius:50%;border:1.5px solid #cfe0ff;box-shadow:0 0 9px #cfe0ff77,inset 0 0 8px #cfe0ff44;display:flex;align-items:center;justify-content:center;background:repeating-conic-gradient(from 0deg,#cfe0ff1f 0 7deg,transparent 7deg 20deg)}
+.cx-ward-lock span{font-size:1.1rem;color:#fff;text-shadow:0 0 8px #cfe0ff}
+
+/* STRAIN (late spreading → early virulent): barrier flickers, embryo swells, cracks */
+.cx-ward-strain .cx-emb,.cx-ward-strain .cx-emb-nucleus{animation:cx-emb-strain 1.15s ease-in-out infinite}
+@keyframes cx-emb-strain{0%,100%{transform:translate(-50%,-50%) scale(.92);opacity:.85}20%{transform:translate(-50%,-50%) scale(1.22);opacity:1}40%{transform:translate(-50%,-50%) scale(1.0);opacity:.9}60%{transform:translate(-50%,-50%) scale(1.28);opacity:1}}
+.cx-ward-strain .cx-ward-frame{animation:cx-ward-flick 3.4s steps(1) infinite;border-color:#e9d3a0}
+@keyframes cx-ward-flick{0%,58%,100%{opacity:.85}60%{opacity:.25}63%{opacity:.85}74%{opacity:.4}76%{opacity:.85}88%{opacity:.25}90%{opacity:.85}}
+.cx-ward-strain .cx-ward-rune{animation:cx-ward-runered 2.2s steps(1) infinite}
+@keyframes cx-ward-runered{0%,70%,100%{color:#eef5ff;text-shadow:0 0 6px #cfe0ffaa;transform:translate(0,0)}74%{color:#ff5a6e;text-shadow:0 0 9px #ff2d4a;transform:translate(1px,-1px)}80%{color:#eef5ff}86%{color:#ff2d4a;transform:translate(-1px,0)}}
+.cx-ward-crack{position:absolute;top:46%;left:50%;width:1.6px;height:0;background:linear-gradient(#ff5a6e,transparent);transform-origin:top center;filter:drop-shadow(0 0 3px #ff2d4a)}
+.cx-ward-strain .cx-ward-crack.c1{transform:translate(-50%,0) rotate(40deg);animation:cx-ward-crackgrow 2.3s ease-out infinite}
+.cx-ward-strain .cx-ward-crack.c2{transform:translate(-50%,0) rotate(155deg);animation:cx-ward-crackgrow 2.3s ease-out infinite .7s}
+.cx-ward-strain .cx-ward-crack.c3{transform:translate(-50%,0) rotate(265deg);animation:cx-ward-crackgrow 2.3s ease-out infinite 1.4s}
+.cx-ward-strain .cx-ward-crack.c4{transform:translate(-50%,0) rotate(330deg);animation:cx-ward-crackgrow 2.3s ease-out infinite 1.9s}
+@keyframes cx-ward-crackgrow{0%,55%{height:0;opacity:0}60%{opacity:1}100%{height:70%;opacity:0}}
+
+/* SHATTER one-shot (plays once as the seal breaks at the hijack) */
+.cx-ward-shatter{position:absolute;inset:0;z-index:4;pointer-events:none}
+.cx-shard{position:absolute;top:50%;left:50%;width:22px;height:3px;background:linear-gradient(90deg,#cfe0ff,transparent);border-radius:2px;opacity:0}
+.cx-shard.s1{--a:20deg;animation:cx-shard-fly 1.1s ease-out forwards}
+.cx-shard.s2{--a:75deg;animation:cx-shard-fly 1.1s ease-out forwards .03s}
+.cx-shard.s3{--a:140deg;animation:cx-shard-fly 1.1s ease-out forwards .06s}
+.cx-shard.s4{--a:205deg;animation:cx-shard-fly 1.1s ease-out forwards .02s}
+.cx-shard.s5{--a:270deg;animation:cx-shard-fly 1.1s ease-out forwards .05s}
+.cx-shard.s6{--a:325deg;animation:cx-shard-fly 1.1s ease-out forwards .08s}
+@keyframes cx-shard-fly{0%{opacity:0;transform:translate(-50%,-50%) rotate(var(--a)) translateX(0)}15%{opacity:.95;transform:translate(-50%,-50%) rotate(var(--a)) translateX(10px)}100%{opacity:0;transform:translate(-50%,-50%) rotate(var(--a)) translateX(90px)}}
