@@ -19,7 +19,9 @@ import { InteractionFocusProvider } from '../../context/InteractionFocusContext'
 import { AnchorProvider } from '../../context/AnchorRegistry';
 import ParticleField from '../overlays/ParticleField';
 import CorruptionRift from '../overlays/corruption/CorruptionRift';
+import RuptureInterstitial from './RuptureInterstitial';
 import ForceRadarOverlay from '../overlays/corruption/ForceRadarOverlay';
+import IntrusionOverlay from '../overlays/corruption/IntrusionOverlay';
 import type { ForbiddenGlimpse } from '../../engine/types';
 
 export default function GameTable() {
@@ -27,7 +29,7 @@ export default function GameTable() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [glimpse, setGlimpse] = useState<ForbiddenGlimpse | null>(null);
 
-  const showTableau = state.screen !== 'title' && state.screen !== 'question' && state.screen !== 'result';
+  const showTableau = state.screen !== 'title' && state.screen !== 'question' && state.screen !== 'result' && state.screen !== 'rupture';
 
   const renderCenter = () => {
     switch (state.screen) {
@@ -43,6 +45,8 @@ export default function GameTable() {
         return <HappeningScene key="happening" />;
       case 'result':
         return <ResultReading key="result" />;
+      case 'rupture':
+        return <RuptureInterstitial key="rupture" />;
       default:
         return null;
     }
@@ -109,6 +113,7 @@ export default function GameTable() {
         <CorruptionRift onSummon={() => setGlimpse(engine.useForbiddenSight())} />
       )}
       {glimpse && <ForceRadarOverlay glimpse={glimpse} onDismiss={() => setGlimpse(null)} />}
+      <IntrusionOverlay />
       <ParticleField />
     </div>
     </AnchorProvider>

@@ -367,17 +367,17 @@ describe('spread coherence feeds', () => {
     e.completeMinigame(spread, { revealedAsDrawn: true });
     Math.random = orig;
     // With coherence feed: expected Order = 58 (tag +5 → cap truncation → coherence capped → Fate coupling).
-    // Recomputed with new constants: COUPLING_OPPOSITE=0.35, COUPLING_OTHER=0.15, DR_STEP=0.05, DR_FLOOR=0.5.
+    // Recomputed with new constants: COUPLING_OPPOSITE=0.35, COUPLING_OTHER=0.09, DR_STEP=0.05, DR_FLOOR=0.67.
     // FORTUNE_TAG_CAP=8. Math.random=0.99, jitter=0.85+0.99*0.30=1.147.
     // Step 1: feedFortuneTag('order',5): fortuneTagFeedThisRun=0→5, allowed=5; shift('order',5):
     //   dr=1.0, gain=5*1.0*1.147=5.735 → order=round(50+5.735)=56.
-    //   chaos=round(50-5.735*0.35)=round(47.993)=48. others=round(50-5.735*0.15)=round(49.14)=49.
+    //   chaos=round(50-5.735*0.35)=round(47.993)=48. others=round(50-5.735*0.09)=round(49.484)=49.
     // Step 2: feedFortuneTag('order',6,'spread-aligned'): fortuneTagFeedThisRun=5, remaining=3, allowed=3;
     //   shift('order',3): dr=0.95 (feedsThisRun[order]=1), gain=3*0.95*1.147=3.269 → order=round(56+3.269)=59.
-    //   chaos=round(48-3.269*0.35)=round(46.856)=47. fate/will/light/shadow=round(49-0.490)=49.
+    //   chaos=round(48-3.269*0.35)=round(46.856)=47. fate/will/light/shadow=round(59-3.269*0.09)=round(49-0.294)=49.
     // Step 3: shift('fate',6) reveal-as-drawn: dr=1.0, gain=6.882 → fate=round(49+6.882)=56.
     //   will(opp)=round(49-6.882*0.35)=round(46.591)=47.
-    //   order=round(59-6.882*0.15)=round(59-1.032)=round(57.968)=58.
+    //   order=round(59-6.882*0.09)=round(59-0.619)=round(58.381)=58.
     // Without coherence feed: Order would be 55.
     expect(e.getState().affinities.order).toBe(58);
   });
@@ -394,17 +394,17 @@ describe('spread coherence feeds', () => {
     e.completeMinigame(spread, { revealedAsDrawn: true });
     Math.random = orig;
     // With coherence feed: expected Chaos = 58 (tag +5 → cap truncation → coherence capped → Fate coupling).
-    // Recomputed with new constants: COUPLING_OPPOSITE=0.35, COUPLING_OTHER=0.15, DR_STEP=0.05, DR_FLOOR=0.5.
+    // Recomputed with new constants: COUPLING_OPPOSITE=0.35, COUPLING_OTHER=0.09, DR_STEP=0.05, DR_FLOOR=0.67.
     // FORTUNE_TAG_CAP=8. Math.random=0.99, jitter=0.85+0.99*0.30=1.147.
     // Step 1: feedFortuneTag('chaos',5): fortuneTagFeedThisRun=0→5, allowed=5; shift('chaos',5):
     //   dr=1.0, gain=5*1.0*1.147=5.735 → chaos=round(50+5.735)=56.
-    //   order=round(50-5.735*0.35)=round(47.993)=48. others=round(50-5.735*0.15)=round(49.14)=49.
+    //   order=round(50-5.735*0.35)=round(47.993)=48. others=round(50-5.735*0.09)=round(49.484)=49.
     // Step 2: feedFortuneTag('chaos',6,'spread-cascade'): fortuneTagFeedThisRun=5, remaining=3, allowed=3;
     //   shift('chaos',3): dr=0.95 (feedsThisRun[chaos]=1), gain=3*0.95*1.147=3.269 → chaos=round(56+3.269)=59.
-    //   order=round(48-3.269*0.35)=round(46.856)=47. fate/will/light/shadow=round(49-0.490)=49.
+    //   order=round(48-3.269*0.35)=round(46.856)=47. fate/will/light/shadow=round(49-3.269*0.09)=round(49-0.294)=49.
     // Step 3: shift('fate',6) reveal-as-drawn: dr=1.0, gain=6.882 → fate=round(49+6.882)=56.
     //   will(opp)=round(49-6.882*0.35)=round(46.591)=47.
-    //   chaos=round(59-6.882*0.15)=round(59-1.032)=round(57.968)=58.
+    //   chaos=round(59-6.882*0.09)=round(59-0.619)=round(58.381)=58.
     // Without coherence feed: Chaos would be 55.
     expect(e.getState().affinities.chaos).toBe(58);
   });
@@ -421,10 +421,10 @@ describe('spread coherence feeds', () => {
     e.completeMinigame(spread, { revealedAsDrawn: true });
     Math.random = orig;
     // Mixed spread: Order should NOT benefit from the extra +6 coherence.
-    // Recomputed with new constants: COUPLING_OPPOSITE=0.35, COUPLING_OTHER=0.15, DR_STEP=0.05, DR_FLOOR=0.5.
+    // Recomputed with new constants: COUPLING_OPPOSITE=0.35, COUPLING_OTHER=0.09, DR_STEP=0.05, DR_FLOOR=0.67.
     // Step 1: feedFortuneTag('order',5): dr=1.0, jitter=1.147, gain=5.735 → order=56.
     // Step 2: no coherence (mixed orientation).
-    // Step 3: shift('fate',6) reveal-as-drawn: dr=1.0, gain=6.882 → order -= 6.882*0.15=1.032 → order=round(54.97)=55.
+    // Step 3: shift('fate',6) reveal-as-drawn: dr=1.0, gain=6.882 → order -= 6.882*0.09=0.619 → order=round(55.381)=55.
     // Tag feed gives Order ~5; no Chaos coupling from 'random' (removed); no coherence.
     // ('random' no longer feeds Chaos, so Order gains back the coupling penalty it used to take.)
     expect(e.getState().affinities.order).toBe(55);

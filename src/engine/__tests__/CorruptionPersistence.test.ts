@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GameEngine } from '../GameEngine';
+import { CorruptionEngine } from '../CorruptionEngine';
 
 beforeEach(() => localStorage.clear());
 
@@ -41,4 +42,12 @@ describe('corruption persistence', () => {
     e.clearHistory();
     expect(e.getState().corruption.value).toBe(0);
   });
+});
+
+it('persists hasIntruded and resets it on clear', () => {
+  const e = new CorruptionEngine(); e.setValue(80); e.markIntruded();
+  const e2 = new CorruptionEngine(); e2.loadFrom(e.serialize());
+  expect(e2.getHasIntruded()).toBe(true);
+  e2.clear();
+  expect(e2.getHasIntruded()).toBe(false);
 });

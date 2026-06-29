@@ -7,7 +7,8 @@ import { TurnOrchestrator } from './TurnOrchestrator';
 import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
 import { AFFINITY_DEFINITIONS, defaultAffinityState, AFFINITY_IDS, BAND_ORDER } from '../data/affinities';
-import { RUPTURE_RESET, infectedCountForBand, INFECTION_GAIN_MULT, CORRUPTED_TAG, CORRUPTION_BANDS, SIGHT_COST, LIE_OFFSET } from '../data/corruption';
+import { RUPTURE_RESET, rollInfectedCount, INFECTION_GAIN_MULT, CORRUPTED_TAG, CORRUPTION_BANDS, SIGHT_COST, LIE_OFFSET, NEAR_PINNACLE, INTRUSION_PHRASES, intrusionChance, isVisibleCorruption } from '../data/corruption';
+import { corruptionTextLevel, corruptSynthesis, corruptText } from './CorruptionGlitch';
 import { selectHappening, HAPPENING_GAP_CHANCE } from '../data/happenings';
 import { dispatch } from './events/EventDispatcher';
 import { buildAffinityResponders } from './responders/affinity';
@@ -52,6 +53,7 @@ export class GameEngine {
   private minigamesPerTurn: number;
   private pendingTransition: (() => void) | null = null;
   private pendingAdvance: (() => void) | null = null;
+  private pendingRupture = false;
   private turnEffects: EffectReport[] = []; // per-turn accumulator of all reports (for RunRecord)
   private happeningOfferedThisTurn = false;
   private selectedMethodInfected = false;
@@ -84,6 +86,7 @@ export class GameEngine {
       availableMethods: [],
       shroudedMethods: [],
       infectedMethods: [],
+      intrusion: null,
       drawPhase: null,
       selectedMethod: null,
       turnResults: [],
@@ -161,6 +164,7 @@ export class GameEngine {
 
   getReadingPlanner(): ReadingPlanner { return this.readingPlanner; }
   getNarrativeAssembler(): NarrativeAssembler { return this.narrativeAssembler; }
+  corruptionEngineForTest(): CorruptionEngine { return this.corruptionEngine; }
 
   /**
    * Compute a synthesis preview without consuming template rotation state.
@@ -256,7 +260,7 @@ export class GameEngine {
   // Pick which offered methods corruption taints this draw — count scales with the
   // corruption band; indices are distinct and within the pool.
   private rollInfectedMethods(poolSize: number): number[] {
-    const count = Math.min(poolSize, infectedCountForBand(this.corruptionEngine.getBand()));
+    const count = Math.min(poolSize, rollInfectedCount(this.corruptionEngine.getBand(), Math.random));
     if (count <= 0) return [];
     const chosen: number[] = [];
     while (chosen.length < count) {
@@ -390,6 +394,7 @@ export class GameEngine {
     const pending = this.state.drawPhase?.pendingSelection;
     if (!pending) return;
     this.forbiddenSightUsedThisMinigame = false; // each minigame allows one charged glimpse
+    this.state.intrusion = null; // clear any stale intrusion from the previous reading
     this.selectedMethodInfected = this.state.infectedMethods.includes(pending.finalIndex);
     this.state.selectedMethod = pending.method;
     this.state.activeSlotIndex = null;
@@ -560,6 +565,17 @@ export class GameEngine {
     this.affinityEngine.decayMandate();
     this.affinityEngine.tickModifiers(); // decay/expire surges once per completed reading
     this.applyCorruptionTick();
+    // Rupture guard: if performRupture fired this tick, route to the interstitial
+    // screen BEFORE maybeIntrude (so a rupturing turn does not also intrude) and
+    // BEFORE the final-reading guard (the turn ends here regardless of completed count).
+    if (this.pendingRupture) {
+      this.pendingRupture = false;
+      this.state.screen = 'rupture';
+      this.saveToStorage();
+      this.notify();
+      return;
+    }
+    this.maybeIntrude();
     this.peekOverrideThisReading = null; // peek override lasts exactly one reading
 
     // Final reading?
@@ -611,8 +627,37 @@ export class GameEngine {
     if (tick.ruptured) this.performRupture();
   }
 
+  // Surfaces a transient phantom intrusion line at virulent+, with a once-per-corruption-event
+  // guarantee: forced if the event hasn't produced one yet and value >= NEAR_PINNACLE.
+  // B6 will insert a rupture guard ABOVE this call in advanceAfterCommit.
+  private maybeIntrude(rng: () => number = Math.random): void {
+    const band = this.corruptionEngine.getBand();
+    if (band !== 'virulent' && band !== 'pinnacle') return;
+    const value = this.corruptionEngine.getValue();
+    const forced = !this.corruptionEngine.getHasIntruded() && value >= NEAR_PINNACLE;
+    if (!forced && rng() >= intrusionChance(value)) return;
+    const text = INTRUSION_PHRASES[Math.floor(rng() * INTRUSION_PHRASES.length)];
+    this.state.intrusion = { text };
+    this.corruptionEngine.markIntruded();
+  }
+
+  clearIntrusion(): void {
+    if (!this.state.intrusion) return;
+    this.state.intrusion = null;
+    this.notify();
+  }
+
+  // Called by the UI when the rupture interstitial animation ends. Delegates to
+  // returnToTitle() which resets turn state, preserves carryover (affinities/
+  // history/usedHappeningIds — already scrubbed/reset by performRupture), and
+  // sets screen='title'. Confirmed safe: returnToTitle does no extra flows.
+  completeRupture(): void {
+    this.returnToTitle();
+  }
+
   // The Rupture: reality tears, the world re-forms low, and corruption vanishes
-  // without a trace. (The between-worlds interstitial is UI, handled in a later plan.)
+  // without a trace. History records marked corrupted are scrubbed — no trace.
+  // Sets pendingRupture so advanceAfterCommit routes to the 'rupture' interstitial.
   private performRupture(): void {
     const reset = AFFINITY_IDS.reduce(
       (acc, id) => ((acc[id] = RUPTURE_RESET), acc),
@@ -621,6 +666,8 @@ export class GameEngine {
     this.affinityEngine.setState(reset);
     this.affinityEngine.clearModifiers();
     this.corruptionEngine.clear();
+    this.state.history = this.state.history.filter((r) => !r.corrupted); // scrub — no trace
+    this.pendingRupture = true;
     this.bus.emit('corruption-ruptured', {});
   }
 
@@ -655,6 +702,7 @@ export class GameEngine {
       synthesis: this.state.synthesis!,
       happening: this.state.happening ?? undefined,
       happeningChoice: this.state.selectedHappeningChoice ?? undefined,
+      corrupted: isVisibleCorruption(this.corruptionEngine.getBand()),
     };
     this.state.history = [...this.state.history, run].slice(-10);
   }
@@ -676,7 +724,11 @@ export class GameEngine {
     );
 
     this.state.synthesis = synthesisResult;
-    this.bus.emit('synthesis-complete', { result: synthesisResult });
+    const cLevel = corruptionTextLevel(this.corruptionEngine.getBand(), this.corruptionEngine.getValue());
+    if (cLevel > 0) {
+      this.state.synthesis = corruptSynthesis(this.state.synthesis, cLevel, Math.random);
+    }
+    this.bus.emit('synthesis-complete', { result: this.state.synthesis });
   }
 
   // Decoupled cadence: at most one happening per turn, in a between-reading gap,
@@ -1515,13 +1567,15 @@ export class GameEngine {
     const affinities = this.affinityEngine.getState();
     const aggregated = this.readingPlanner.aggregate(results, question);
 
-    return this.narrativeAssembler.generateLLMPrompt({
+    const prompt = this.narrativeAssembler.generateLLMPrompt({
       question,
       slots: results,
       effects: this.turnEffects,
       affinities,
       aggregated,
     });
+    const lvl = corruptionTextLevel(this.corruptionEngine.getBand(), this.corruptionEngine.getValue());
+    return lvl > 0 ? corruptText(prompt, lvl, Math.random) : prompt;
   }
 
   // ---------- Subscription ----------
@@ -1581,6 +1635,7 @@ export class GameEngine {
     this.usedHappeningIds = new Set(saved.usedHappeningIds);
     this.peekOverrideThisReading = null;
     this.pendingEmergentUpheaval = null;
+    this.pendingRupture = false;
     this.happeningOfferedThisTurn = false;
     this.selectedMethodInfected = false;
     this.bus.clear();
@@ -1607,6 +1662,7 @@ export class GameEngine {
     this.usedHappeningIds = new Set(usedIds);
     this.peekOverrideThisReading = null;
     this.pendingEmergentUpheaval = null;
+    this.pendingRupture = false;
     this.happeningOfferedThisTurn = false;
     this.selectedMethodInfected = false;
     this.bus.clear();

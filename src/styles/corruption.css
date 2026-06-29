@@ -27,3 +27,346 @@
 @keyframes cx-fk { 0%{opacity:0} 10%{opacity:1} 30%{opacity:.4} 48%{opacity:.95} 66%{opacity:0} 100%{opacity:0} }
 .cx-tk1{animation:cx-tw 2.4s steps(1) infinite}.cx-tk2{animation:cx-tw 3.0s steps(1) infinite}.cx-tk3{animation:cx-tw 2.0s steps(1) infinite}.cx-tk4{animation:cx-tw 3.4s steps(1) infinite}
 @keyframes cx-tw { 0%,45%,100%{opacity:0} 52%{opacity:1} 62%{opacity:.3} 72%{opacity:.9} 82%{opacity:0} }
+
+/* ───────────────────────── Phase 3 corruption presentation ───────────────────────── */
+:root{ --cx-red:#ff2d4a; --cx-red-deep:#c20f22; --cx-void:#07010c; --cx-pink:#ffb3bc; }
+
+/* shared chromatic = red↔void tear (never cyan) */
+@keyframes cx-capulse{0%,82%,100%{text-shadow:none}87%{text-shadow:-1px 0 var(--cx-red),1px 0 #1a0006}92%{text-shadow:.8px 0 var(--cx-red-deep),-.8px 0 var(--cx-void)}}
+
+/* ── selection-screen telegraph (apply to a method card root) ── */
+.cx-card-spreading{border-color:#5a2230 !important;box-shadow:0 6px 18px #00000055,0 0 12px #ff2d4a22}
+.cx-card-spreading .cx-name{animation:cx-capulse 4.6s ease-in-out infinite}
+.cx-card-virulent{border-color:var(--cx-red) !important;box-shadow:0 6px 18px #00000066,0 0 18px #ff2d4a55,inset 0 0 22px #ff2d4a22}
+.cx-card-virulent .cx-name{color:#fff;text-shadow:0 0 7px var(--cx-red);animation:cx-capulse 2.4s ease-in-out infinite}
+.cx-card-virulent .cx-glyph{color:#ff8a98;animation:cx-capulse 2.4s ease-in-out infinite, cx-jitter 3.7s steps(1) infinite}
+@keyframes cx-jitter{0%,90%,100%{transform:translate(0,0)}91%{transform:translate(-2px,1px)}93%{transform:translate(2px,-1px)}95%{transform:translate(-1px,0)}}
+.cx-scanlines{position:absolute;inset:0;pointer-events:none;opacity:.1;background:repeating-linear-gradient(0deg,var(--cx-red) 0 1px,transparent 1px 4px)}
+.cx-mosh{position:absolute;left:0;right:0;background:var(--cx-red);opacity:0;pointer-events:none}
+.cx-mosh.m1{top:24%;height:3px;animation:cx-mq 3.4s steps(1) infinite}
+.cx-mosh.m2{top:47%;height:5px;animation:cx-mq 4.1s steps(1) infinite .7s}
+.cx-mosh.m3{top:70%;height:2px;animation:cx-mq 2.9s steps(1) infinite 1.3s}
+@keyframes cx-mq{0%,38%,100%{opacity:0}39%{opacity:.6;transform:translateX(-5px)}42%{opacity:0}60%{opacity:.4;transform:translateX(4px)}63%{opacity:0}}
+
+/* ── corrupted card ascension (fake gold bloom → quick GPU-artifact tear) ──
+   See corrupted-ascend-v8.html for the full slice markup the component emits. */
+.cx-ca-root{position:relative;border-radius:11px;animation:cx-ca-ascend 3.0s ease-in-out forwards}
+@keyframes cx-ca-ascend{
+  0%,14%{transform:translateY(0) scale(1);box-shadow:0 6px 18px #00000055}
+  44%{transform:translateY(-46px) scale(1.06);box-shadow:0 0 30px 5px rgba(212,168,84,.6)}
+  53%{transform:translateY(-46px) scale(1.06);box-shadow:0 0 36px 7px rgba(212,168,84,.72)}
+  58%{transform:translateY(-46px) scale(1.05);box-shadow:0 0 24px 4px rgba(255,45,74,.5)}
+  72%{transform:translateY(-50px) scale(1.03);box-shadow:0 0 0 rgba(0,0,0,0)}
+  100%{transform:translateY(-50px) scale(1.03);opacity:0}
+}
+.cx-ca-base{animation:cx-ca-basedie 3.0s linear forwards}
+@keyframes cx-ca-basedie{0%,55%{opacity:1}59%{opacity:.12}62%{opacity:0}100%{opacity:0}}
+.cx-ca-slice{opacity:0;animation:cx-ca-tear 3.0s steps(1) forwards}
+@keyframes cx-ca-tear{0%,55%{opacity:0;transform:translateX(0)}57%{opacity:1;transform:translateX(var(--dx))}62%{transform:translateX(calc(var(--dx)*-0.6))}66%{opacity:.9;transform:translateX(calc(var(--dx)*1.2))}70%{opacity:1;transform:translateX(calc(var(--dx)*-0.5))}72%{opacity:0}100%{opacity:0}}
+.cx-ca-slice.dis::after{content:'';position:absolute;inset:0;background:var(--cx-red);mix-blend-mode:multiply;opacity:.5;pointer-events:none} /* discolour only some slices */
+
+/* ── results-screen overlay (Virulent+) ── */
+.cx-results{position:relative}
+.cx-results .cx-scan{position:absolute;inset:0;pointer-events:none;z-index:5;opacity:.07;background:repeating-linear-gradient(0deg,var(--cx-red) 0 1px,transparent 1px 4px);animation:cx-scanmove 7s linear infinite}
+@keyframes cx-scanmove{0%{background-position:0 0}100%{background-position:0 8px}}
+.cx-results .cx-vignette{position:absolute;inset:0;pointer-events:none;z-index:6;border-radius:8px;animation:cx-vigpulse 4.5s ease-in-out infinite}
+@keyframes cx-vigpulse{0%,100%{box-shadow:inset 0 0 40px rgba(255,45,74,.08),inset 0 0 0 1px rgba(255,45,74,.25)}50%{box-shadow:inset 0 0 80px rgba(255,45,74,.2),inset 0 0 0 1px rgba(255,45,74,.5)}}
+.cx-ca-text{animation:cx-capulse 4.6s ease-in-out infinite}
+
+/* ── intrusion (transient phantom line) ── */
+.cx-intrusion{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:60;pointer-events:none}
+.cx-intrusion span{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:clamp(1.2rem,4vw,1.6rem);color:#fff;animation:cx-intr 2.4s linear forwards}
+@keyframes cx-intr{
+  0%{opacity:0}
+  6%{opacity:1;transform:translateX(-6px);text-shadow:-2px 0 var(--cx-void),2px 0 var(--cx-red)}
+  8%{opacity:0}10%{opacity:1;transform:translateX(5px)}12%{opacity:1;text-shadow:0 0 10px var(--cx-red);transform:translateX(0)}
+  72%{opacity:1}
+  80%{opacity:1;transform:translateX(8px) skewX(-6deg);text-shadow:-3px 0 var(--cx-void),3px 0 var(--cx-red)}
+  86%{opacity:0}100%{opacity:0}
+}
+
+/* ── Rupture interstitial ── */
+
+/* Full-screen container: radial dark background, clips overflow */
+.cx-rupt-screen {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 50% 38%, #141a2e, #0a0e1a 72%);
+  overflow: hidden;
+  z-index: 100;
+}
+
+/* Starfield wrapper */
+.cx-rupt-stars {
+  position: absolute;
+  inset: 0;
+  animation: cx-rupt-stars 8s linear forwards;
+}
+@keyframes cx-rupt-stars {
+  0%,52%  { opacity: 1; transform: scale(1); }
+  59%     { opacity: .4; transform: scale(1.1); }
+  64%     { opacity: 0; transform: scale(1.3); }
+  78%     { opacity: 0; transform: scale(1); }
+  92%     { opacity: 1; }
+  100%    { opacity: 1; }
+}
+
+/* Individual star dots */
+.cx-rupt-star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: #cdd6f0;
+  opacity: .8;
+  display: block;
+}
+.cx-rupt-star--big {
+  width: 3px;
+  height: 3px;
+  background: #fff;
+  box-shadow: 0 0 6px #9db4dd;
+}
+
+/* Red edge creep */
+.cx-rupt-creep {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  animation: cx-rupt-creep 8s ease-in-out forwards;
+}
+@keyframes cx-rupt-creep {
+  0%,10% { box-shadow: inset 0 0 0 rgba(0,0,0,0); }
+  28%    { box-shadow: inset 0 0 50px rgba(255,45,74,.2); }
+  50%    { box-shadow: inset 0 0 95px rgba(255,45,74,.45); }
+  61%    { box-shadow: inset 0 0 150px rgba(255,45,74,.75); }
+  64%    { box-shadow: inset 0 0 0 rgba(0,0,0,0); }
+  100%   { box-shadow: inset 0 0 0 rgba(0,0,0,0); }
+}
+
+/* Screen tremor — applied to the root container */
+.cx-rupt-tremor {
+  animation: cx-rupt-tremor 8s steps(1) forwards;
+}
+@keyframes cx-rupt-tremor {
+  0%,14%  { transform: translate(0,0); }
+  18%     { transform: translate(-1px,1px); }
+  26%     { transform: translate(1px,-1px); }
+  34%     { transform: translate(-2px,0); }
+  42%     { transform: translate(2px,1px); }
+  50%     { transform: translate(-3px,-1px); }
+  56%     { transform: translate(3px,0); }
+  60%     { transform: translate(-4px,2px); }
+  63%     { transform: translate(0,0); }
+  64%,100%{ transform: translate(0,0); }
+}
+
+/* Eye-rift SVG wrapper: positions + violent consume scale */
+.cx-rupt-eyerift {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 140px;
+  height: 196px;
+  transform-origin: center;
+  transform: translate(-50%,-50%) scale(.97);
+  opacity: 0;
+  animation: cx-rupt-mawrip-outer 8s ease-in-out forwards;
+}
+@keyframes cx-rupt-mawrip-outer {
+  0%,11% { opacity: 0; transform: translate(-50%,-50%) scale(.97); }
+  14%    { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  58%    { transform: translate(-50%,-50%) scale(1.1); }
+  62%    { transform: translate(-50%,-50%) scale(2.2); }
+  66%    { transform: translate(-50%,-50%) scale(9); opacity: 1; }
+  70%    { opacity: 0; transform: translate(-50%,-50%) scale(13); }
+  100%   { opacity: 0; transform: translate(-50%,-50%) scale(.97); }
+}
+
+/* Maw group: scaleX from 0 (vertical seam) to full width */
+.cx-rupt-maw {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cx-rupt-mawrip 8s cubic-bezier(.5,0,.5,1) forwards;
+}
+@keyframes cx-rupt-mawrip {
+  0%,12% { transform: scaleX(0); }
+  15%    { transform: scaleX(.03); }
+  34%    { transform: scaleX(1); }
+  100%   { transform: scaleX(1); }
+}
+
+/* Seam path: stroke + void fill bleeds in */
+.cx-rupt-rip {
+  stroke: #ff2d4a;
+  stroke-width: 1;
+  stroke-opacity: .85;
+  fill: url(#cx-vd);
+  fill-opacity: 0;
+  animation: cx-rupt-ripfill 8s ease-in forwards;
+}
+@keyframes cx-rupt-ripfill {
+  0%,22% { fill-opacity: 0; }
+  42%    { fill-opacity: 1; }
+  100%   { fill-opacity: 1; }
+}
+
+/* Winking void-seam segments */
+.cx-rupt-seg {
+  fill: #ff2d4a;
+  opacity: 0;
+}
+.cx-rupt-seg--w1 { animation: cx-rupt-wink 8s steps(1) forwards; }
+.cx-rupt-seg--w2 { animation: cx-rupt-wink 8s steps(1) .5s forwards; }
+.cx-rupt-seg--w3 { animation: cx-rupt-wink 8s steps(1) .9s forwards; }
+.cx-rupt-seg--w4 { animation: cx-rupt-wink 8s steps(1) 1.3s forwards; }
+@keyframes cx-rupt-wink {
+  0%,20%  { opacity: 0; }
+  26%     { opacity: .9; }
+  32%     { opacity: .3; }
+  40%     { opacity: .8; }
+  50%     { opacity: 0; }
+  100%    { opacity: 0; }
+}
+
+/* Eye iris group: spawns after void fills, then flash */
+.cx-rupt-iris-grp {
+  opacity: 0;
+  animation: cx-rupt-eyespawn 8s ease-out forwards;
+}
+@keyframes cx-rupt-eyespawn {
+  0%,44%  { opacity: 0; filter: brightness(.7); }
+  48%     { opacity: 1; filter: brightness(1.1); }
+  56%     { filter: brightness(2); }
+  64%,100%{ opacity: 1; filter: brightness(1); }
+}
+
+/* Eyelid: snaps open at 52%, then snaps shut again at 64% */
+.cx-rupt-lid {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cx-rupt-lidopen 8s ease-out forwards;
+}
+@keyframes cx-rupt-lidopen {
+  0%,50%  { transform: scaleY(1); }
+  52%     { transform: scaleY(0); }
+  62%     { transform: scaleY(0); }
+  64%     { transform: scaleY(1); }
+  100%    { transform: scaleY(1); }
+}
+
+/* Iris core: blooms outward during consume */
+.cx-rupt-core {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: cx-rupt-core 8s ease-in forwards;
+}
+@keyframes cx-rupt-core {
+  0%,52% { opacity: 0; transform: scale(0); }
+  56%    { opacity: 1; transform: scale(2); }
+  63%    { opacity: 1; transform: scale(8); }
+  67%    { opacity: 0; transform: scale(14); }
+  100%   { opacity: 0; transform: scale(0); }
+}
+
+/* Full-screen cracks SVG */
+.cx-rupt-cracks {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.cx-rupt-cracks path {
+  stroke: #ff2d4a;
+  stroke-width: 0.8;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 200;
+  stroke-dashoffset: 200;
+  animation: cx-rupt-crackrip 8s ease-out forwards;
+}
+@keyframes cx-rupt-crackrip {
+  0%,52%  { stroke-dashoffset: 200; stroke-width: 0.8; stroke: #ff2d4a; opacity: 0; }
+  54%     { opacity: 1; }
+  60%     { stroke-dashoffset: 0; stroke-width: 1; stroke: #ff2d4a; }
+  64%     { stroke-width: 2; stroke: #fff; }
+  67%     { opacity: 0; }
+  100%    { opacity: 0; stroke-dashoffset: 200; }
+}
+
+/* White flash overlay */
+.cx-rupt-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+  animation: cx-rupt-flash 8s steps(1) forwards;
+}
+@keyframes cx-rupt-flash {
+  0%,51%  { opacity: 0; }
+  52%     { opacity: .9; }
+  54%     { opacity: .2; }
+  56%     { opacity: 0; }
+  62%     { opacity: 0; }
+  65%     { opacity: 1; }
+  68%     { opacity: .3; }
+  71%     { opacity: 0; }
+  100%    { opacity: 0; }
+}
+
+/* Black void overlay */
+.cx-rupt-void {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  animation: cx-rupt-void 8s ease-in-out forwards;
+}
+@keyframes cx-rupt-void {
+  0%,67% { opacity: 0; }
+  70%    { opacity: 1; }
+  76%    { opacity: 1; }
+  86%    { opacity: 0; }
+  100%   { opacity: 0; }
+}
+
+/* Vertical red thread */
+.cx-rupt-thread {
+  position: absolute;
+  left: 50%;
+  top: 20%;
+  width: 1px;
+  height: 60%;
+  background: linear-gradient(#ff2d4a00, #ff2d4a, #ff2d4a00);
+  transform: translateX(-50%) scaleY(0);
+  opacity: 0;
+  pointer-events: none;
+  animation: cx-rupt-thread 8s ease-in-out forwards;
+}
+@keyframes cx-rupt-thread {
+  0%,69%  { opacity: 0; transform: translateX(-50%) scaleY(0); }
+  72%     { opacity: .9; transform: translateX(-50%) scaleY(1); }
+  78%     { opacity: .7; }
+  84%     { opacity: 0; transform: translateX(-50%) scaleY(.2); }
+  100%    { opacity: 0; }
+}
+
+/* Blue-white reform glow */
+.cx-rupt-reform {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 42%, rgba(120,150,220,.18), transparent 60%);
+  opacity: 0;
+  animation: cx-rupt-reform 8s ease-in-out forwards;
+}
+@keyframes cx-rupt-reform {
+  0%,78% { opacity: 0; }
+  90%    { opacity: 1; }
+  97%    { opacity: .5; }
+  100%   { opacity: .3; }
+}

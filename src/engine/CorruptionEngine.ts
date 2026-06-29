@@ -19,12 +19,16 @@ export interface CorruptionTickResult {
 // surfaced rounded.
 export class CorruptionEngine {
   private value = 0;
+  private hasIntruded = false;
 
   getValue(): number { return Math.round(this.value); }
   getBand(): CorruptionBand { return corruptionBandOf(Math.round(this.value)); }
 
   setValue(v: number): void { this.value = Math.max(0, Math.min(PINNACLE, v)); }
-  clear(): void { this.value = 0; }
+  clear(): void { this.value = 0; this.hasIntruded = false; }
+
+  markIntruded(): void { this.hasIntruded = true; }
+  getHasIntruded(): boolean { return this.hasIntruded; }
 
   // Direct add (used by forbidden-sight's once-per-minigame cost). Clamped.
   add(amount: number): void { this.value = Math.max(0, Math.min(PINNACLE, this.value + amount)); }
@@ -55,6 +59,9 @@ export class CorruptionEngine {
       }
     } else {
       this.value = Math.max(0, this.value - DECAY_RATE);
+      // Corruption event is over — the predator starved; reset so the next
+      // event re-earns its guaranteed intrusion.
+      if (this.value === 0) this.hasIntruded = false;
     }
 
     return this.report(false, drains);
@@ -70,16 +77,18 @@ export class CorruptionEngine {
     };
   }
 
-  serialize(): string { return JSON.stringify({ value: this.value }); }
+  serialize(): string { return JSON.stringify({ value: this.value, hasIntruded: this.hasIntruded }); }
 
   loadFrom(json: string): void {
     try {
-      const parsed = JSON.parse(json) as { value?: unknown };
+      const parsed = JSON.parse(json) as { value?: unknown; hasIntruded?: unknown };
       this.value = typeof parsed.value === 'number'
         ? Math.max(0, Math.min(PINNACLE, parsed.value))
         : 0;
+      this.hasIntruded = !!parsed.hasIntruded;
     } catch {
       this.value = 0;
+      this.hasIntruded = false;
     }
   }
 }

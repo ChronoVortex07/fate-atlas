@@ -24,7 +24,9 @@ export default function ResultReading() {
   const [copied, setCopied] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  const { turnResults, synthesis, happening, selectedHappeningChoice, questionType } = state;
+  const { turnResults, synthesis, happening, selectedHappeningChoice, questionType, corruption } = state;
+
+  const corrupted = corruption.band === 'virulent' || corruption.band === 'pinnacle';
 
   const handleDrawAgain = useCallback(() => engine.returnToQuestionSelect(), [engine]);
   const handleShare = useCallback(async () => {
@@ -44,7 +46,14 @@ export default function ResultReading() {
 
   return (
     <motion.div style={containerStyle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }}>
-      <div ref={shareRef} data-share-container style={cardStyle}>
+      <div ref={shareRef} data-share-container style={corrupted ? { ...cardStyle, position: 'relative', overflow: 'hidden' } : cardStyle} className={corrupted ? 'cx-results' : undefined}>
+        {corrupted && <>
+          <div className="cx-scan"/>
+          <div className="cx-vignette"/>
+          <div className="cx-mosh m1"/>
+          <div className="cx-mosh m2"/>
+          <div className="cx-mosh m3"/>
+        </>}
         <RunicBand opacity={0.3} />
         <h1 style={titleStyle}>Your Reading</h1>
         <div style={questionStyle}>{questionLabel}</div>
@@ -69,7 +78,7 @@ export default function ResultReading() {
         {synthesis && (
           <div style={synthesisSectionStyle}>
             <h2 style={sectionTitleStyle}>Interpretation</h2>
-            <h3 style={headlineStyle}>{synthesis.headline}</h3>
+            <h3 style={headlineStyle} className={corrupted ? 'cx-ca-text' : undefined}>{synthesis.headline}</h3>
             {synthesis.paragraphs.map((p, i) => (
               <p key={i} style={paraStyle}>{p}</p>
             ))}

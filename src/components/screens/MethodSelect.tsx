@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
 import CardSpread from '../cards/CardSpread';
+import MethodCard from '../cards/MethodCard';
+import CorruptedAscend from '../overlays/corruption/CorruptedAscend';
 import WillSwapButton from './WillSwapButton';
 import EventBanner, { type BannerMessage } from '../overlays/EventBanner';
 import FateForceOverlay, { type HandTarget } from '../overlays/FateForceOverlay';
 import type { MethodCardVisual, MethodCardMotion } from '../cards/MethodCard';
+import type { CorruptedProp } from '../cards/MethodCardFront';
 import type { DivinationType } from '../../engine/types';
 
 // Local lifecycle of one draw: deal the cards face-down, auto-play any draw
@@ -86,6 +89,10 @@ export default function MethodSelect() {
     if (confirmedRef.current) return;
     confirmedRef.current = true;
 
+    // Infected picks: CorruptedAscend's onDone drives confirmSelection — skip timer.
+    const isInfectedPick = !pending.wasForced && state.infectedMethods.includes(pending.finalIndex);
+    if (isInfectedPick) return;
+
     const timers: ReturnType<typeof setTimeout>[] = [];
     let t = 0;
 
@@ -158,6 +165,8 @@ export default function MethodSelect() {
         if (i === pending.finalIndex) return forceStage === 'ascend' ? 'fated' : 'idle';
         return 'idle';
       }
+      // Infected pick: suppress the normal gold-lift — CorruptedAscend plays the ascent.
+      if (i === pending.finalIndex && isInfectedPick) return 'idle';
       if (i === pending.finalIndex) return 'selected';
       return 'idle';
     }
@@ -200,6 +209,22 @@ export default function MethodSelect() {
 
   const interactive = phase === 'ready';
 
+  // Derive corruption class for each card index.
+  const band = state.corruption.band;
+  const corruptedFor = (i: number): CorruptedProp => {
+    if (!state.infectedMethods.includes(i)) return null;
+    if (band === 'virulent' || band === 'pinnacle') return 'virulent';
+    if (band === 'spreading') return 'spreading';
+    return null;
+  };
+
+  // Infected pick: the picked card's index (non-forced only).
+  const infectedPickIndex =
+    pending && !pending.wasForced && state.infectedMethods.includes(pending.finalIndex)
+      ? pending.finalIndex
+      : -1;
+  const isInfectedPick = infectedPickIndex >= 0;
+
   return (
     <motion.div style={containerStyle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }}>
       <EventBanner message={bannerMessage} />
@@ -228,28 +253,45 @@ export default function MethodSelect() {
         </div>
         <div style={goldRuleStyle} />
 
-        <CardSpread
-          containerRef={spreadRef}
-          dealNonce={nonce}
-          methods={displayMethods}
-          visualFor={visualFor}
-          motionFor={motionFor}
-          appearedFor={appearedFor}
-          appearDelayFor={appearDelayFor}
-          dissolvingFor={dissolvingFor}
-          phantomIndex={phantomIndex}
-          interactive={interactive}
-          onPick={(i) => {
-            // Measure the picked card now (resting position) so the Fate-force
-            // hand can descend onto it.
-            const el = spreadRef.current?.children[i] as HTMLElement | undefined;
-            if (el) {
-              const r = el.getBoundingClientRect();
-              setHandTarget({ x: r.left + r.width / 2, topY: r.top });
-            }
-            engine.beginSelection(i);
-          }}
-        />
+        <div style={spreadWrapStyle}>
+          <CardSpread
+            containerRef={spreadRef}
+            dealNonce={nonce}
+            methods={displayMethods}
+            visualFor={visualFor}
+            motionFor={motionFor}
+            appearedFor={appearedFor}
+            appearDelayFor={appearDelayFor}
+            dissolvingFor={dissolvingFor}
+            phantomIndex={phantomIndex}
+            interactive={interactive}
+            corruptedFor={corruptedFor}
+            onPick={(i) => {
+              // Measure the picked card now (resting position) so the Fate-force
+              // hand can descend onto it.
+              const el = spreadRef.current?.children[i] as HTMLElement | undefined;
+              if (el) {
+                const r = el.getBoundingClientRect();
+                setHandTarget({ x: r.left + r.width / 2, topY: r.top });
+              }
+              engine.beginSelection(i);
+            }}
+          />
+          {isInfectedPick && (
+            <div style={infectedAscendOverlayStyle}>
+              <CorruptedAscend onDone={() => engine.confirmSelection()}>
+                <MethodCard
+                  index={infectedPickIndex}
+                  method={displayMethods[infectedPickIndex]}
+                  visual="face-up"
+                  motion="idle"
+                  interactive={false}
+                  corrupted={corruptedFor(infectedPickIndex)}
+                />
+              </CorruptedAscend>
+            </div>
+          )}
+        </div>
 
         {state.affinityEffects.spreadRedraws >= 1 && (
           <WillSwapButton onSwap={() => engine.swapMethod()} disabled={!interactive} />
@@ -297,4 +339,18 @@ const turnProgressStyle: React.CSSProperties = { display: 'flex', gap: '10px' };
 const progressDotStyle: React.CSSProperties = {
   width: '10px', height: '10px', borderRadius: '50%',
   transition: 'background 0.4s ease, box-shadow 0.4s ease',
+};
+
+// Wraps the card spread so the infected ascend overlay can be positioned relative to it.
+const spreadWrapStyle: React.CSSProperties = { position: 'relative', width: '100%' };
+
+// Overlay that places the CorruptedAscend card at the center of the spread area.
+// pointer-events:none so it doesn't block interaction (the pick is already made).
+const infectedAscendOverlayStyle: React.CSSProperties = {
+  position: 'absolute', inset: 0, display: 'flex',
+  alignItems: 'center', justifyContent: 'center',
+  pointerEvents: 'none', zIndex: 10,
+  // Match the card sizing custom properties set on the container.
+  ['--card-w' as string]: 'clamp(86px, 22vw, 120px)',
+  ['--card-h' as string]: 'calc(var(--card-w) * 1.5)',
 };
