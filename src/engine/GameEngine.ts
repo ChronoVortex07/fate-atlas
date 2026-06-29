@@ -7,7 +7,7 @@ import { TurnOrchestrator } from './TurnOrchestrator';
 import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
 import { AFFINITY_DEFINITIONS, defaultAffinityState, AFFINITY_IDS, BAND_ORDER } from '../data/affinities';
-import { RUPTURE_RESET, rollInfectedCount, INFECTION_GAIN_MULT, CORRUPTED_TAG, CORRUPTION_BANDS, SIGHT_COST, LIE_OFFSET, NEAR_PINNACLE, INTRUSION_PHRASES, intrusionChance, isVisibleCorruption } from '../data/corruption';
+import { RUPTURE_RESET, rollInfectedCount, INFECTION_GAIN_MULT, CORRUPTED_TAG, CORRUPTION_BANDS, SIGHT_COST, LIE_OFFSET, NEAR_PINNACLE, INTRUSION_PHRASES, intrusionChance, isVisibleCorruption, SEED_OMEN } from '../data/corruption';
 import { corruptionTextLevel, corruptSynthesisSegments, corruptText, appendSeedOmen } from './CorruptionGlitch';
 import { selectHappening, HAPPENING_GAP_CHANCE } from '../data/happenings';
 import { dispatch } from './events/EventDispatcher';
@@ -54,6 +54,7 @@ export class GameEngine {
   private pendingTransition: (() => void) | null = null;
   private pendingAdvance: (() => void) | null = null;
   private pendingRupture = false;
+  private suppressIntrusionThisPass = false;
   private turnEffects: EffectReport[] = []; // per-turn accumulator of all reports (for RunRecord)
   private happeningOfferedThisTurn = false;
   private selectedMethodInfected = false;
@@ -87,6 +88,7 @@ export class GameEngine {
       shroudedMethods: [],
       infectedMethods: [],
       intrusion: null,
+      omen: null,
       drawPhase: null,
       selectedMethod: null,
       turnResults: [],
@@ -638,12 +640,30 @@ export class GameEngine {
     // (performRupture) actually runs — immediately mid-turn, or deferred to the
     // result-page exit on the final reading (so the result renders at the pinnacle).
     if (tick.ruptured) this.pendingRupture = true;
+    // Light's escalating warning: each time Light perceives corruption entering a
+    // worse band, it warns. Below virulent it is a furtive omen popup; the virulent
+    // crossing is the interrupted taunt (handled in maybeIntrude via the flag below).
+    this.suppressIntrusionThisPass = false;
+    const cband = this.corruptionEngine.getBand();
+    const warned = this.corruptionEngine.getWarnedBand();
+    const lightPerceives =
+      BAND_ORDER.indexOf(this.affinityEngine.bandOf('light')) >= BAND_ORDER.indexOf('ascendant');
+    if (lightPerceives && CORRUPTION_BANDS.indexOf(cband) > CORRUPTION_BANDS.indexOf(warned)) {
+      const enteringVirulent =
+        CORRUPTION_BANDS.indexOf(cband) >= CORRUPTION_BANDS.indexOf('virulent');
+      if (!enteringVirulent) {
+        this.state.omen = { text: SEED_OMEN };
+      }
+      // (the virulent-crossing taunt is set in maybeIntrude — Task 4)
+      this.corruptionEngine.markWarned(cband);
+    }
   }
 
   // Surfaces a transient phantom intrusion line at virulent+, with a once-per-corruption-event
   // guarantee: forced if the event hasn't produced one yet and value >= NEAR_PINNACLE.
   // advanceAfterCommit gates this on !pendingRupture so a rupturing turn never also intrudes.
   private maybeIntrude(rng: () => number = Math.random): void {
+    if (this.suppressIntrusionThisPass) return;
     const band = this.corruptionEngine.getBand();
     if (band !== 'virulent' && band !== 'pinnacle') return;
     const value = this.corruptionEngine.getValue();
@@ -657,6 +677,12 @@ export class GameEngine {
   clearIntrusion(): void {
     if (!this.state.intrusion) return;
     this.state.intrusion = null;
+    this.notify();
+  }
+
+  clearOmen(): void {
+    if (!this.state.omen) return;
+    this.state.omen = null;
     this.notify();
   }
 

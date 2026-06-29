@@ -622,6 +622,7 @@ export interface GameState {
   shroudedMethods: number[];
   infectedMethods: number[]; // indices of offered methods tainted by corruption (parallels shroudedMethods)
   intrusion: { text: string } | null; // transient phantom line; React animates then clears
+  omen: { text: string } | null;     // Light's transient seed-warning popup; React animates then clears
   drawPhase: DrawPhase | null;
   selectedMethod: DivinationType | null;
   turnResults: SlotResult[];
