@@ -51,6 +51,7 @@ export class GameEngine {
   private peekOverrideThisReading: 'guarantee' | 'deny' | null = null;
   private pendingEmergentUpheaval: { transform: TransformPayload; readings: number; source: string } | null = null;
   private minigamesPerTurn: number;
+  private defaultMinigamesPerTurn: number;
   private pendingTransition: (() => void) | null = null;
   private pendingAdvance: (() => void) | null = null;
   private pendingRupture = false;
@@ -61,6 +62,7 @@ export class GameEngine {
   private forbiddenSightUsedThisMinigame = false;
 
   constructor(minigamesPerTurn = 3) {
+    this.defaultMinigamesPerTurn = minigamesPerTurn;
     this.minigamesPerTurn = minigamesPerTurn;
     this.bus = new EventBus();
     this.affinityEngine = new AffinityEngine(AFFINITY_DEFINITIONS);
@@ -93,6 +95,7 @@ export class GameEngine {
       selectedMethod: null,
       turnResults: [],
       minigamesCompleted: 0,
+      minigamesPerTurn: this.defaultMinigamesPerTurn,
       activeSlotIndex: null,
       minigameState: null,
       synthesis: null,
@@ -322,9 +325,11 @@ export class GameEngine {
 
   // ---------- Turn lifecycle ----------
 
-  startTurn(question: QuestionType): void {
+  startTurn(question: QuestionType, methodCount?: number): void {
     this.affinityEngine.beginRun();
 
+    this.minigamesPerTurn = methodCount ?? this.defaultMinigamesPerTurn;
+    this.state.minigamesPerTurn = this.minigamesPerTurn;
     this.state.screen = 'method-select';
     this.state.questionType = question;
     this.state.selectedMethod = null;

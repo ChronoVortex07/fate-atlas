@@ -627,6 +627,7 @@ export interface GameState {
   selectedMethod: DivinationType | null;
   turnResults: SlotResult[];
   minigamesCompleted: number;
+  minigamesPerTurn: number;   // methods required this turn (3/5/7 — set by startTurn)
   activeSlotIndex: number | null;
   minigameState: MinigameState | null;
   synthesis: SynthesisResult | null;
