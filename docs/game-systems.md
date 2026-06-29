@@ -1314,12 +1314,23 @@ they never fall merkstave and are tagged `non-reversible`.
 The cloth has three concentric rings by normalized radius `r = hypot(x, y)`: **Heart**
 (`r < 0.33`), **Field** (`0.33 ≤ r < 0.75`), **Margin** (`r ≥ 0.75`); a stone past `r > 1.1` is
 **off-cloth**. `resolveScatter({ affinities, aim, drift, reveal, rng })` draws 6 distinct runes
-and, per stone, computes a position (cluster centroid from the aim, jitter **widened by Chaos /
-tightened by Order**, then lerped toward the Heart by the Fate **drift**), a `faceUp` roll
-(base 0.6, **+Light / −Shadow**, or forced up by `reveal`), and an orientation (merkstave base
-0.35, **+Chaos / −Order**; never for `non-reversible` runes). The default `governingIndex` is the
-face-up stone nearest the Heart (a stone is force-revealed if all land silent). `drawRuneScatter`
-wraps this with no aim for engine-spawned results (spawn-second / reroll).
+and, per stone, computes a position, a `faceUp` roll (base 0.6, **+Light / −Shadow**, or forced
+up by `reveal`), and an orientation (merkstave base 0.35, **+Chaos / −Order**; never for
+`non-reversible` runes). The default `governingIndex` is the face-up stone nearest the Heart (a
+stone is force-revealed if all land silent). `drawRuneScatter` wraps this with no aim for
+engine-spawned results (spawn-second / reroll).
+
+**Scatter geometry.** The six stones fall on **even base bearings** offset from the aim centroid —
+a tossed handful fans across the cloth instead of clumping — each at a radius scaled by the
+**reach** and wobbled by an angular **jitter**. Both are driven by a `disorder` term
+(`0.5 + (chaos − order)/2`, clamped): **0 at full Order → a tight, legible ring near the Heart;
+1 at full Chaos → a wide, wild spray reaching the Margin**. The reach is **floored**
+(`REACH_MIN 0.40`) and the per-stone radius is **soft-capped at the rim** (`MAX_RADIUS 1.18`), so
+the cast **never collapses to a single point** (the old `0.45·(1 + chaos − order)` hit 0 at full
+Order) and a forceful or chaotic throw never flies off-screen — errant stones (past `r > 1.1`)
+sit at the rim. The Fate **drift** then **scales every radius toward the Heart** (down to 40% at
+full drift via `DRIFT_PULL`), concentrating the cast without piling the stones on the exact
+center (it no longer lerps each stone onto the origin).
 
 ### 13c. Consolidation (`consolidateScatter`)
 

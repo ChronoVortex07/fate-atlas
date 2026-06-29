@@ -98,6 +98,45 @@ describe('resolveScatter', () => {
     };
     expect(spread({ chaos: 0, order: 100, fate: 0 })).toBeLessThan(spread({ chaos: 100, order: 0, fate: 0 }));
   });
+
+  const positionKeys = (s: ReturnType<typeof resolveScatter>) =>
+    new Set(s.stones.map((st) => `${st.x.toFixed(4)},${st.y.toFixed(4)}`));
+
+  it('does not collapse to a single point at maximum Order', () => {
+    // Regression: spreadBase = 0.45 * (1 + chaos - order) hit 0 at full Order,
+    // landing every stone on the centroid with no deviation.
+    const s = resolveScatter({ affinities: { chaos: 0, order: 100, fate: 0 }, rng: seq([0.2, 0.8, 0.5, 0.3, 0.9, 0.1, 0.6, 0.4]) });
+    expect(positionKeys(s).size).toBe(s.stones.length);
+    expect(Math.max(...s.stones.map((st) => Math.hypot(st.x, st.y)))).toBeGreaterThan(0.1);
+  });
+
+  it('does not collapse to a single point at maximum Fate drift', () => {
+    // Regression: lerp(x, 0, drift) pulled every stone onto the exact center at drift = 1.
+    const s = resolveScatter({ affinities: { chaos: 50, order: 50, fate: 100 }, drift: 1, rng: seq([0.2, 0.8, 0.5, 0.3, 0.9, 0.1, 0.6, 0.4]) });
+    expect(positionKeys(s).size).toBe(s.stones.length);
+  });
+
+  it('Fate drift compresses the scatter toward the Heart without collapsing it', () => {
+    const seed = [0.2, 0.8, 0.5, 0.3, 0.9, 0.1, 0.6, 0.4];
+    const reach = (drift: number) => {
+      const s = resolveScatter({ affinities: { chaos: 50, order: 50, fate: 100 }, drift, rng: seq(seed) });
+      return Math.max(...s.stones.map((st) => Math.hypot(st.x, st.y)));
+    };
+    expect(reach(1)).toBeLessThan(reach(0)); // pulled inward
+    expect(reach(1)).toBeGreaterThan(0);     // but still a real scatter
+  });
+
+  it('keeps even a wild, full-power aimed cast on the cloth (no runaway stones)', () => {
+    // A hard pull-back + max Chaos must still leave every stone within the cloth's rim
+    // (errant stones sit just past the Margin, not flung off-screen out of overflow).
+    for (let trial = 0; trial < 200; trial++) {
+      const s = resolveScatter({
+        affinities: { chaos: 100, order: 0, fate: 0 },
+        aim: { angle: Math.random() * Math.PI * 2, power: 1 },
+      });
+      for (const st of s.stones) expect(Math.hypot(st.x, st.y)).toBeLessThanOrEqual(1.2);
+    }
+  });
 });
 
 describe('drawRuneScatter', () => {

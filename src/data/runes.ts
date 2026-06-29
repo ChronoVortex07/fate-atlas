@@ -131,6 +131,23 @@ export function consolidateScatter(scatter: RuneScatter): RuneResult {
 
 const ALL_RUNE_IDS = Object.keys(RUNES) as RuneId[];
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+
+// Scatter geometry tuning. The fall must never collapse to a single point: Order
+// tightens the ring toward the Heart but only down to REACH_MIN, while Chaos flings it
+// out to REACH_MAX. Stones fall on even base bearings (a handful fans across the cloth
+// instead of piling up) with an angular wobble that widens with disorder. Fate drift
+// scales the whole scatter toward the Heart, preserving bearings and spacing — it never
+// lands stones on top of each other at the exact center.
+const REACH_MIN = 0.40;   // full Order — a tight but legible ring around the Heart
+const REACH_MAX = 0.88;   // full Chaos — stones reach the Margin / spill off-cloth
+const RAD_FLOOR = 0.45;   // per-stone radius is at least this fraction of the reach…
+const RAD_SPAN = 0.85;    // …and at most RAD_FLOOR + RAD_SPAN of it
+const JITTER_MIN = 0.18;  // full Order — stones hug their even bearing (radians)
+const JITTER_MAX = 1.05;  // full Chaos — bearings scatter wildly
+const DRIFT_PULL = 0.40;  // full Fate drift — radii compress to this fraction of normal
+const MAX_RADIUS = 1.18;  // a wild/aimed cast still lands at the rim, never off-screen
+                          // (errant-rune omen fires past 1.1, so it survives the cap)
 
 export interface ScatterInput {
   affinities: Record<string, number>;
@@ -146,24 +163,36 @@ export function resolveScatter(input: ScatterInput): RuneScatter {
   const order = (input.affinities.order ?? 0) / 100;
   const light = (input.affinities.light ?? 0) / 100;
   const shadow = (input.affinities.shadow ?? 0) / 100;
-  const drift = Math.max(0, Math.min(1, input.drift ?? 0));
+  const drift = clamp01(input.drift ?? 0);
 
   // cluster centroid from aim (power → distance), else origin
   const aimDist = input.aim ? input.aim.power * 0.5 : 0;
   const cx = input.aim ? Math.cos(input.aim.angle) * aimDist : 0;
   const cy = input.aim ? Math.sin(input.aim.angle) * aimDist : 0;
-  const spreadBase = 0.45 * (1 + chaos - order); // wider with chaos, tighter with order
+
+  // disorder: 0 at full Order, 1 at full Chaos, 0.5 at a balanced table. Drives both the
+  // radial reach (how far the stones fall) and the angular wobble (how messy the fall is).
+  const disorder = clamp01(0.5 + (chaos - order) * 0.5);
+  const reach = lerp(REACH_MIN, REACH_MAX, disorder);
+  const jitter = lerp(JITTER_MIN, JITTER_MAX, disorder);
+  const driftScale = lerp(1, DRIFT_PULL, drift);
+  const spin = rng() * Math.PI * 2; // random rotation of the whole fan
 
   const ids = [...ALL_RUNE_IDS];
   for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
   const drawn = ids.slice(0, 6);
 
-  const stones: LandedRune[] = drawn.map((rune) => {
-    const ang = rng() * Math.PI * 2;
-    const rad = spreadBase * (0.3 + rng());
-    let x = cx + Math.cos(ang) * rad;
-    let y = cy + Math.sin(ang) * rad;
-    x = lerp(x, 0, drift); y = lerp(y, 0, drift);
+  const stones: LandedRune[] = drawn.map((rune, i) => {
+    // Even base bearing per stone + a disorder-scaled wobble, so the handful fans across
+    // the cloth rather than clumping on one side.
+    const ang = spin + (i / drawn.length) * Math.PI * 2 + (rng() * 2 - 1) * jitter;
+    const rad = reach * (RAD_FLOOR + rng() * RAD_SPAN);
+    // Fate drift pulls the whole scatter (centroid included) in toward the Heart.
+    let x = (cx + Math.cos(ang) * rad) * driftScale;
+    let y = (cy + Math.sin(ang) * rad) * driftScale;
+    // Soft cap: a forceful or chaotic cast spills to the rim, never off-screen.
+    const r0 = Math.hypot(x, y);
+    if (r0 > MAX_RADIUS) { const k = MAX_RADIUS / r0; x *= k; y *= k; }
     const r = Math.hypot(x, y);
     const faceUp = input.reveal ? true : rng() < 0.6 + light * 0.4 - shadow * 0.4;
     const canMerk = RUNES[rune].reversible && faceUp;
