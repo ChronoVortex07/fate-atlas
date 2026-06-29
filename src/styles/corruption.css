@@ -37,6 +37,10 @@
 /* ── selection-screen telegraph (apply to a method card root) ── */
 .cx-card-spreading{border-color:#5a2230 !important;box-shadow:0 6px 18px #00000055,0 0 12px #ff2d4a22}
 .cx-card-spreading .cx-name{animation:cx-capulse 4.6s ease-in-out infinite}
+/* Spreading telegraph: a faint, infrequent jump on the glyph — a single twitch
+   every ~6s, easy to miss unless you're watching for it (virulent jitters harder). */
+.cx-card-spreading .cx-glyph{animation:cx-jump-faint 6.3s steps(1) infinite}
+@keyframes cx-jump-faint{0%,92%,100%{transform:translate(0,0)}93%{transform:translate(-1px,1px)}95%{transform:translate(1px,0)}97%{transform:translate(0,-1px)}}
 .cx-card-virulent{border-color:var(--cx-red) !important;box-shadow:0 6px 18px #00000066,0 0 18px #ff2d4a55,inset 0 0 22px #ff2d4a22}
 .cx-card-virulent .cx-name{color:#fff;text-shadow:0 0 7px var(--cx-red);animation:cx-capulse 2.4s ease-in-out infinite}
 .cx-card-virulent .cx-glyph{color:#ff8a98;animation:cx-capulse 2.4s ease-in-out infinite, cx-jitter 3.7s steps(1) infinite}
@@ -73,14 +77,35 @@
 @keyframes cx-vigpulse{0%,100%{box-shadow:inset 0 0 40px rgba(255,45,74,.08),inset 0 0 0 1px rgba(255,45,74,.25)}50%{box-shadow:inset 0 0 80px rgba(255,45,74,.2),inset 0 0 0 1px rgba(255,45,74,.5)}}
 .cx-ca-text{animation:cx-capulse 4.6s ease-in-out infinite}
 
-/* ── intrusion (transient phantom line) ── */
-.cx-intrusion{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:60;pointer-events:none}
-.cx-intrusion span{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:clamp(1.2rem,4vw,1.6rem);color:#fff;animation:cx-intr 2.4s linear forwards}
+/* ── per-word reading corruption (Virulent+ synthesis segments) ──
+   Legibility-first: the word stays readable; the treatment is what reads as wrong.
+   Only `redact` hides its text. Chromatic stays red↔void (never cyan) per the kit. */
+.cx-w-ca{animation:cx-capulse 5.2s ease-in-out infinite}
+.cx-w-ca.cx-w-fast{animation-duration:2.6s;color:#fff;text-shadow:0 0 4px var(--cx-red)}
+.cx-w-red{color:var(--cx-red)}
+.cx-w-hot{color:#fff;text-shadow:0 0 6px var(--cx-red),0 0 2px var(--cx-red)}
+.cx-w-stut{color:#d8c4e8}
+.cx-w-flick{animation:cx-wflick 3.1s steps(1) infinite}
+@keyframes cx-wflick{0%,48%,52%,100%{opacity:1}50%{opacity:.25}70%{opacity:1}72%{opacity:.4}74%{opacity:1}}
+.cx-w-ghost{color:#ff6678;opacity:.6;font-style:italic}
+.cx-w-redact{background:var(--cx-red-deep);color:transparent;border-radius:1px;padding:0 .14em;user-select:none;box-shadow:inset 0 0 0 1px #ff2d4a55}
+
+/* ── intrusion (transient phantom line) ──
+   A brief red wash blooms behind the phantom line so the whisper announces itself
+   instead of blending into the UI; the text itself is larger and harder-glowing. */
+.cx-intrusion{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:60;pointer-events:none;animation:cx-intr-wash 2.4s ease-out forwards}
+@keyframes cx-intr-wash{
+  0%{background:transparent;box-shadow:none}
+  10%{background:radial-gradient(ellipse at center,rgba(255,45,74,.13),transparent 62%);box-shadow:inset 0 0 130px rgba(255,45,74,.2)}
+  72%{background:radial-gradient(ellipse at center,rgba(255,45,74,.10),transparent 62%);box-shadow:inset 0 0 110px rgba(255,45,74,.15)}
+  100%{background:transparent;box-shadow:none}
+}
+.cx-intrusion span{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:500;font-size:clamp(1.5rem,5.5vw,2.1rem);letter-spacing:.04em;color:#fff;animation:cx-intr 2.4s linear forwards}
 @keyframes cx-intr{
   0%{opacity:0}
   6%{opacity:1;transform:translateX(-6px);text-shadow:-2px 0 var(--cx-void),2px 0 var(--cx-red)}
-  8%{opacity:0}10%{opacity:1;transform:translateX(5px)}12%{opacity:1;text-shadow:0 0 10px var(--cx-red);transform:translateX(0)}
-  72%{opacity:1}
+  8%{opacity:0}10%{opacity:1;transform:translateX(5px)}12%{opacity:1;text-shadow:0 0 18px var(--cx-red),0 0 6px var(--cx-red);transform:translateX(0)}
+  72%{opacity:1;text-shadow:0 0 18px var(--cx-red),0 0 6px var(--cx-red)}
   80%{opacity:1;transform:translateX(8px) skewX(-6deg);text-shadow:-3px 0 var(--cx-void),3px 0 var(--cx-red)}
   86%{opacity:0}100%{opacity:0}
 }

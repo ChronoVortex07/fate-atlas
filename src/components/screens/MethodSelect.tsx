@@ -38,8 +38,15 @@ export default function MethodSelect() {
   const [forceStage, setForceStage] = useState<ForceStage>('idle');
   const [handTarget, setHandTarget] = useState<HandTarget | null>(null);
   const [revealShrouded, setRevealShrouded] = useState(false);
+  // Where to place the corrupted-ascend overlay: the picked card's resting slot,
+  // measured relative to the spread wrapper so the card shears/ascends in place
+  // instead of jumping to the centre. null until a pick is measured (→ centre fallback).
+  const [infectedAscendRect, setInfectedAscendRect] = useState<
+    { left: number; top: number; width: number; height: number } | null
+  >(null);
   const confirmedRef = useRef(false);
   const spreadRef = useRef<HTMLDivElement>(null);
+  const spreadWrapRef = useRef<HTMLDivElement>(null);
 
   // Deal, then either auto-play the draw effects or go straight to the flip.
   useEffect(() => {
@@ -117,8 +124,15 @@ export default function MethodSelect() {
 
     timers.push(setTimeout(() => engine.confirmSelection(), t));
     return () => timers.forEach(clearTimeout);
+    // Depend on the *stable* identity of the selection (this draw's nonce + whether
+    // a pick is staged), NOT the `pending` object: every engine notify() deep-clones
+    // state, so `pending` gets a fresh reference each time. Keying off the object made
+    // any unrelated notify() landing mid-sequence (e.g. an intrusion's clearIntrusion
+    // timer at virulent+) re-run this effect, whose cleanup cancels the in-flight
+    // timers while confirmedRef short-circuits the reschedule — freezing the hand of
+    // fate on screen. nonce + presence stay constant for the whole sequence.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pending, engine]);
+  }, [nonce, pending != null, engine]);
 
   // A shroud report targeting `i` has already been sequenced this effects pass.
   const hasShroudPlayed = (i: number): boolean => {
@@ -253,7 +267,7 @@ export default function MethodSelect() {
         </div>
         <div style={goldRuleStyle} />
 
-        <div style={spreadWrapStyle}>
+        <div ref={spreadWrapRef} style={spreadWrapStyle}>
           <CardSpread
             containerRef={spreadRef}
             dealNonce={nonce}
@@ -268,27 +282,40 @@ export default function MethodSelect() {
             corruptedFor={corruptedFor}
             onPick={(i) => {
               // Measure the picked card now (resting position) so the Fate-force
-              // hand can descend onto it.
+              // hand can descend onto it AND the corrupted ascend can play in place.
               const el = spreadRef.current?.children[i] as HTMLElement | undefined;
               if (el) {
                 const r = el.getBoundingClientRect();
                 setHandTarget({ x: r.left + r.width / 2, topY: r.top });
+                const wrap = spreadWrapRef.current?.getBoundingClientRect();
+                if (wrap) {
+                  setInfectedAscendRect({
+                    left: r.left - wrap.left,
+                    top: r.top - wrap.top,
+                    width: r.width,
+                    height: r.height,
+                  });
+                }
               }
               engine.beginSelection(i);
             }}
           />
           {isInfectedPick && (
             <div style={infectedAscendOverlayStyle}>
-              <CorruptedAscend onDone={() => engine.confirmSelection()}>
-                <MethodCard
-                  index={infectedPickIndex}
-                  method={displayMethods[infectedPickIndex]}
-                  visual="face-up"
-                  motion="idle"
-                  interactive={false}
-                  corrupted={corruptedFor(infectedPickIndex)}
-                />
-              </CorruptedAscend>
+              <div style={infectedAscendRect
+                ? { position: 'absolute', left: infectedAscendRect.left, top: infectedAscendRect.top, width: infectedAscendRect.width, height: infectedAscendRect.height }
+                : { position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}>
+                <CorruptedAscend onDone={() => engine.confirmSelection()}>
+                  <MethodCard
+                    index={infectedPickIndex}
+                    method={displayMethods[infectedPickIndex]}
+                    visual="face-up"
+                    motion="idle"
+                    interactive={false}
+                    corrupted={corruptedFor(infectedPickIndex)}
+                  />
+                </CorruptedAscend>
+              </div>
             </div>
           )}
         </div>
@@ -344,11 +371,12 @@ const progressDotStyle: React.CSSProperties = {
 // Wraps the card spread so the infected ascend overlay can be positioned relative to it.
 const spreadWrapStyle: React.CSSProperties = { position: 'relative', width: '100%' };
 
-// Overlay that places the CorruptedAscend card at the center of the spread area.
+// Full-cover positioning layer over the spread: the CorruptedAscend card is placed
+// absolutely at the picked card's measured slot (infectedAscendRect) so it shears
+// and ascends in place rather than at the centre.
 // pointer-events:none so it doesn't block interaction (the pick is already made).
 const infectedAscendOverlayStyle: React.CSSProperties = {
-  position: 'absolute', inset: 0, display: 'flex',
-  alignItems: 'center', justifyContent: 'center',
+  position: 'absolute', inset: 0,
   pointerEvents: 'none', zIndex: 10,
   // Match the card sizing custom properties set on the container.
   ['--card-w' as string]: 'clamp(86px, 22vw, 120px)',

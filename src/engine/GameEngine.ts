@@ -8,7 +8,7 @@ import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
 import { AFFINITY_DEFINITIONS, defaultAffinityState, AFFINITY_IDS, BAND_ORDER } from '../data/affinities';
 import { RUPTURE_RESET, rollInfectedCount, INFECTION_GAIN_MULT, CORRUPTED_TAG, CORRUPTION_BANDS, SIGHT_COST, LIE_OFFSET, NEAR_PINNACLE, INTRUSION_PHRASES, intrusionChance, isVisibleCorruption } from '../data/corruption';
-import { corruptionTextLevel, corruptSynthesis, corruptText, appendSeedOmen } from './CorruptionGlitch';
+import { corruptionTextLevel, corruptSynthesisSegments, corruptText, appendSeedOmen } from './CorruptionGlitch';
 import { selectHappening, HAPPENING_GAP_CHANCE } from '../data/happenings';
 import { dispatch } from './events/EventDispatcher';
 import { buildAffinityResponders } from './responders/affinity';
@@ -94,6 +94,7 @@ export class GameEngine {
       activeSlotIndex: null,
       minigameState: null,
       synthesis: null,
+      synthesisSegments: null,
       happening: null,
       selectedHappeningChoice: null,
       pendingReadingEffects: [],
@@ -330,6 +331,7 @@ export class GameEngine {
     this.state.activeSlotIndex = null;
     this.state.minigameState = null;
     this.state.synthesis = null;
+    this.state.synthesisSegments = null;
     this.state.happening = null;
     this.state.selectedHappeningChoice = null;
     this.state.pendingReadingEffects = [];
@@ -565,21 +567,29 @@ export class GameEngine {
     this.affinityEngine.decayMandate();
     this.affinityEngine.tickModifiers(); // decay/expire surges once per completed reading
     this.applyCorruptionTick();
-    // Rupture guard: if performRupture fired this tick, route to the interstitial
-    // screen BEFORE maybeIntrude (so a rupturing turn does not also intrude) and
-    // BEFORE the final-reading guard (the turn ends here regardless of completed count).
-    if (this.pendingRupture) {
+
+    const isFinal = completed >= this.minigamesPerTurn;
+
+    // Rupture guard. A mid-turn pinnacle tears reality immediately — wipe now and
+    // route to the interstitial, skipping the rest of the turn. On the FINAL
+    // reading we instead hold the Rupture back: show the (max-corrupted) result
+    // first so the player gets one last look at how bad it got, then fire the
+    // Rupture when they leave the result page (returnToQuestionSelect). The wipe
+    // is deferred to that exit so synthesis renders at peak corruption. Either
+    // way, a rupturing turn does not also intrude.
+    if (this.pendingRupture && !isFinal) {
+      this.performRupture();
       this.pendingRupture = false;
       this.state.screen = 'rupture';
       this.saveToStorage();
       this.notify();
       return;
     }
-    this.maybeIntrude();
+    if (!this.pendingRupture) this.maybeIntrude();
     this.peekOverrideThisReading = null; // peek override lasts exactly one reading
 
-    // Final reading?
-    if (completed >= this.minigamesPerTurn) {
+    // Final reading? (pendingRupture, if set, stays armed for the result-page exit.)
+    if (isFinal) {
       this.synthesizeAll();
       this.buildRunRecord();
       this.state.screen = 'result';
@@ -624,12 +634,15 @@ export class GameEngine {
     const tick = this.corruptionEngine.tick(this.affinityEngine.getBase(), gains, Math.random, mult);
     this.selectedMethodInfected = false; // applies to exactly one reading
     if (Object.keys(tick.drains).length > 0) this.affinityEngine.erode(tick.drains);
-    if (tick.ruptured) this.performRupture();
+    // Only FLAG the rupture here; advanceAfterCommit decides when the wipe
+    // (performRupture) actually runs — immediately mid-turn, or deferred to the
+    // result-page exit on the final reading (so the result renders at the pinnacle).
+    if (tick.ruptured) this.pendingRupture = true;
   }
 
   // Surfaces a transient phantom intrusion line at virulent+, with a once-per-corruption-event
   // guarantee: forced if the event hasn't produced one yet and value >= NEAR_PINNACLE.
-  // B6 will insert a rupture guard ABOVE this call in advanceAfterCommit.
+  // advanceAfterCommit gates this on !pendingRupture so a rupturing turn never also intrudes.
   private maybeIntrude(rng: () => number = Math.random): void {
     const band = this.corruptionEngine.getBand();
     if (band !== 'virulent' && band !== 'pinnacle') return;
@@ -655,9 +668,12 @@ export class GameEngine {
     this.returnToTitle();
   }
 
-  // The Rupture: reality tears, the world re-forms low, and corruption vanishes
-  // without a trace. History records marked corrupted are scrubbed — no trace.
-  // Sets pendingRupture so advanceAfterCommit routes to the 'rupture' interstitial.
+  // The Rupture wipe: reality tears, the world re-forms low, and corruption
+  // vanishes without a trace. History records marked corrupted are scrubbed.
+  // The pending flag is set in applyCorruptionTick; the caller (advanceAfterCommit
+  // mid-turn, or returnToQuestionSelect on a held-back final-reading rupture)
+  // invokes this at the moment the world should actually reset, then routes to
+  // the 'rupture' interstitial.
   private performRupture(): void {
     const reset = AFFINITY_IDS.reduce(
       (acc, id) => ((acc[id] = RUPTURE_RESET), acc),
@@ -667,7 +683,6 @@ export class GameEngine {
     this.affinityEngine.clearModifiers();
     this.corruptionEngine.clear();
     this.state.history = this.state.history.filter((r) => !r.corrupted); // scrub — no trace
-    this.pendingRupture = true;
     this.bus.emit('corruption-ruptured', {});
   }
 
@@ -724,6 +739,7 @@ export class GameEngine {
     );
 
     this.state.synthesis = synthesisResult;
+    this.state.synthesisSegments = null;
     const band = this.corruptionEngine.getBand();
     if (band === 'seeded') {
       // Seeded is otherwise silent — the omen is the deliberate, innocuous tell.
@@ -731,7 +747,9 @@ export class GameEngine {
     } else {
       const cLevel = corruptionTextLevel(band, this.corruptionEngine.getValue());
       if (cLevel > 0) {
-        this.state.synthesis = corruptSynthesis(this.state.synthesis, cLevel, Math.random);
+        // The true reading stays on `synthesis`; corruption is a display-only overlay
+        // of styled segments (Spreading subtle, Virulent+ defiled but still legible).
+        this.state.synthesisSegments = corruptSynthesisSegments(this.state.synthesis, cLevel, Math.random);
       }
     }
     this.bus.emit('synthesis-complete', { result: this.state.synthesis });
@@ -1596,6 +1614,17 @@ export class GameEngine {
   // ---------- Navigation helpers ----------
 
   returnToQuestionSelect(): void {
+    // A Rupture held back so the player could see the max-corrupted final reading
+    // now fires: tear reality and route to the interstitial instead of the
+    // question screen. completeRupture() → returnToTitle() carries on from there.
+    if (this.pendingRupture) {
+      this.performRupture();
+      this.pendingRupture = false;
+      this.state.screen = 'rupture';
+      this.saveToStorage();
+      this.notify();
+      return;
+    }
     this.state.screen = 'question';
     this.state.questionType = null;
     this.state.availableMethods = [];
@@ -1608,6 +1637,7 @@ export class GameEngine {
     this.state.activeSlotIndex = null;
     this.state.minigameState = null;
     this.state.synthesis = null;
+    this.state.synthesisSegments = null;
     this.state.happening = null;
     this.state.selectedHappeningChoice = null;
     this.state.eventQueue = [];

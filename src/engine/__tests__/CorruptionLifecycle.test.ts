@@ -122,6 +122,32 @@ describe('GameEngine corruption lifecycle', () => {
     expect(e.getState().screen).toBe('title');
   });
 
+  it('on the FINAL reading, a pinnacle rupture shows the corrupted result first, then ruptures on leaving', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const e = new GameEngine(1); // a single reading IS the final reading
+    e.startTurn('self');
+    e.loadState({ affinities: { chaos: 100, order: 100, fate: 100, will: 100, light: 100, shadow: 100 } });
+    e.setCorruption(99);
+
+    oneReading(e);
+
+    // The max-corrupted reading is shown before the world resets — the Rupture is held back.
+    const atResult = e.getState();
+    expect(atResult.screen).toBe('result');
+    expect(atResult.corruption.band).toBe('pinnacle');
+    expect(atResult.corruption.value).toBe(100);
+    expect(atResult.affinityBase.chaos).toBeGreaterThan(RUPTURE_RESET); // not yet wiped
+    expect(atResult.synthesisSegments).not.toBeNull();                  // corrupted overlay rendered
+
+    // Leaving the result page (DRAW AGAIN) fires the held-back Rupture.
+    e.returnToQuestionSelect();
+    const afterExit = e.getState();
+    expect(afterExit.screen).toBe('rupture');
+    expect(afterExit.corruption.value).toBe(0);
+    expect(afterExit.corruption.band).toBe('dormant');
+    expect(afterExit.affinityBase.chaos).toBe(RUPTURE_RESET);
+  });
+
   it('resets hasIntruded when corruption starves to 0', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99); // suppress procs + seeding noise
     const e = new GameEngine(3);

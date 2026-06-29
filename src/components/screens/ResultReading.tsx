@@ -7,6 +7,34 @@ import OrnamentalBorder from '../shared/OrnamentalBorder';
 import MysticButton from '../shared/MysticButton';
 import HistoryModal from '../overlays/HistoryModal';
 import CardReadingDetail from '../cards/CardReadingDetail';
+import type { GlitchSegment } from '../../engine/types';
+
+// Corruption treatment → CSS class. The word stays in the DOM and legible (except
+// `redact`, which is covered); the styling is what reads as ominous.
+const GLITCH_CLASS: Record<string, string> = {
+  ca: 'cx-w-ca',
+  'ca-fast': 'cx-w-ca cx-w-fast',
+  red: 'cx-w-red',
+  flick: 'cx-w-flick',
+  hot: 'cx-w-hot',
+  stut: 'cx-w-stut',
+  ghost: 'cx-w-ghost',
+  redact: 'cx-w-redact',
+};
+
+function GlitchText({ segments }: { segments: GlitchSegment[] }) {
+  return (
+    <>
+      {segments.map((s, i) =>
+        s.style ? (
+          <span key={i} className={GLITCH_CLASS[s.style]}>{s.text}</span>
+        ) : (
+          <span key={i}>{s.text}</span>
+        ),
+      )}
+    </>
+  );
+}
 
 function formatQuestionType(qt: string): string {
   switch (qt) {
@@ -24,9 +52,10 @@ export default function ResultReading() {
   const [copied, setCopied] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  const { turnResults, synthesis, happening, selectedHappeningChoice, questionType, corruption } = state;
+  const { turnResults, synthesis, synthesisSegments, happening, selectedHappeningChoice, questionType, corruption } = state;
 
   const corrupted = corruption.band === 'virulent' || corruption.band === 'pinnacle';
+  const seg = synthesisSegments;
 
   const handleDrawAgain = useCallback(() => engine.returnToQuestionSelect(), [engine]);
   const handleShare = useCallback(async () => {
@@ -78,18 +107,28 @@ export default function ResultReading() {
         {synthesis && (
           <div style={synthesisSectionStyle}>
             <h2 style={sectionTitleStyle}>Interpretation</h2>
-            <h3 style={headlineStyle} className={corrupted ? 'cx-ca-text' : undefined}>{synthesis.headline}</h3>
-            {synthesis.paragraphs.map((p, i) => (
-              <p key={i} style={paraStyle}>{p}</p>
-            ))}
-            {synthesis.tensionNote && (
+            <h3 style={headlineStyle}>
+              {seg ? <GlitchText segments={seg.headline} /> : synthesis.headline}
+            </h3>
+            {seg
+              ? seg.paragraphs.map((segs, i) => (
+                  <p key={i} style={paraStyle}><GlitchText segments={segs} /></p>
+                ))
+              : synthesis.paragraphs.map((p, i) => (
+                  <p key={i} style={paraStyle}>{p}</p>
+                ))}
+            {(seg?.tensionNote ?? synthesis.tensionNote) && (
               <div style={tensionBoxStyle}>
                 <div style={tensionBarStyle} />
-                <p style={tensionTextStyle}>{synthesis.tensionNote}</p>
+                <p style={tensionTextStyle}>
+                  {seg?.tensionNote ? <GlitchText segments={seg.tensionNote} /> : synthesis.tensionNote}
+                </p>
               </div>
             )}
-            {synthesis.affinityNote && (
-              <p style={affinityStyle}>{synthesis.affinityNote}</p>
+            {(seg?.affinityNote ?? synthesis.affinityNote) && (
+              <p style={affinityStyle}>
+                {seg?.affinityNote ? <GlitchText segments={seg.affinityNote} /> : synthesis.affinityNote}
+              </p>
             )}
           </div>
         )}

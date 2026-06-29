@@ -482,6 +482,34 @@ export interface SynthesisResult {
   affinityNote?: string;
 }
 
+// ── Corruption display segments ──
+// A reading falsified for *display* is broken into legible word-segments tagged
+// with a visual treatment (rendered as CSS-styled spans). The underlying word
+// stays readable — dread comes from the styling, not from destroying the text.
+// `redact` is the one treatment that hides its text (a covering bar / █ in plain
+// text); `ghost` carries an entity whisper inserted between words.
+export type GlitchStyle =
+  | 'ca'       // chromatic-aberration pulse
+  | 'ca-fast'  // faster, hotter chromatic pulse (near pinnacle)
+  | 'red'      // recoloured red
+  | 'flick'    // flickering
+  | 'hot'      // white-hot glow
+  | 'stut'     // stutter/repeat (text carries the repeats)
+  | 'ghost'    // entity whisper (inserted intrusion)
+  | 'redact';  // covered/redacted
+
+export interface GlitchSegment {
+  text: string;        // display text (still legible except for `redact`)
+  style?: GlitchStyle; // undefined = plain
+}
+
+export interface CorruptedSynthesis {
+  headline: GlitchSegment[];
+  paragraphs: GlitchSegment[][];
+  tensionNote?: GlitchSegment[];
+  affinityNote?: GlitchSegment[];
+}
+
 // ── Run ──
 export interface RunRecord {
   id: string;
@@ -601,6 +629,7 @@ export interface GameState {
   activeSlotIndex: number | null;
   minigameState: MinigameState | null;
   synthesis: SynthesisResult | null;
+  synthesisSegments: CorruptedSynthesis | null; // display-only falsification (Spreading+); null = render clean synthesis
   happening: HappeningResult | null;
   selectedHappeningChoice: number | null;
   pendingReadingEffects: ReadingEffectId[]; // queued by happenings, consumed by the next reading (turn-scoped)

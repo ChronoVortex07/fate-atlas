@@ -280,19 +280,32 @@ itself the excess that sustains it.
 ### Reading falsification (Phase 3)
 
 `CorruptionGlitch.ts` defines `corruptionTextLevel(band, value)` → 0–3 and
-`corruptText(text, level, rng)` / `corruptSynthesis`. `GameEngine` applies them to the
-synthesis result (headline, paragraphs, tensionNote, affinityNote) before writing to
-`state.synthesis`, and also to the copy-paste LLM prompt via `generateLLMPrompt`.
+`corruptSegments(text, level, rng, opts?)`, the core that falsifies text into **legible,
+styled segments** (`GlitchSegment[]` — a word plus an optional `GlitchStyle`). `GameEngine`
+runs the synthesis through `corruptSynthesisSegments` and stores the result on
+`state.synthesisSegments` (a parallel `CorruptedSynthesis`); the true reading stays clean on
+`state.synthesis`. `ResultReading` renders the segments as CSS-styled spans
+(`.cx-w-*` in `corruption.css`) when present, falling back to clean `state.synthesis` otherwise.
+
+**Legibility-first principle:** dread comes from the styling, not from destroying the text.
+Only `redact` hides its word (a covering bar; `█` in plain-text exports). Whispers (`ghost`)
+are entity intrusions spliced *between* words; the rest — `ca`/`ca-fast` (chromatic pulse),
+`red`, `flick`, `hot`, `stut` — leave the word readable.
 
 | Level | Band(s) | Falsification character |
 |-------|---------|------------------------|
 | 0 | dormant | Clean — no alteration |
 | 0 | seeded | Clean prose, **plus the seed omen** (see below) — no glitch-system falsification |
-| 1 | spreading | Subtle: tone drift (e.g. `promise → warning`, `clarity → static`) + interior letter transpositions; each word has ~25% chance of one effect |
-| 2 | virulent (67–98) | Heavy ramp: same drift/typo pass (28%), plus redaction (`█`-blocks, ~18%), Unicode combining-character garble (~40%), stutter repeats (~10%), and **one** injected contradiction sentence appended |
-| 3 | virulent near-pinnacle (ramp from 67→99) | As level 2 but **two** contradictions injected; the continuous ramp `2 + min(1, (value−67)/(99−67))` means falsification deepens as the Rupture approaches |
+| 1 | spreading | Subtle, no styling: tone drift (e.g. `promise → warning`) + interior letter transpositions, ~25%/word. Segments are emitted but all unstyled, so it reads as quietly-wrong prose |
+| 2 | virulent (67) — *early* | Legible but defiled: the Spreading drift/typo pass underneath, **one** redaction and **one** ghost whisper across the *whole reading*, plus light `ca`/`red`/`flick`/`stut` styling |
+| 3 | virulent → pinnacle (ramp `2 + min(1,(value−67)/32)`) | Everything ramps with `t = level−2`: redactions `1+round(4t)` and whispers `1+round(2t)` budgeted across the reading (~5 / ~3 near pinnacle), faster/hotter chromatic (`ca-fast`+`hot`), light zalgo accents on hot words, more stutters — still readable |
 
-The synthesis is falsified in-place on `state.synthesis`; the underlying result objects (`turnResults`) are **not** altered. The LLM prompt (`generateLLMPrompt`) is independently passed through `corruptText` at the same level, so sharing a reading at virulent+ exports a corrupted transcript.
+Redactions and whispers are **budgeted across the whole reading** (`corruptSynthesisSegments`
+distributes them toward longer fields), so early virulent shows ~one of each rather than one
+per field. The underlying result objects (`turnResults`) are **not** altered. The LLM prompt
+(`generateLLMPrompt`) is independently passed through `corruptText` — `segmentsToText` of the
+same core (redactions → `█`, whispers/stutters inline) — so sharing at virulent+ exports a
+corrupted transcript.
 
 ### Seed omen (the seeded-band tell)
 
@@ -314,15 +327,19 @@ When a turn completes at *spreading* or above (`isVisibleCorruption` = `spreadin
 
 ### Rupture interstitial (Phase 3)
 
-When `CorruptionEngine.tick()` sets `ruptured = true`, `performRupture()` runs synchronously:
+When `CorruptionEngine.tick()` sets `ruptured = true`, `applyCorruptionTick` only **flags** it (`pendingRupture = true`); the actual wipe, `performRupture()`, runs at the moment the world should reset:
 
 1. Every affinity is reset to `RUPTURE_RESET` (25 — latent band).
 2. All affinity modifiers (surges, transforms) are cleared.
 3. Corruption is cleared to 0.
 4. Corrupted history records are scrubbed.
-5. `pendingRupture = true` is set; `advanceAfterCommit` detects it and routes `state.screen` to `'rupture'` **before** any further transition logic.
 
-The `RuptureInterstitial` screen plays an unskippable ~8 s sequence, then calls `engine.completeRupture()` → `returnToTitle()`. `state.screen` becomes `'title'`. The save written at rupture time reflects the reset state so a hard reload does not re-enter the rupture screen. `intrusion` is not checked after a rupture tick (the rupture guard in `advanceAfterCommit` precedes `maybeIntrude`).
+**When the wipe fires depends on whether the rupture lands on the final reading of the turn:**
+
+- **Mid-turn rupture** (`completed < minigamesPerTurn`): `advanceAfterCommit` runs `performRupture()` immediately and routes `state.screen` to `'rupture'`, skipping the rest of the turn.
+- **Final-reading rupture** (`completed >= minigamesPerTurn`): the Rupture is **held back** so the player gets one last look at how bad it got. `advanceAfterCommit` leaves `pendingRupture` armed, synthesizes and builds the run record at **peak corruption** (so the result page renders fully defiled, at the pinnacle), and routes to `'result'`. The wipe is deferred until the player leaves via **DRAW AGAIN** (`returnToQuestionSelect`), which runs `performRupture()` and routes to `'rupture'` then. The corrupted final-reading record is scrubbed by that deferred wipe.
+
+The `RuptureInterstitial` screen plays an unskippable ~8 s sequence, then calls `engine.completeRupture()` → `returnToTitle()`. `state.screen` becomes `'title'`. The save written at rupture time reflects the reset state so a hard reload does not re-enter the rupture screen. A rupturing turn never also intrudes: `advanceAfterCommit` gates `maybeIntrude` on `!pendingRupture`.
 
 ### Phase 4 gain-pipeline rebalance
 

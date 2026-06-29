@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { corruptionTextLevel, interiorTypo, corruptText, corruptSynthesis, SEED_OMENS, seedOmen, appendSeedOmen } from '../CorruptionGlitch';
+import { corruptionTextLevel, interiorTypo, corruptText, corruptSegments, segmentsToText, corruptSynthesisSegments, SEED_OMENS, seedOmen, appendSeedOmen } from '../CorruptionGlitch';
+import type { GlitchSegment } from '../types';
+
+const countStyle = (segs: GlitchSegment[], style: string) => segs.filter((s) => s.style === style).length;
 
 // deterministic PRNG so corruption output is reproducible in tests
 function mulberry32(seed: number) {
@@ -57,13 +60,80 @@ describe('corruptText', () => {
   });
 });
 
-describe('corruptSynthesis', () => {
-  it('corrupts headline + paragraphs at level>=1', () => {
+const LONG = 'Fortune inclines toward you and the way ahead carries real promise.';
+
+describe('segmentsToText', () => {
+  it('joins plain segments back to their text', () => {
+    expect(segmentsToText([{ text: 'hello ' }, { text: 'world' }])).toBe('hello world');
+  });
+  it('renders a redacted segment as block characters, hiding its text', () => {
+    const out = segmentsToText([{ text: 'secret', style: 'redact' }]);
+    expect(out).toMatch(/^█+$/);
+    expect(out).not.toContain('secret');
+  });
+  it('keeps a ghost whisper as plain text', () => {
+    expect(segmentsToText([{ text: '(the way ahead does not exist)', style: 'ghost' }]))
+      .toBe('(the way ahead does not exist)');
+  });
+  it('round-trips a clean (level 0) corruption to the original text', () => {
+    expect(segmentsToText(corruptSegments(LONG, 0, mulberry32(1)))).toBe(LONG);
+  });
+});
+
+describe('corruptSegments', () => {
+  it('level 0 returns a single untouched, unstyled segment', () => {
+    const segs = corruptSegments(LONG, 0, mulberry32(1));
+    expect(segs).toEqual([{ text: LONG }]);
+  });
+
+  it('level 1 alters text but applies no glitch styling, redaction, or whispers', () => {
+    const segs = corruptSegments(LONG, 1, mulberry32(7));
+    expect(segmentsToText(segs)).not.toBe(LONG);
+    expect(segs.every((s) => s.style === undefined)).toBe(true);
+  });
+
+  it('early virulent (level 2) uses at most one redaction and surfaces a whisper', () => {
+    const segs = corruptSegments(LONG, 2, mulberry32(3));
+    expect(countStyle(segs, 'redact')).toBe(1);
+    expect(countStyle(segs, 'ghost')).toBeGreaterThanOrEqual(1);
+  });
+
+  it('ramps redactions and whispers from early virulent to near pinnacle', () => {
+    const early = corruptSegments(LONG, 2, mulberry32(3));
+    const peak = corruptSegments(LONG, 3, mulberry32(3));
+    expect(countStyle(peak, 'redact')).toBeGreaterThan(countStyle(early, 'redact'));
+    expect(countStyle(peak, 'ghost')).toBeGreaterThanOrEqual(countStyle(early, 'ghost'));
+  });
+
+  it('ghost whispers are drawn from the contradiction pool', () => {
+    const segs = corruptSegments(LONG, 3, mulberry32(11));
+    const ghosts = segs.filter((s) => s.style === 'ghost');
+    expect(ghosts.length).toBeGreaterThan(0);
+    for (const g of ghosts) expect(g.text.trim().length).toBeGreaterThan(0);
+  });
+
+  it('is deterministic for a given seed', () => {
+    expect(corruptSegments(LONG, 2, mulberry32(42))).toEqual(corruptSegments(LONG, 2, mulberry32(42)));
+  });
+});
+
+describe('corruptSynthesisSegments', () => {
+  it('returns segment arrays and falsifies headline + paragraphs at level>=1', () => {
     const s = { headline: 'Transformation Bears Its Fruit',
       paragraphs: ['Fortune inclines toward you and the way ahead carries real promise.'],
       tensionNote: undefined, affinityNote: undefined };
-    const out = corruptSynthesis(s, 1, mulberry32(9));
-    expect(out.paragraphs[0]).not.toBe(s.paragraphs[0]);
+    const out = corruptSynthesisSegments(s, 1, mulberry32(9));
+    expect(Array.isArray(out.headline)).toBe(true);
+    expect(Array.isArray(out.paragraphs[0])).toBe(true);
+    expect(segmentsToText(out.paragraphs[0])).not.toBe(s.paragraphs[0]);
+  });
+
+  it('carries optional notes through as segments when present', () => {
+    const s = { headline: 'H', paragraphs: ['a body of words here'],
+      tensionNote: 'tension lives here', affinityNote: undefined };
+    const out = corruptSynthesisSegments(s, 2, mulberry32(5));
+    expect(out.tensionNote).toBeTruthy();
+    expect(out.affinityNote).toBeUndefined();
   });
 });
 
