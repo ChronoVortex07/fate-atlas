@@ -215,6 +215,21 @@ describe('NarrativeAssembler', () => {
     expect(result.affinityNote).toContain('Order');
   });
 
+  it('affinity note appears for high fate', () => {
+    const r = assembler.assemble(baseAggregated, [], 'decision', { fate: 80, will: 20 });
+    expect(r.affinityNote).toContain('Fate');
+  });
+
+  it('affinity note appears for high will', () => {
+    const r = assembler.assemble(baseAggregated, [], 'decision', { will: 80, fate: 20 });
+    expect(r.affinityNote).toContain('will');
+  });
+
+  it('the most-elevated affinity wins when several are high', () => {
+    const r = assembler.assemble(baseAggregated, [], 'decision', { chaos: 70, fate: 95 });
+    expect(r.affinityNote).toContain('Fate'); // fate (95) outranks chaos (70)
+  });
+
   it('LLM prompt formats spread positions for multi-position tarot slots', () => {
     const spreadSlot = {
       type: 'tarot',

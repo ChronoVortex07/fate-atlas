@@ -2,9 +2,35 @@ import type {
   AggregatedReading, SynthesisResult, SlotResult, QuestionType,
   EffectReport, AffinityEffects,
 } from './types';
+import type { AffinityId } from './types';
 import { bandOf } from '../data/affinities';
 import { ReadingComposer } from './narrative/ReadingComposer';
 import { ProseBuilder, seedFor } from './narrative/ProseBuilder';
+
+// Each affinity's voice, surfaced when it is the most-elevated force in the reading.
+const AFFINITY_NOTES: Record<AffinityId, string> = {
+  chaos: 'The currents of chaos run strong. Expect the unexpected — these readings carry extra volatility.',
+  order: 'Order shapes this reading with unusual clarity. The patterns are steady and reliable.',
+  fate:  'Fate draws the thread taut — what is shown here carries the weight of the already-written.',
+  will:  'Your will presses against the omens; nothing here is fixed that your own hand cannot move.',
+  light: 'Light lies plainly across the reading — the forces consent to be named.',
+  shadow:'Shadow keeps its counsel; what is shown is the smaller truth, the larger one withheld.',
+};
+// Tie-break order when several affinities share the top value.
+const AFFINITY_PRIORITY: AffinityId[] = ['chaos', 'order', 'fate', 'will', 'light', 'shadow'];
+
+function pickAffinityNote(affinities: Record<string, number>, clarity: number): string | undefined {
+  const elevated = AFFINITY_PRIORITY
+    .map((id) => ({ id, value: affinities[id] ?? 0, band: bandOf(affinities[id] ?? 0) }))
+    .filter((a) => a.band === 'ascendant' || a.band === 'dominant')
+    .sort((a, b) => b.value - a.value); // priority order is preserved on ties (stable sort)
+  if (elevated.length === 0) return undefined;
+  let note = AFFINITY_NOTES[elevated[0].id];
+  // Light's clarity reframe (preserved): plainly-named at high clarity, occluded at low.
+  if (clarity >= 2) note = `The forces name themselves plainly: ${note}`;
+  else if (clarity <= -2) note = 'Something stirs beneath the surface, but its name will not come.';
+  return note;
+}
 
 export class NarrativeAssembler {
   private composer = new ReadingComposer();
@@ -50,22 +76,8 @@ export class NarrativeAssembler {
       paragraphs.splice(Math.max(0, paragraphs.length - 1), 0, line);
     }
 
-    // Affinity note — elevated when Chaos/Order reach Ascendant or higher.
-    let affinityNote: string | undefined;
-    const chaosBand = bandOf(affinities.chaos ?? 0);
-    const orderBand = bandOf(affinities.order ?? 0);
-    const isElevated = (b: string) => b === 'ascendant' || b === 'dominant';
-    if (isElevated(chaosBand)) {
-      affinityNote = 'The currents of chaos run strong. Expect the unexpected — these readings carry extra volatility.';
-    } else if (isElevated(orderBand)) {
-      affinityNote = 'Order shapes this reading with unusual clarity. The patterns are steady and reliable.';
-    }
-    const clarity = effects?.hintClarity ?? 0;
-    if (clarity >= 2 && affinityNote) {
-      affinityNote = `The forces name themselves plainly: ${affinityNote}`;
-    } else if (clarity <= -2 && affinityNote) {
-      affinityNote = 'Something stirs beneath the surface, but its name will not come.';
-    }
+    // Affinity note — the most-elevated of the six affinities speaks (Ascendant+).
+    const affinityNote = pickAffinityNote(affinities, effects?.hintClarity ?? 0);
 
     return {
       headline: built.headline,

@@ -207,6 +207,21 @@ Combining the static effects above with the event-driven responders in §6:
   dice suffer disadvantage (`shadow-disadvantage`); pool preview hidden. *dominant:* up to
   three method cards shrouded; cryptic, sparse readings.
 
+### 3c. Affinity note in synthesis
+
+When `NarrativeAssembler.assemble` builds the final reading, it emits a short **affinity note** if any of the six affinities is elevated (band `ascendant` or `dominant`). All six have a voice; the **most-elevated** one speaks. Tie-break order (highest value wins; ties resolved left-to-right): **chaos → order → fate → will → light → shadow**.
+
+| Affinity | Note |
+|----------|------|
+| Chaos | "The currents of chaos run strong. Expect the unexpected — these readings carry extra volatility." |
+| Order | "Order shapes this reading with unusual clarity. The patterns are steady and reliable." |
+| Fate | "Fate draws the thread taut — what is shown here carries the weight of the already-written." |
+| Will | "Your will presses against the omens; nothing here is fixed that your own hand cannot move." |
+| Light | "Light lies plainly across the reading — the forces consent to be named." |
+| Shadow | "Shadow keeps its counsel; what is shown is the smaller truth, the larger one withheld." |
+
+**Light's `hintClarity` reframe (preserved from earlier behaviour):** if `hintClarity ≥ 2` (Light strongly dominant), the note is prefixed with "The forces name themselves plainly: …" regardless of which affinity won; if `hintClarity ≤ −2` (Shadow strongly dominant), the note is replaced entirely with "Something stirs beneath the surface, but its name will not come." If no affinity is elevated, no note is emitted.
+
 ---
 
 ## 4. Corruption (engine foundation)
