@@ -23,16 +23,30 @@ const GLITCH_CLASS: Record<string, string> = {
   redact: 'cx-w-redact',
 };
 
-function GlitchText({ segments }: { segments: GlitchSegment[] }) {
+const COMBINING = ['̵', '̶', '̷', '̸'];
+function garbleWord(s: string): string {
+  let out = '';
+  for (const ch of s) { out += ch; if (/\w/.test(ch) && ch.charCodeAt(0) % 3 === 0) out += COMBINING[ch.charCodeAt(0) % COMBINING.length]; }
+  return out;
+}
+function GlitchText({ segments, swap }: { segments: GlitchSegment[]; swap?: boolean }) {
+  let swapN = 0;
   return (
     <>
-      {segments.map((s, i) =>
-        s.style ? (
-          <span key={i} className={GLITCH_CLASS[s.style]}>{s.text}</span>
-        ) : (
-          <span key={i}>{s.text}</span>
-        ),
-      )}
+      {segments.map((s, i) => {
+        if (!s.style) return <span key={i}>{s.text}</span>;
+        const cls = GLITCH_CLASS[s.style];
+        if (swap && (s.style === 'hot' || s.style === 'ca-fast')) {
+          const lane = ['a', 'b', 'c'][swapN++ % 3];
+          return (
+            <span key={i} className={`${cls} cx-swap ${lane}`}>
+              <span className="cx-v0">{s.text}</span>
+              <span className="cx-v1">{garbleWord(s.text)}</span>
+            </span>
+          );
+        }
+        return <span key={i} className={cls}>{s.text}</span>;
+      })}
     </>
   );
 }
@@ -102,7 +116,7 @@ export default function ResultReading() {
             <div style={cardsHeaderStyle}>The Cards · {turnResults.length}</div>
             <div style={tileGridStyle}>
               {turnResults.map((r, i) => (
-                <ResultTile key={i} result={r} index={i} onOpen={() => setOpenResult(r)} />
+                <ResultTile key={i} result={r} index={i} corruptionBand={corruption.band} onOpen={() => setOpenResult(r)} />
               ))}
             </div>
           </div>
@@ -113,11 +127,11 @@ export default function ResultReading() {
           <div style={synthesisHeroStyle}>
             <h2 style={sectionTitleStyle}>Interpretation</h2>
             <h3 style={headlineStyle}>
-              {seg ? <GlitchText segments={seg.headline} /> : synthesis.headline}
+              {seg ? <GlitchText segments={seg.headline} swap={corrupted} /> : synthesis.headline}
             </h3>
             {seg
               ? seg.paragraphs.map((segs, i) => (
-                  <p key={i} style={paraStyle}><GlitchText segments={segs} /></p>
+                  <p key={i} style={paraStyle}><GlitchText segments={segs} swap={corrupted} /></p>
                 ))
               : synthesis.paragraphs.map((p, i) => (
                   <p key={i} style={paraStyle}>{p}</p>
@@ -126,7 +140,7 @@ export default function ResultReading() {
               <div style={tensionBoxStyle}>
                 <div style={tensionBarStyle} />
                 <p style={tensionTextStyle}>
-                  {seg?.tensionNote ? <GlitchText segments={seg.tensionNote} /> : synthesis.tensionNote}
+                  {seg?.tensionNote ? <GlitchText segments={seg.tensionNote} swap={corrupted} /> : synthesis.tensionNote}
                 </p>
               </div>
             )}

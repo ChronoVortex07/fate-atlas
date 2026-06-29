@@ -1,4 +1,5 @@
 import type { SlotResult, TarotResult, TarotCardFace } from '../../engine/types';
+import { CORRUPTED_TAG } from '../../data/corruption';
 import CardSigil from './CardSigil';
 import AstralSigil from './AstralSigil';
 import RuneSigil from './RuneSigil';
@@ -52,12 +53,18 @@ function metaFor(r: SlotResult): { text: string; rev?: boolean } {
   }
 }
 
-export default function ResultTile({ result, index, onOpen }: { result: SlotResult; index: number; onOpen: () => void }) {
+export default function ResultTile({ result, index, onOpen, corruptionBand }:
+  { result: SlotResult; index: number; onOpen: () => void; corruptionBand: string }) {
+  const tainted = result.tags?.includes(CORRUPTED_TAG);
+  const virulent = corruptionBand === 'virulent' || corruptionBand === 'pinnacle';
+  // Deterministic-ish "random" aberration: a few tiles by index parity.
+  const sigCa = virulent ? ['', ' cx-sig', ' cx-sig d1', '', ' cx-sig d2', ' cx-sig d3'][index % 6] : '';
+
   const spread = result.type === 'tarot' ? (result as TarotResult).spread : undefined;
   const isSpread = !!spread && spread.length > 1;
 
   return (
-    <button type="button" onClick={onOpen} style={tileStyle} className="result-tile">
+    <button type="button" onClick={onOpen} style={tileStyle} className={`result-tile${tainted ? ' cx-tile-tainted' : ''}`}>
       <span style={idxStyle}>{index + 1}</span>
       {isSpread ? (
         <div style={triStyle}>
@@ -87,8 +94,8 @@ export default function ResultTile({ result, index, onOpen }: { result: SlotResu
         </div>
       ) : (
         <>
-          <div style={sigilStyle}><Sigil result={result} size={32} /></div>
-          <span style={nameStyle}>{nameFor(result)}</span>
+          <div style={sigilStyle} className={sigCa.trim() || undefined}><Sigil result={result} size={32} /></div>
+          <span style={nameStyle} className="cx-tile-name">{nameFor(result)}</span>
           {(() => { const m = metaFor(result); return <span style={{ ...metaStyle, ...(m.rev ? metaRevStyle : null) }}>{m.text}</span>; })()}
         </>
       )}
