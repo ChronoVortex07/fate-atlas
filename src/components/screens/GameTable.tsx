@@ -22,6 +22,7 @@ import CorruptionRift from '../overlays/corruption/CorruptionRift';
 import RuptureInterstitial from './RuptureInterstitial';
 import ForceRadarOverlay from '../overlays/corruption/ForceRadarOverlay';
 import IntrusionOverlay from '../overlays/corruption/IntrusionOverlay';
+import OmenOverlay from '../overlays/corruption/OmenOverlay';
 import type { ForbiddenGlimpse } from '../../engine/types';
 
 export default function GameTable() {
@@ -114,6 +115,7 @@ export default function GameTable() {
       )}
       {glimpse && <ForceRadarOverlay glimpse={glimpse} onDismiss={() => setGlimpse(null)} />}
       <IntrusionOverlay />
+      <OmenOverlay />
       <ParticleField />
     </div>
     </AnchorProvider>

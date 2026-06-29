@@ -395,3 +395,9 @@
   97%    { opacity: .5; }
   100%   { opacity: .3; }
 }
+
+/* ── Light's seed-omen (a hushed, frightened warning popup — Light's voice) ── */
+.cx-omen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:62;pointer-events:none;animation:cx-omen-wash 4.2s ease-out forwards}
+@keyframes cx-omen-wash{0%{background:radial-gradient(60% 40% at 50% 50%,#cfe0ff00,transparent)}18%{background:radial-gradient(60% 40% at 50% 50%,#cfe0ff14,transparent)}100%{background:radial-gradient(60% 40% at 50% 50%,#cfe0ff00,transparent)}}
+.cx-omen span{max-width:min(80vw,560px);text-align:center;font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:500;font-size:clamp(1.05rem,3.2vw,1.45rem);line-height:1.4;letter-spacing:.02em;color:#eaf2ff;text-shadow:0 0 10px #9fc0ff88;animation:cx-omen-line 4.2s ease-out forwards}
+@keyframes cx-omen-line{0%{opacity:0;transform:translateY(6px)}14%{opacity:1;transform:translateY(0)}82%{opacity:1}100%{opacity:0;transform:translateY(-4px)}}
