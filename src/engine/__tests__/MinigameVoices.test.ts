@@ -23,6 +23,13 @@ const strings = (name: string, fav = 0): SlotResult => ({
   dimensions: { favorability: fav, certainty: 0, volatility: 0 },
 } as unknown as SlotResult);
 
+const iching = (n: number, name: string, fav = 0): SlotResult => ({
+  type: 'iching', hexagramNumber: n, name, symbol: '䷀',
+  judgment: 'Success comes through perseverance', changingLines: [],
+  themes: ['mystery'], tags: [], modifierRoles: ['effect'],
+  dimensions: { favorability: fav, certainty: 0, volatility: 0 },
+} as unknown as SlotResult);
+
 describe('drawFraming fragments', () => {
   it('exposes variant scaffolds and group framing', () => {
     const df = READING_FRAGMENTS.drawFraming;
@@ -130,5 +137,15 @@ describe('MinigameVoice — strings journey aggregation', () => {
     expect(g.subject.toLowerCase()).toContain('split');
     expect(g.subject).toContain('A');
     expect(g.subject).toContain('B');
+  });
+});
+
+describe('MinigameVoice — iching movement aggregation', () => {
+  it('names the first and last hexagram and appends the final judgment gloss', () => {
+    const g = voiceFor('iching').describeGroup([iching(1, 'The Creative'), iching(29, 'The Abyss')], 'effect', 0);
+    expect(g.subject.toLowerCase()).toContain('turning from');
+    expect(g.subject).toContain('The Creative');
+    expect(g.subject).toContain('The Abyss');
+    expect(g.clause.toLowerCase()).toContain('success comes through perseverance');
   });
 });

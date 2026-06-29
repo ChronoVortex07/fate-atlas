@@ -154,9 +154,13 @@ const ichingVoice: MinigameVoice = {
   },
   describeGroup(slots, role, _occBase) {
     const hexes = slots.filter((s): s is Extract<SlotResult, { type: 'iching' }> => s.type === 'iching');
-    const items = hexes.map((h) => String(h.hexagramNumber));
-    const subject = `${DF.group.lead.iching} ${joinSeq(items, DF.group.seqLast, DF.group.mid)}`;
-    const clause = verbPhrase(role, groupDims(slots), 'iching-group' + items.join('|'));
+    const first = hexes[0], last = hexes[hexes.length - 1];
+    const subject = DF.group.ichingMovement
+      .replace('{from}', `Hexagram ${first.hexagramNumber}, ${first.name}`)
+      .replace('{to}', `Hexagram ${last.hexagramNumber}, ${last.name}`);
+    let clause = verbPhrase(role, groupDims(slots), 'iching-group' + hexes.map((h) => h.hexagramNumber).join('|'));
+    const g = gloss(last.judgment);
+    if (g) clause = `${clause} — ${g}`;
     return { subject, clause };
   },
 };

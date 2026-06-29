@@ -105,6 +105,7 @@ export const READING_FRAGMENTS = {
         generic: 'together —',
       } as Record<string, string>,
       d20Trend: { rising: 'the dice climbing —', falling: 'the dice falling —', scattered: 'the dice scattering —' } as Record<string, string>,
+      ichingMovement: 'the hexagrams turning from {from} toward {to}',
       stringsLead: 'the threads, drawn from',
       stringsSplit: 'the threads split from',
       seqLast: ', then ',
