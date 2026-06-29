@@ -117,5 +117,9 @@ const footerStyle: React.CSSProperties = { width: '100%', display: 'flex', align
 const wmStyle: React.CSSProperties = { display: 'flex', alignItems: 'baseline', gap: 6 };
 const wmAtlasStyle: React.CSSProperties = { fontFamily: "'Cormorant Garamond', serif", fontWeight: 700, letterSpacing: '0.18em', color: '#c8d8f0', fontSize: '0.78rem' };
 const wmOfStyle: React.CSSProperties = { fontFamily: "'Cormorant Garamond', serif", fontStyle: 'italic', fontSize: '0.62rem', color: '#c8a060' };
-const wmFateStyle: React.CSSProperties = { fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, letterSpacing: '0.18em', fontSize: '0.78rem', background: 'linear-gradient(180deg,#f0d595,#c08f3c)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' };
+// Solid gold rather than a background-clip:text gradient: html2canvas (the share
+// export) can't clip a gradient to glyphs, so it filled the whole box and left the
+// transparent text invisible — "FATE" exported as a redacted bar. A solid colour
+// rasterises identically to what's on screen.
+const wmFateStyle: React.CSSProperties = { fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, letterSpacing: '0.18em', fontSize: '0.78rem', color: '#e6c071' };
 const footTagStyle: React.CSSProperties = { fontFamily: "'Cormorant Garamond', serif", fontStyle: 'italic', color: '#5b7290', fontSize: '0.6rem' };

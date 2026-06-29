@@ -447,7 +447,7 @@ export default function Dashboard() {
             <div style={summaryRowStyle}>
               <span style={summaryKeyStyle}>Turn</span>
               <span style={summaryValueStyle}>
-                {state.minigamesCompleted}/3 complete
+                {state.minigamesCompleted}/{state.minigamesPerTurn} complete
               </span>
             </div>
             <div style={summaryRowStyle}>

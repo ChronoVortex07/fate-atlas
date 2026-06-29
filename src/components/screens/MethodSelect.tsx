@@ -277,11 +277,11 @@ export default function MethodSelect() {
         <h1 style={headingStyle}>Choose your divination</h1>
         <p style={subtitleStyle}>
           {state.minigamesCompleted > 0
-            ? `Reading ${state.minigamesCompleted + 1} of 3 — draw your next method`
+            ? `Reading ${state.minigamesCompleted + 1} of ${state.minigamesPerTurn} — draw your next method`
             : 'The stars deal their cards — draw one to reveal your fate'}
         </p>
         <div style={turnProgressStyle}>
-          {Array.from({ length: 3 }, (_, i) => (
+          {Array.from({ length: state.minigamesPerTurn }, (_, i) => (
             <div key={i} style={{
               ...progressDotStyle,
               background: i < state.minigamesCompleted ? '#d4a854' : '#1a2440',
