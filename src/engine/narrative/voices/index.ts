@@ -1,5 +1,6 @@
 import type { SlotResult, DivinationType, DimensionValues } from '../../types';
 import type { MinigameVoice, DrawOccurrence } from './types';
+import type { PositionCard, PositionSummary } from '../types';
 import { READING_FRAGMENTS as F } from '../../../data/reading-fragments';
 import {
   withArticle, gloss, verbPhrase, stableIndex, joinSeq, joinAnd, meanFavorability,
@@ -22,6 +23,56 @@ function occSuffix(occ: DrawOccurrence): string {
 
 const groupDims = (slots: SlotResult[]): DimensionValues =>
   ({ favorability: meanFavorability(slots), certainty: 0, volatility: 0 });
+
+const POSITION_ORDER: ('past' | 'present' | 'future')[] = ['past', 'present', 'future'];
+
+function leanOf(fav: number): 'favor' | 'steady' | 'adverse' {
+  return fav >= 0.5 ? 'favor' : fav <= -0.5 ? 'adverse' : 'steady';
+}
+
+/** Magnitude-weighted mean favorability: strong pulls dominate rather than cancel. */
+function weightedMeanFavorability(favs: number[]): number {
+  let num = 0, den = 0;
+  for (const f of favs) { const w = Math.abs(f); num += f * w; den += w; }
+  return den > 0 ? num / den : 0;
+}
+
+/**
+ * Collapse every multi-card spread into one Past/Present/Future set: each
+ * occupied position carries all cards that landed there (across every spread),
+ * a magnitude-weighted merged lean, and a contradiction flag when the position
+ * holds both a favorable (>= +0.5) and an adverse (<= -0.5) card.
+ */
+export function aggregateTarotPositions(spreads: SlotResult[]): PositionSummary[] {
+  const byPos = new Map<'past' | 'present' | 'future', PositionCard[]>();
+  for (const s of spreads) {
+    if (s.type !== 'tarot' || !s.spread) continue;
+    for (const { position, card } of s.spread) {
+      const meaning = (card.orientation === 'upright' ? card.meaningUpright : card.meaningReversed) ?? '';
+      const pc: PositionCard = {
+        name: card.name,
+        orientation: card.orientation,
+        favorability: card.dimensions.favorability,
+        lean: leanOf(card.dimensions.favorability),
+        gloss: card.veiled ? '' : gloss(meaning),
+        veiled: !!card.veiled,
+      };
+      const list = byPos.get(position) ?? [];
+      list.push(pc);
+      byPos.set(position, list);
+    }
+  }
+  const summaries: PositionSummary[] = [];
+  for (const position of POSITION_ORDER) {
+    const cards = byPos.get(position);
+    if (!cards || cards.length === 0) continue;
+    const favs = cards.map((c) => c.favorability);
+    const lean = leanOf(weightedMeanFavorability(favs));
+    const contradiction = favs.some((f) => f >= 0.5) && favs.some((f) => f <= -0.5);
+    summaries.push({ position, cards, lean, contradiction });
+  }
+  return summaries;
+}
 
 // ── Tarot ──
 const tarotVoice: MinigameVoice = {
