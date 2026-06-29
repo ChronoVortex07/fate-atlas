@@ -168,11 +168,23 @@ const stringsVoice: MinigameVoice = {
   },
   describeGroup(slots, role, _occBase) {
     const threads = slots.filter((s): s is Extract<SlotResult, { type: 'strings' }> => s.type === 'strings');
-    const items = threads.map((t) => {
-      const parts = t.name.split(' · ');
-      return `to ${parts[parts.length - 1] ?? 'the end'}`;
-    });
-    const subject = `${DF.group.lead.strings} ${joinAnd(items, DF.group.listLast, DF.group.mid)}`;
+    const partsOf = (t: Extract<SlotResult, { type: 'strings' }>) => t.name.split(' · ');
+    const origin = partsOf(threads[0])[0] ?? 'the start';
+    const waypoints: string[] = [];
+    const destinations: string[] = [];
+    for (const t of threads) {
+      const p = partsOf(t);
+      for (const mid of p.slice(1, -1)) if (!waypoints.includes(mid)) waypoints.push(mid);
+      const dest = p[p.length - 1] ?? 'the end';
+      if (!destinations.includes(dest)) destinations.push(dest);
+    }
+    let subject: string;
+    if (destinations.length > 1) {
+      subject = `${DF.group.stringsSplit} ${origin} toward ${joinAnd(destinations, DF.group.listLast, DF.group.mid)}`;
+    } else {
+      const through = waypoints.length > 0 ? ` through ${joinAnd(waypoints, DF.group.listLast, DF.group.mid)}` : '';
+      subject = `${DF.group.stringsLead} ${origin}${through} to ${destinations[0] ?? 'the end'}`;
+    }
     const clause = verbPhrase(role, groupDims(slots), 'strings-group' + threads.map((t) => t.name).join('|'));
     return { subject, clause };
   },

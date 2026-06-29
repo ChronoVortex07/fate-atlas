@@ -104,6 +104,8 @@ export const READING_FRAGMENTS = {
         strings: 'the threads gather —',
         generic: 'together —',
       } as Record<string, string>,
+      stringsLead: 'the threads, drawn from',
+      stringsSplit: 'the threads split from',
       seqLast: ', then ',
       listLast: ', and ',
       mid: ', ',
