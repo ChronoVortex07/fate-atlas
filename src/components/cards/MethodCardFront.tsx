@@ -1,4 +1,5 @@
 import MethodEmblem from './MethodEmblem';
+import WardSeal, { type WardProp } from './WardSeal';
 import { METHOD_FRONTS } from '../../data/method-cards';
 import type { DivinationType } from '../../engine/types';
 
@@ -6,7 +7,7 @@ export type CorruptedProp = 'spreading' | 'virulent' | null;
 
 // The face-up card content: Celestial-Veil frame + family-tinted emblem, title,
 // and flavor. Fills its parent (MethodCard) which owns the 2:3 box + flip.
-export default function MethodCardFront({ method, corrupted = null }: { method: DivinationType; corrupted?: CorruptedProp }) {
+export default function MethodCardFront({ method, corrupted = null, ward = null }: { method: DivinationType; corrupted?: CorruptedProp; ward?: WardProp }) {
   const cfg = METHOD_FRONTS[method];
   return (
     <div style={{ ...frontStyle, borderColor: cfg.color + '55' }}>
@@ -27,6 +28,7 @@ export default function MethodCardFront({ method, corrupted = null }: { method: 
       </div>
       <div className={corrupted ? 'cx-name' : undefined} style={titleStyle}>{cfg.title}</div>
       <div style={flavorStyle}>{cfg.flavor}</div>
+      <WardSeal ward={ward} />
     </div>
   );
 }

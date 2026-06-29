@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react';
 import MethodCard, { type MethodCardVisual, type MethodCardMotion } from './MethodCard';
 import type { CorruptedProp } from './MethodCardFront';
+import type { WardProp } from './WardSeal';
 import type { DivinationType } from '../../engine/types';
 
 export interface CardSpreadProps {
@@ -21,11 +22,13 @@ export interface CardSpreadProps {
   containerRef?: React.RefObject<HTMLDivElement>;
   // Optional: returns corruption class for index i (null = normal)
   corruptedFor?: (index: number) => CorruptedProp;
+  // Optional: returns Light's ward-seal / lure overlay for index i (null = none)
+  wardFor?: (index: number) => WardProp;
 }
 
 export default function CardSpread({
   methods, visualFor, motionFor, appearedFor, appearDelayFor, dissolvingFor, phantomIndex,
-  interactive, onPick, dealNonce, containerRef, corruptedFor,
+  interactive, onPick, dealNonce, containerRef, corruptedFor, wardFor,
 }: CardSpreadProps) {
   const internalRef = useRef<HTMLDivElement>(null);
   const scrollRef = containerRef ?? internalRef;
@@ -55,6 +58,7 @@ export default function CardSpread({
           interactive={interactive}
           onClick={() => onPick(i)}
           corrupted={corruptedFor ? corruptedFor(i) : null}
+          ward={wardFor ? wardFor(i) : null}
         />
       ))}
     </div>

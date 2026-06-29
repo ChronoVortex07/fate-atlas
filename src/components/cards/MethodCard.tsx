@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import MethodCardFront, { type CorruptedProp } from './MethodCardFront';
+import type { WardProp } from './WardSeal';
 import FateMark from '../shared/FateMark';
 import { METHOD_FRONTS } from '../../data/method-cards';
 import type { DivinationType } from '../../engine/types';
@@ -20,6 +21,7 @@ export interface MethodCardProps {
   dissolving?: boolean;   // Fate-thin: the card dissolves into gold motes and is removed
   phantom?: boolean;      // a placeholder card (the closing path) — never revealed, aria-hidden
   corrupted?: CorruptedProp; // telegraph infection band; null/undefined = normal
+  ward?: WardProp;           // Light's ward-seal / corruption's lure overlay
 }
 
 // Deal-in entrance: the card drops in from below, faded and small, with a slight
@@ -32,7 +34,7 @@ const DISSOLVE = { opacity: 0, scale: 0.84, filter: 'brightness(1.6)' };
 
 export default function MethodCard({
   method, visual, motion: emphasis = 'idle', interactive, onClick, index,
-  appeared = true, appearDelay = 0, dissolving = false, phantom = false, corrupted = null,
+  appeared = true, appearDelay = 0, dissolving = false, phantom = false, corrupted = null, ward = null,
 }: MethodCardProps) {
   const flipped = visual !== 'face-down'; // face-up OR shrouded → rotated to front
 
@@ -58,7 +60,10 @@ export default function MethodCard({
         disabled={!interactive}
         onClick={interactive ? onClick : undefined}
         style={cardBoxStyle}
-        className={corrupted === 'virulent' ? 'cx-card-virulent' : corrupted === 'spreading' ? 'cx-card-spreading' : undefined}
+        className={[
+          corrupted === 'virulent' ? 'cx-card-virulent' : corrupted === 'spreading' ? 'cx-card-spreading' : '',
+          ward && ward.kind === 'lure' && ward.lunging ? 'cx-lure-lunge' : '',
+        ].filter(Boolean).join(' ') || undefined}
         animate={dissolving ? DISSOLVE : motionState}
         transition={dissolving ? { duration: 0.55, ease: 'easeIn' } : { type: 'spring', stiffness: 320, damping: 26 }}
         whileHover={interactive ? { y: -8, scale: 1.03 } : undefined}
@@ -84,7 +89,7 @@ export default function MethodCard({
                 <ShroudFog dispersing />
               </div>
             ) : (
-              <MethodCardFront method={method} corrupted={corrupted} />
+              <MethodCardFront method={method} corrupted={corrupted} ward={ward} />
             )}
           </div>
         </motion.div>

@@ -9,6 +9,8 @@ import EventBanner, { type BannerMessage } from '../overlays/EventBanner';
 import FateForceOverlay, { type HandTarget } from '../overlays/FateForceOverlay';
 import type { MethodCardVisual, MethodCardMotion } from '../cards/MethodCard';
 import type { CorruptedProp } from '../cards/MethodCardFront';
+import type { WardProp } from '../cards/WardSeal';
+import { sealStageForValue, NEAR_PINNACLE } from '../../data/corruption';
 import type { DivinationType } from '../../engine/types';
 
 // Local lifecycle of one draw: deal the cards face-down, auto-play any draw
@@ -232,6 +234,28 @@ export default function MethodSelect() {
     return null;
   };
 
+  // Light's warning overlay per card. Precision comes from corruptionWarning
+  // (Dominant → methods named; Ascendant → vague, handled by the spread-wide
+  // ambient shimmer instead). State comes from the corruption value.
+  const warning = state.corruptionWarning;
+  const corruptionValue = state.corruption.value;
+  const wardFor = (i: number): WardProp => {
+    if (!state.infectedMethods.includes(i)) return null;
+    // Virulent hijack: the seal is broken — corruption openly lures.
+    if (band === 'virulent' || band === 'pinnacle') {
+      return { kind: 'lure', lunging: corruptionValue >= NEAR_PINNACLE };
+    }
+    // Spreading + Light Dominant (names the tainted paths): the ward seal.
+    if (warning && warning.methods.includes(i)) {
+      const stage = sealStageForValue(corruptionValue);
+      if (stage === 'intact' || stage === 'strain') return { kind: 'seal', stage };
+    }
+    return null;
+  };
+
+  // Ascendant Light senses a predator but cannot pinpoint it → vague spread-wide unease.
+  const showAmbientUnease = !!warning && warning.present && !warning.tainted && warning.methods.length === 0;
+
   // Infected pick: the picked card's index (non-forced only).
   const infectedPickIndex =
     pending && !pending.wasForced && state.infectedMethods.includes(pending.finalIndex)
@@ -268,6 +292,7 @@ export default function MethodSelect() {
         <div style={goldRuleStyle} />
 
         <div ref={spreadWrapRef} style={spreadWrapStyle}>
+          {showAmbientUnease && <div className="cx-ambient" aria-hidden />}
           <CardSpread
             containerRef={spreadRef}
             dealNonce={nonce}
@@ -280,6 +305,7 @@ export default function MethodSelect() {
             phantomIndex={phantomIndex}
             interactive={interactive}
             corruptedFor={corruptedFor}
+            wardFor={wardFor}
             onPick={(i) => {
               // Measure the picked card now (resting position) so the Fate-force
               // hand can descend onto it AND the corrupted ascend can play in place.
