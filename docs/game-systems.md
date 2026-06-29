@@ -1399,6 +1399,11 @@ bands (4 nodes each), and the final **destination** band (3 nodes drawn from the
 that answer the current question). Edges connect adjacent bands only; every node has ≥1
 forward edge and a path origin→destination always exists. Nodes are placed in a radial
 bloom (origin centre, bands as orbit-rings). Base path length is **4 nodes / 3 picks**.
+Each band's ring is given a **fresh random rotation** and its nodes a **shuffled slot
+assignment** every game (`placeBand`), and the three destinations are **shuffled** before
+placement — so neither a node's index nor an ending's valence maps to a fixed screen
+angle. This keeps the layout from being solved by steering toward where the favorable
+ending "always" sits; spatial direction carries no information about the outcome.
 The **final fork** (penultimate band → destinations) funnels to a single thread per node
 at baseline (`plan.finalWidth` = 1) so the ending can't be freely cherry-picked; coverage
 still guarantees every destination stays reachable. Will reopens it (ascendant → 2,

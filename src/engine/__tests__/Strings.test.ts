@@ -241,3 +241,48 @@ describe('ReadingPlanner strings expansion', () => {
     expect(agg.strongestAdverse!.label).toContain('Undertow');
   });
 });
+
+// A well-distributed seedable RNG so each seed yields a distinct weave layout.
+function mulberry32(seed: number): () => number {
+  return () => {
+    seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const octantOf = (n: { x: number; y: number }): number => {
+  const ang = Math.atan2(n.y, n.x); // -π..π
+  return Math.floor(((ang + Math.PI) / (2 * Math.PI)) * 8) % 8;
+};
+
+describe('generateWeave placement is not telegraphed', () => {
+  // 'self' has exactly three destinations, so 'the-true-name' (the benevolent one)
+  // is always seeded — making it a stable probe for "where does the good ending sit?".
+  const plan = planWeave(baseAff);
+
+  it('scatters a given destination across the circle instead of pinning it to a fixed angle', () => {
+    const octants = new Set<number>();
+    for (let s = 1; s <= 200; s++) {
+      const g = generateWeave('self', plan, mulberry32(s));
+      const dest = g.nodes.find((n) => n.conceptId === 'the-true-name')!;
+      octants.add(octantOf(dest));
+    }
+    // The old layout fixed each destination at base angle index/count, pinning the
+    // benevolent ending to one screen position every game. The fix must spread it.
+    expect(octants.size).toBeGreaterThanOrEqual(6);
+  });
+
+  it('shuffles destination order so outcome valence is not bound to a slot index', () => {
+    const atSlotZero = new Set<string>();
+    for (let s = 1; s <= 100; s++) {
+      const g = generateWeave('self', plan, mulberry32(s));
+      const destBand = g.bandCount - 1;
+      const slotZero = g.nodes.find((n) => n.band === destBand && n.id === `b${destBand}-0`)!;
+      atSlotZero.add(slotZero.conceptId);
+    }
+    // Old code always placed destinationsFor()[0] (the benevolent star) at index 0.
+    expect(atSlotZero.size).toBeGreaterThanOrEqual(2);
+  });
+});

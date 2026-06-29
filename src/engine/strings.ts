@@ -53,6 +53,16 @@ const N_DEST = 3;     // destination nodes shown
 
 const pick = <T,>(arr: T[], rng: () => number): T => arr[Math.floor(rng() * arr.length)];
 
+// Fisher–Yates, returns a fresh array so callers keep their input order.
+const shuffle = <T,>(arr: T[], rng: () => number): T[] => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
 // Weighted-without-replacement sample of `n` ids, weight skewed by extremeBias:
 // Chaos (>0) favors high-magnitude concepts; Order (<0) favors mild ones.
 function sampleCrossings(n: number, extremeBias: number, rng: () => number): string[] {
@@ -73,18 +83,28 @@ function sampleCrossings(n: number, extremeBias: number, rng: () => number): str
   return out;
 }
 
-function placeNode(id: string, band: number, indexInBand: number, bandSize: number, bandCount: number, jitter: number, rng: () => number): WovenNode {
+// Lay a band's nodes around its orbit-ring. The ring gets a fresh random rotation
+// each game and each node's angular slot is shuffled, so neither a node's index nor
+// a destination's data-order maps to a learnable screen angle. This is what stops the
+// weave from being solved by "steer toward where the good ending always sits" — the
+// favorable destination no longer occupies a fixed direction from the centre.
+function placeBand(ids: string[], band: number, bandCount: number, jitter: number, rng: () => number): WovenNode[] {
   const radius = bandCount > 1 ? band / (bandCount - 1) : 0;
-  const baseAngle = bandSize > 1 ? (indexInBand / bandSize) * Math.PI * 2 : 0;
-  const wobble = (rng() - 0.5) * jitter;
-  return {
-    id: `b${band}-${indexInBand}`,
-    conceptId: id,
-    band,
-    family: CONCEPTS[id].family,
-    x: Math.cos(baseAngle + wobble) * radius,
-    y: Math.sin(baseAngle + wobble) * radius,
-  };
+  const n = ids.length;
+  const rotation = n > 1 ? rng() * Math.PI * 2 : 0;
+  const slots = shuffle([...Array(n).keys()], rng); // node index → angular slot
+  return ids.map((id, i) => {
+    const baseAngle = n > 1 ? rotation + (slots[i] / n) * Math.PI * 2 : 0;
+    const wobble = (rng() - 0.5) * jitter;
+    return {
+      id: `b${band}-${i}`,
+      conceptId: id,
+      band,
+      family: CONCEPTS[id].family,
+      x: Math.cos(baseAngle + wobble) * radius,
+      y: Math.sin(baseAngle + wobble) * radius,
+    };
+  });
 }
 
 export function generateWeave(question: QuestionType, plan: WeavePlan, rng: () => number = Math.random): WeaveGraph {
@@ -93,22 +113,23 @@ export function generateWeave(question: QuestionType, plan: WeavePlan, rng: () =
   const bands: WovenNode[][] = [];
 
   // band 0: origin
-  bands.push([placeNode(pick(ORIGIN_IDS, rng), 0, 0, 1, bandCount, 0, rng)]);
+  bands.push(placeBand([pick(ORIGIN_IDS, rng)], 0, bandCount, 0, rng));
 
   // crossing bands 1..bandCount-2
   for (let b = 1; b < bandCount - 1; b++) {
     const ids = sampleCrossings(N_CROSSING, plan.extremeBias, rng);
-    bands.push(ids.map((id, i) => placeNode(id, b, i, ids.length, bandCount, jitter, rng)));
+    bands.push(placeBand(ids, b, bandCount, jitter, rng));
   }
 
-  // destination band
+  // destination band — shuffle so the benevolent/challenging/neutral endings rotate
+  // between slots each game rather than the data order pinning valence to a position.
   const destPool = destinationsFor(question);
-  const destIds = destPool.length <= N_DEST ? destPool : (() => {
+  const destIds = destPool.length <= N_DEST ? shuffle(destPool, rng) : (() => {
     const copy = [...destPool]; const out: string[] = [];
     while (out.length < N_DEST && copy.length) out.push(copy.splice(Math.floor(rng() * copy.length), 1)[0]);
     return out;
   })();
-  bands.push(destIds.map((id, i) => placeNode(id, bandCount - 1, i, destIds.length, bandCount, jitter, rng)));
+  bands.push(placeBand(destIds, bandCount - 1, bandCount, jitter, rng));
 
   // edges: every next-band node gets ≥1 incoming (round-robin coverage), then each
   // source gets up to `cap` distinct forward targets. Crossing bands keep a dense
