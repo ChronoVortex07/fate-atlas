@@ -163,6 +163,7 @@ export default function Dashboard() {
   const [scenarioOpen, setScenariosOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [forceOpen, setForceOpen] = useState(false);
+  const [corruptionOpen, setCorruptionOpen] = useState(false);
 
   // ── Scenario state ──
   const [scenarioId, setScenarioId] = useState('');
@@ -183,6 +184,11 @@ export default function Dashboard() {
       engine.loadState({ affinities: { ...state.affinities, [id]: value } });
     },
     [engine, state.affinities],
+  );
+
+  const handleCorruptionChange = useCallback(
+    (value: number) => engine.setCorruption(value),
+    [engine],
   );
 
   const handleLoadScenario = useCallback(() => {
@@ -262,6 +268,55 @@ export default function Dashboard() {
                 </div>
               );
             })}
+          </div>
+        )}
+      </div>
+
+      {/* ════ Corruption ════ */}
+      <div style={sectionBorderStyle}>
+        <button
+          style={sectionHeaderStyle}
+          onClick={() => setCorruptionOpen((p) => !p)}
+        >
+          <span style={triangleStyle(corruptionOpen)}>{corruptionOpen ? '▼' : '▶'}</span>
+          <span style={sectionLabelStyle}>Corruption</span>
+        </button>
+        {corruptionOpen && (
+          <div style={affinityBodyStyle}>
+            <div style={affinityHeaderRowStyle}>
+              <span style={affinityNameStyle}>Value</span>
+              <span style={affinityValueStyle}>{state.corruption.value}</span>
+              <span style={{ ...bandLabelStyle, color: '#d4a854' }}>
+                {state.corruption.band}
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={state.corruption.value}
+              onChange={(e) => handleCorruptionChange(Number(e.target.value))}
+              style={sliderStyle}
+            />
+            <div style={corruptionBtnRowStyle}>
+              {([
+                ['Clear', 0], ['Seed', 5], ['Spreading', 50], ['Virulent', 80], ['Pinnacle', 100],
+              ] as [string, number][]).map(([label, value]) => (
+                <button
+                  key={label}
+                  style={corruptionBtnStyle}
+                  onClick={() => handleCorruptionChange(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div style={{ ...summaryRowStyle, marginTop: '0.35rem' }}>
+              <span style={summaryKeyStyle}>Has intruded</span>
+              <span style={summaryValueStyle}>
+                {String(engine.corruptionEngineForTest().getHasIntruded())}
+              </span>
+            </div>
           </div>
         )}
       </div>
@@ -568,6 +623,28 @@ const barFillStyle: React.CSSProperties = {
   height: '100%',
   borderRadius: '2px',
   transition: 'width 0.2s ease',
+};
+
+// ── Corruption Styles ──
+
+const corruptionBtnRowStyle: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '0.3rem',
+  marginTop: '0.4rem',
+};
+
+const corruptionBtnStyle: React.CSSProperties = {
+  fontFamily: "'Inter', sans-serif",
+  fontWeight: 600,
+  fontSize: '0.55rem',
+  color: '#d4a854',
+  background: 'rgba(26, 36, 64, 0.6)',
+  border: '1px solid #d4a854',
+  borderRadius: '3px',
+  padding: '0.2rem 0.4rem',
+  cursor: 'pointer',
+  outline: 'none',
 };
 
 // ── Current Decisions Styles ──
