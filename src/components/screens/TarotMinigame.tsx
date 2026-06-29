@@ -81,7 +81,12 @@ export default function TarotMinigame() {
   const [fatedForce, setFatedForce] = useState<{ index: number } | null>(null);
   const [fatedPressed, setFatedPressed] = useState(false);
   const [fatedTarget, setFatedTarget] = useState<HandTarget | null>(null);
-  const planRequestedRef = useRef(false);
+  // Orientation preempt is decided once per full hand and cached here so Strict
+  // Mode re-mounts (and any effect re-run) re-arm the timers from the decision
+  // instead of re-rolling the non-idempotent planReveal(). Both reset on a fresh
+  // draft (hand no longer full) in the reset effect below.
+  const preemptDecidedRef = useRef(false);
+  const preemptOrientationRef = useRef<'upright' | 'reversed' | null>(null);
   const godPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const commitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handRowRef = useRef<HTMLDivElement | null>(null);
@@ -117,22 +122,40 @@ export default function TarotMinigame() {
     if (d.phase !== 'drafting') return;
     if (!d.hand.every((h) => h !== null)) return;
     if (suppressPreemptRef.current) return; // let the fated god-hand finish first
-    if (planRequestedRef.current) return;
-    planRequestedRef.current = true;
-    const plan = engine.planReveal();
-    if (!plan.preempt || !plan.orientation) return;
+
+    // Decide the orientation EXACTLY ONCE per full hand and cache it. planReveal()
+    // is non-idempotent (the responder re-rolls / a forced flag is consumed), so a
+    // second call can disagree with the first. Under React Strict Mode the effect
+    // runs mount → cleanup → mount; re-deriving the plan on the second mount could
+    // return "no preempt" after the first mount already showed the god-hand,
+    // leaving the overlay up with no commit scheduled (soft-lock). Caching the
+    // decision lets every re-arm reuse it, so the commit timer is always restored.
+    if (!preemptDecidedRef.current) {
+      preemptDecidedRef.current = true;
+      const plan = engine.planReveal();
+      preemptOrientationRef.current = plan.preempt ? plan.orientation : null;
+    }
+    const orientation = preemptOrientationRef.current;
+    if (!orientation) return; // Fate keeps its hands off; the player keeps the choice.
+
     // Fate seizes the choice: measure the hand row, drop the god-hand, commit.
-    // Timers stored in refs so the cleanup below (which resets planRequestedRef)
-    // can clear them on dep-change without losing them to a no-op Strict Mode
-    // cleanup. planRequestedRef reset in cleanup allows Strict Mode re-arm.
     const rect = handRowRef.current?.getBoundingClientRect();
     if (rect) setHandTarget({ x: rect.left + rect.width / 2, topY: rect.top });
-    setPreempt({ orientation: plan.orientation });
+    setPreempt({ orientation });
     godPressTimerRef.current = setTimeout(() => setGodPressed(true), 650);
-    commitTimerRef.current = setTimeout(() => engine.commitDraft(plan.orientation === 'reversed'), 1500);
+    commitTimerRef.current = setTimeout(() => {
+      engine.commitDraft(orientation === 'reversed');
+      // Release the god-hand so the overlay exit-animates off the now-revealed
+      // spread. The reset effect can't do this — after commit the hand is still
+      // full and the phase has left 'drafting', so neither of its clear paths run
+      // (mirrors the fated god-hand, which self-clears via fatedDoneTimerRef).
+      setPreempt(null);
+      setGodPressed(false);
+      setHandTarget(null);
+    }, 1500);
     return () => {
-      // Reset guard so a re-run (Strict Mode remount or genuine dep change) can re-arm.
-      planRequestedRef.current = false;
+      // Real unmount / dep-change: drop the pending timers. The cached decision in
+      // the refs survives so a Strict Mode re-mount re-arms without re-rolling.
       if (godPressTimerRef.current != null) { clearTimeout(godPressTimerRef.current); godPressTimerRef.current = null; }
       if (commitTimerRef.current != null) { clearTimeout(commitTimerRef.current); commitTimerRef.current = null; }
     };
@@ -148,7 +171,8 @@ export default function TarotMinigame() {
     const full = d.hand.every((h) => h !== null);
     const empty = d.hand.every((h) => h === null);
     if (!full) {
-      planRequestedRef.current = false;
+      preemptDecidedRef.current = false;
+      preemptOrientationRef.current = null;
       setPreempt(null);
       setGodPressed(false);
       setHandTarget(null);
