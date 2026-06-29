@@ -98,3 +98,33 @@ export const CORRUPTED_TAG = 'corrupted'; // marks a result the player can tell 
 
 export const SIGHT_COST = 6;   // corruption added on the first forbidden-sight use per minigame
 export const LIE_OFFSET = 18;  // magnitude the one falsified force is shifted by
+
+// ── Light's corruption warning (presentation copy + seal staging) ──
+
+// Light's seed-omen — fired once per perceived band escalation (sentence-case,
+// formal: the scared protector). See docs/game-systems.md.
+export const SEED_OMEN =
+  'Something has taken root in the weave that should not be. Say nothing — do not let it know I warned you.';
+
+// Light's furtive, cut-off line that corruption interrupts at the virulent crossing.
+export const LIGHT_LEAD_IN = 'There is something in the —';
+
+// Corruption's taunt, drawn when it interrupts Light at the virulent crossing.
+// Lowercase, matching INTRUSION_PHRASES.
+export const TAUNT_LIGHT = [
+  'i let it warn you. watch how little it matters.',
+];
+
+// Ward-seal visual stage as a pure function of corruption value (deterministic,
+// reload-safe). 'none' below spreading; intact → strain → shattered as it worsens.
+export type SealStage = 'none' | 'intact' | 'strain' | 'shattered';
+export const SEAL_INTACT_MAX = 56; // ≤ this (within spreading) the seal is calm
+export const SEAL_STRAIN_MAX = 78; // ≤ this the seal strains; above → shattered
+
+export function sealStageForValue(value: number): SealStage {
+  const band = corruptionBandOf(value);
+  if (band === 'dormant' || band === 'seeded') return 'none';
+  if (value <= SEAL_INTACT_MAX) return 'intact';
+  if (value <= SEAL_STRAIN_MAX) return 'strain';
+  return 'shattered';
+}
