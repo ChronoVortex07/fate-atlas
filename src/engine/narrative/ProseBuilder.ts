@@ -185,17 +185,20 @@ export class ProseBuilder {
     const framing = this.pick(`pos_frame_${s.position}`, F.positionFraming[s.position]);
     const named = (c: PositionCard) => `the ${c.name}${c.orientation === 'reversed' ? ' reversed' : ''}`;
     const namedGloss = (c: PositionCard) => (c.gloss ? `${named(c)} — ${c.gloss}` : named(c));
+    const visible = s.cards.filter((c) => !c.veiled);
 
     if (s.contradiction) {
-      const favor = [...s.cards].filter((c) => c.favorability > 0).sort((a, b) => b.favorability - a.favorability)[0];
-      const adverse = [...s.cards].filter((c) => c.favorability < 0).sort((a, b) => a.favorability - b.favorability)[0];
-      return this.pick('pos_contradiction', F.positionContradiction)
-        .replace('{pos}', `the ${s.position}`)
-        .replace('{favor}', named(favor))
-        .replace('{adverse}', named(adverse));
+      const favor = visible.filter((c) => c.favorability > 0).sort((a, b) => b.favorability - a.favorability)[0];
+      const adverse = visible.filter((c) => c.favorability < 0).sort((a, b) => a.favorability - b.favorability)[0];
+      if (favor && adverse) {
+        return this.pick('pos_contradiction', F.positionContradiction)
+          .replace('{pos}', `the ${s.position}`)
+          .replace('{favor}', named(favor))
+          .replace('{adverse}', named(adverse));
+      }
+      // A veiled card was a pole — fall through to the lean rendering so its name never leaks.
     }
 
-    const visible = s.cards.filter((c) => !c.veiled);
     if (visible.length === 0) {
       return `${framing} what is veiled ${F.positionLeans[s.lean]}`;
     }

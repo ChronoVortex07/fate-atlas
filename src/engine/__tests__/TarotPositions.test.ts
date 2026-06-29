@@ -104,4 +104,17 @@ describe('ProseBuilder positions rendering', () => {
     const text = out.paragraphs.join(' ').toLowerCase();
     expect(text).toContain('fortune'); // positionLeans.favor === 'leans toward fortune'
   });
+
+  it('does not leak a veiled card name in a contradiction position', () => {
+    const summaries: PositionSummary[] = [{
+      position: 'present', contradiction: true, lean: 'steady',
+      cards: [
+        { name: 'SecretSun', orientation: 'upright', favorability: 1.5, lean: 'favor', gloss: '', veiled: true },
+        { name: 'Five of Swords', orientation: 'reversed', favorability: -1.5, lean: 'adverse', gloss: 'a hollow win', veiled: false },
+      ],
+    }];
+    const out = new ProseBuilder().build([{ kind: 'positions', summaries }, closeBeat], proseCtx);
+    const text = out.paragraphs.join(' ');
+    expect(text).not.toContain('SecretSun');
+  });
 });
