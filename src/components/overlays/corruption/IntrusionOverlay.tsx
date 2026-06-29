@@ -12,7 +12,10 @@ export default function IntrusionOverlay() {
   if (!intrusion) return null;
   return (
     <div className="cx-intrusion" aria-hidden>
-      <span key={intrusion.text}>{intrusion.text}</span>
+      <span key={intrusion.text}>
+        {intrusion.lead && <span className="cx-lead">{intrusion.lead}</span>}
+        {intrusion.text}
+      </span>
     </div>
   );
 }

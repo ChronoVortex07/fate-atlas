@@ -401,3 +401,7 @@
 @keyframes cx-omen-wash{0%{background:radial-gradient(60% 40% at 50% 50%,#cfe0ff00,transparent)}18%{background:radial-gradient(60% 40% at 50% 50%,#cfe0ff14,transparent)}100%{background:radial-gradient(60% 40% at 50% 50%,#cfe0ff00,transparent)}}
 .cx-omen span{max-width:min(80vw,560px);text-align:center;font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:500;font-size:clamp(1.05rem,3.2vw,1.45rem);line-height:1.4;letter-spacing:.02em;color:#eaf2ff;text-shadow:0 0 10px #9fc0ff88;animation:cx-omen-line 4.2s ease-out forwards}
 @keyframes cx-omen-line{0%{opacity:0;transform:translateY(6px)}14%{opacity:1;transform:translateY(0)}82%{opacity:1}100%{opacity:0;transform:translateY(-4px)}}
+
+/* ── taunt lead-in: Light's cut-off line that precedes corruption's taunt ── */
+.cx-intrusion .cx-lead{display:block;font-style:italic;font-weight:500;color:#dfe8ff;text-shadow:0 0 6px #9fc0ff66;opacity:.85;margin-bottom:.5rem;font-size:clamp(1.05rem,3.4vw,1.4rem);animation:cx-lead-in 2.4s ease-out forwards}
+@keyframes cx-lead-in{0%{opacity:0}10%{opacity:.9}55%{opacity:.9}70%{opacity:.25}100%{opacity:0}}
