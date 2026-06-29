@@ -76,7 +76,8 @@ describe('ReadingComposer', () => {
     const positions = beats.find((b) => b.kind === 'positions');
     expect(positions).toBeTruthy();
     if (positions && positions.kind === 'positions') {
-      expect(positions.entries.map((e) => e.lean)).toEqual(['favor', 'steady', 'adverse']);
+      expect(positions.summaries.map((s) => s.position)).toEqual(['past', 'present', 'future']);
+      expect(positions.summaries.map((s) => s.lean)).toEqual(['favor', 'steady', 'adverse']);
     }
   });
 

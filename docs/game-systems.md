@@ -621,8 +621,7 @@ reading over those. Favorability is **magnitude-weighted** (`Σ v·|v| / Σ|v|`)
 pulls dominate rather than cancelling, and the planner surfaces the **strongest favorable
 and adverse poles** (`strongestFavor` / `strongestAdverse`). `NarrativeAssembler` then uses
 a **narrower symmetric favorability band** (`high ≥ +0.5`, `low ≤ −0.5`), **names the
-opposing poles** when a neutral net hides opposed forces, emits one **per-position line**
-per spread (instead of re-listing the spread inside the modifier frames), and narrates each
+opposing poles** when a neutral net hides opposed forces, merges every multi-card spread into **one Past/Present/Future set** (`aggregateTarotPositions`) and emits a single positions beat that **names the card(s) per position, weaves a meaning gloss, and flags a contradiction** when a position holds both a favorable and an adverse card (instead of re-listing each spread inside the modifier frames), and narrates each
 result under **exactly one** modifier role (disjoint frames — the role where it ranks
 strongest).
 
@@ -672,10 +671,7 @@ The spread composition is visible at every display surface:
   and orientation indicators.
 - **ResultReading** — the final results page shows a 3-column positional layout for each
   multi-card tarot slot, with per-card symbol, name, orientation, and meaning snippet.
-- **NarrativeAssembler** — `describeSlotBrief` renders position breakdowns
-  ("Past: The Fool (upright); Present: The Magician (upright); Future: The High Priestess
-  (upright)") for modifier-frame text. `describeSlotFull` (LLM prompt) already handles
-  per-position rendering with veiled-card support.
+- **NarrativeAssembler** — repeated same-type draws now collapse through their voice's `describeGroup` into one combined voice: tarot via merged Past/Present/Future positions (`aggregateTarotPositions`); strings as one woven journey; d20 as a roll trend; I Ching as movement between hexagrams. `describeSlotFull` (LLM prompt) still handles per-position rendering with veiled-card support.
 
 ---
 

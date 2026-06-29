@@ -104,6 +104,10 @@ export const READING_FRAGMENTS = {
         strings: 'the threads gather —',
         generic: 'together —',
       } as Record<string, string>,
+      d20Trend: { rising: 'the dice climbing —', falling: 'the dice falling —', scattered: 'the dice scattering —' } as Record<string, string>,
+      ichingMovement: 'the hexagrams turning from {from} toward {to}',
+      stringsLead: 'the threads, drawn from',
+      stringsSplit: 'the threads split from',
       seqLast: ', then ',
       listLast: ', and ',
       mid: ', ',
@@ -169,6 +173,17 @@ export const READING_FRAGMENTS = {
 
   // ── Positions: lean phrases for multi-card spreads ──
   positionLeans: { favor: 'leans toward fortune', steady: 'holds steady', adverse: 'turns adverse' } as Record<string, string>,
+
+  // ── Positions: per-position framing + contradiction templates ──
+  positionFraming: {
+    past:    ['In what has passed,', 'Behind the moment lies', 'The past holds'],
+    present: ['At the present turn,', 'Here and now,', 'The present shows'],
+    future:  ['Ahead,', 'What comes bends toward', 'The future opens onto'],
+  } as Record<string, string[]>,
+  positionContradiction: [
+    '{pos} divides against itself — {favor} set against {adverse}',
+    '{pos} speaks in two voices: {favor}, and yet {adverse}',
+  ],
 
   // ── Closes ──
   closes: {

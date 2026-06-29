@@ -17,6 +17,19 @@ const tarot = (name: string, fav = 0): SlotResult => ({
   dimensions: { favorability: fav, certainty: 0, volatility: 0 },
 } as unknown as SlotResult);
 
+const strings = (name: string, fav = 0): SlotResult => ({
+  type: 'strings', name, symbol: '✶', interpretation: 'A woven path',
+  themes: ['mystery'], tags: [], modifierRoles: ['subject'],
+  dimensions: { favorability: fav, certainty: 0, volatility: 0 },
+} as unknown as SlotResult);
+
+const iching = (n: number, name: string, fav = 0): SlotResult => ({
+  type: 'iching', hexagramNumber: n, name, symbol: '䷀',
+  judgment: 'Success comes through perseverance', changingLines: [],
+  themes: ['mystery'], tags: [], modifierRoles: ['effect'],
+  dimensions: { favorability: fav, certainty: 0, volatility: 0 },
+} as unknown as SlotResult);
+
 describe('drawFraming fragments', () => {
   it('exposes variant scaffolds and group framing', () => {
     const df = READING_FRAGMENTS.drawFraming;
@@ -64,7 +77,7 @@ describe('MinigameVoice — aggregation', () => {
     expect(g.subject).toContain('5');
     expect(g.subject).toContain('12');
     expect(g.subject).toContain('18');
-    expect(g.subject).toContain('the dice fall in turn');
+    expect(g.subject).toContain('the dice climbing'); // 5,12,18 is strictly rising
     // exactly one scaffold, not three
     expect(g.subject.match(/the dice/g)?.length).toBe(1);
     expect(g.clause.trim().length).toBeGreaterThan(0);
@@ -75,6 +88,18 @@ describe('MinigameVoice — aggregation', () => {
     expect(g.subject).toContain('Tower');
     expect(g.subject).toContain('Star');
     expect(g.clause.trim().length).toBeGreaterThan(0);
+  });
+});
+
+describe('MinigameVoice — d20 trend aggregation', () => {
+  it('a strictly falling sequence reads as falling', () => {
+    const g = voiceFor('d20').describeGroup([d20(18), d20(12), d20(5)], 'effect', 0);
+    expect(g.subject).toContain('the dice falling');
+    expect(g.subject.match(/the dice/g)?.length).toBe(1);
+  });
+  it('a non-monotonic sequence reads as scattered', () => {
+    const g = voiceFor('d20').describeGroup([d20(5), d20(18), d20(11)], 'effect', 0);
+    expect(g.subject).toContain('the dice scattering');
   });
 });
 
@@ -89,5 +114,38 @@ describe('MinigameVoice — fallback', () => {
     const group = voiceFor('astral').describeGroup([astral, astral], 'subject', 0);
     expect(group.subject.length).toBeGreaterThan(0);
     expect(group.clause.trim().length).toBeGreaterThan(0);
+  });
+});
+
+describe('MinigameVoice — strings journey aggregation', () => {
+  it('converging destinations read as one journey through pooled waypoints', () => {
+    const g = voiceFor('strings').describeGroup(
+      [strings('Origin · Mid · End'), strings('Origin · Other · End')], 'subject', 0,
+    );
+    expect(g.subject.toLowerCase()).toContain('drawn from');
+    expect(g.subject).toContain('Origin');
+    expect(g.subject).toContain('Mid');
+    expect(g.subject).toContain('Other');
+    expect(g.subject).toContain('End');
+    expect(g.clause.trim().length).toBeGreaterThan(0);
+  });
+
+  it('diverging destinations read as a split', () => {
+    const g = voiceFor('strings').describeGroup(
+      [strings('Origin · A'), strings('Origin · B')], 'subject', 0,
+    );
+    expect(g.subject.toLowerCase()).toContain('split');
+    expect(g.subject).toContain('A');
+    expect(g.subject).toContain('B');
+  });
+});
+
+describe('MinigameVoice — iching movement aggregation', () => {
+  it('names the first and last hexagram and appends the final judgment gloss', () => {
+    const g = voiceFor('iching').describeGroup([iching(1, 'The Creative'), iching(29, 'The Abyss')], 'effect', 0);
+    expect(g.subject.toLowerCase()).toContain('turning from');
+    expect(g.subject).toContain('The Creative');
+    expect(g.subject).toContain('The Abyss');
+    expect(g.clause.toLowerCase()).toContain('success comes through perseverance');
   });
 });

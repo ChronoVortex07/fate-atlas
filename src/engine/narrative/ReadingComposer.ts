@@ -4,7 +4,7 @@ import type {
 import type { Beat, FavBand, DrawVoice } from './types';
 import { favBandOf } from './drawVoice';
 import type { DrawOccurrence } from './voices/types';
-import { voiceFor } from './voices/index';
+import { voiceFor, aggregateTarotPositions } from './voices/index';
 import type { DivinationType } from '../types';
 
 export interface ComposeInput {
@@ -102,17 +102,10 @@ export class ReadingComposer {
     }
     if (terse) forceBeats = forceBeats.slice(0, 1);
 
-    // ── Positions beat (multi-card spreads) ──
+    // ── Positions beat (multi-card spreads → one Past/Present/Future set) ──
     const spreads = [...new Set([...results, ...unique])].filter(isMultiSpread);
-    let positionsBeat: Beat | null = null;
-    const entries = spreads.flatMap((s) =>
-      (s.type === 'tarot' && s.spread ? s.spread : []).map((sp) => {
-        const fav = sp.card.dimensions.favorability;
-        const lean: 'favor' | 'steady' | 'adverse' = fav >= 0.5 ? 'favor' : fav <= -0.5 ? 'adverse' : 'steady';
-        return { position: sp.position, lean };
-      }),
-    );
-    if (entries.length > 0) positionsBeat = { kind: 'positions', entries };
+    const summaries = aggregateTarotPositions(spreads);
+    const positionsBeat: Beat | null = summaries.length > 0 ? { kind: 'positions', summaries } : null;
 
     // ── Tension beats ──
     const fp = agg.strongestFavor, ap = agg.strongestAdverse;

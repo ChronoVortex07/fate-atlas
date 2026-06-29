@@ -95,19 +95,20 @@ describe('NarrativeAssembler', () => {
     expect(body).toContain('the dice, settling on 10');
   });
 
-  it('renders a multi-card spread as named positions', () => {
+  it('renders a multi-card spread as one merged, elaborated positions line', () => {
     const spread = makeSlot('tarot', {
       spread: [
-        { position: 'past', card: { name: 'A', orientation: 'upright', themes: ['renewal'], dimensions: { favorability: 1.0, certainty: 0, volatility: 0 }, modifierRoles: ['subject'], id: 'a', arcana: 'minor', symbol: '✦', meaningUpright: '', meaningReversed: '', tags: [] } },
-        { position: 'present', card: { name: 'B', orientation: 'upright', themes: ['harmony'], dimensions: { favorability: 0.0, certainty: 0, volatility: 0 }, modifierRoles: ['subject'], id: 'b', arcana: 'minor', symbol: '✦', meaningUpright: '', meaningReversed: '', tags: [] } },
-        { position: 'future', card: { name: 'C', orientation: 'reversed', themes: ['conflict'], dimensions: { favorability: -1.0, certainty: 0, volatility: 0 }, modifierRoles: ['subject'], id: 'c', arcana: 'minor', symbol: '✦', meaningUpright: '', meaningReversed: '', tags: [] } },
+        { position: 'past', card: { name: 'Aurora', orientation: 'upright', themes: ['renewal'], dimensions: { favorability: 1.0, certainty: 0, volatility: 0 }, modifierRoles: ['subject'], id: 'a', arcana: 'minor', symbol: '✦', meaningUpright: '', meaningReversed: '', tags: [] } },
+        { position: 'present', card: { name: 'Beacon', orientation: 'upright', themes: ['harmony'], dimensions: { favorability: 0.0, certainty: 0, volatility: 0 }, modifierRoles: ['subject'], id: 'b', arcana: 'minor', symbol: '✦', meaningUpright: '', meaningReversed: '', tags: [] } },
+        { position: 'future', card: { name: 'Cinder', orientation: 'reversed', themes: ['conflict'], dimensions: { favorability: -1.0, certainty: 0, volatility: 0 }, modifierRoles: ['subject'], id: 'c', arcana: 'minor', symbol: '✦', meaningUpright: '', meaningReversed: '', tags: [] } },
       ],
     });
     const agg = { ...baseAggregated, modifierAssignments: { subject: [spread], action: [], effect: [] } };
     const result = assembler.assemble(agg, [spread], 'self', { chaos: 40, order: 50 });
-    const line = result.paragraphs.find((p) => p.includes('Past') && p.includes('Future'));
-    expect(line).toBeTruthy();
-    expect(line).toMatch(/leans toward fortune|holds steady|turns adverse/);
+    const body = result.paragraphs.join('\n');
+    expect(body).toContain('Aurora');
+    expect(body).toContain('Cinder');
+    expect(body).toMatch(/leans toward fortune|holds steady|turns adverse/);
   });
 
   it('de-dupes a result shared across modifier roles to a single mention', () => {
@@ -308,7 +309,7 @@ describe('NarrativeAssembler', () => {
     const body = result.paragraphs.join('\n');
     // one combined scaffold, not three "settling on" repeats
     expect((body.match(/the dice/g) ?? []).length).toBe(1);
-    expect(body).toContain('the dice fall in turn');
+    expect(body).toContain('the dice climbing'); // 5,12,18 is strictly rising
     expect(body).toContain('5');
     expect(body).toContain('12');
     expect(body).toContain('18');
