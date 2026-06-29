@@ -363,6 +363,8 @@ the **corruption value** sets the *seal stage* on any pinpointed card.
 | **Ascendant** (vague) | ambient unease across the whole spread (`cx-ambient`, no per-card pinpointing) |
 | **Dominant** (precise) | the **ward seal** appears directly on the named tainted card(s) (`corruptionWarning` identifies them) |
 
+> **Why the warning popup can appear with no rune barrier on a card — by design.** The two signals have *deliberately different thresholds.* The escalating **seed-omen popup** (`state.omen`, below) fires at **Ascendant+** — and on the `seeded` crossing, *before any card is infected at all*. The per-card **ward seal** (the "rune barrier") requires **Dominant** Light **and** the `spreading` band **and** an infected card. So at Ascendant Light (the common case) you see the popup plus the faint `cx-ambient` unease but **no runes on a card**: vague perception names nothing, and the runes are a Dominant-Light-only reward for *precise* perception. A missing rune barrier while the popup shows is therefore expected, not a missing feature.
+
 **Seal stage (`sealStageForValue`, a pure function of corruption value):**
 
 | Corruption value | Band | Seal state |
