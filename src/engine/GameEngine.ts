@@ -8,7 +8,7 @@ import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
 import { AFFINITY_DEFINITIONS, defaultAffinityState, AFFINITY_IDS, BAND_ORDER } from '../data/affinities';
 import { RUPTURE_RESET, rollInfectedCount, INFECTION_GAIN_MULT, CORRUPTED_TAG, CORRUPTION_BANDS, SIGHT_COST, LIE_OFFSET, NEAR_PINNACLE, INTRUSION_PHRASES, intrusionChance, isVisibleCorruption } from '../data/corruption';
-import { corruptionTextLevel, corruptSynthesis, corruptText } from './CorruptionGlitch';
+import { corruptionTextLevel, corruptSynthesis, corruptText, appendSeedOmen } from './CorruptionGlitch';
 import { selectHappening, HAPPENING_GAP_CHANCE } from '../data/happenings';
 import { dispatch } from './events/EventDispatcher';
 import { buildAffinityResponders } from './responders/affinity';
@@ -724,9 +724,15 @@ export class GameEngine {
     );
 
     this.state.synthesis = synthesisResult;
-    const cLevel = corruptionTextLevel(this.corruptionEngine.getBand(), this.corruptionEngine.getValue());
-    if (cLevel > 0) {
-      this.state.synthesis = corruptSynthesis(this.state.synthesis, cLevel, Math.random);
+    const band = this.corruptionEngine.getBand();
+    if (band === 'seeded') {
+      // Seeded is otherwise silent — the omen is the deliberate, innocuous tell.
+      this.state.synthesis = appendSeedOmen(this.state.synthesis, Math.random);
+    } else {
+      const cLevel = corruptionTextLevel(band, this.corruptionEngine.getValue());
+      if (cLevel > 0) {
+        this.state.synthesis = corruptSynthesis(this.state.synthesis, cLevel, Math.random);
+      }
     }
     this.bus.emit('synthesis-complete', { result: this.state.synthesis });
   }

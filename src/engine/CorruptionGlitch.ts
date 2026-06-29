@@ -89,3 +89,22 @@ export function corruptSynthesis(s: SynthesisResult, level: number, rng: () => n
     affinityNote: s.affinityNote ? corruptText(s.affinityNote, level, rng) : s.affinityNote,
   };
 }
+
+// ── The seed omen ──
+// The ONLY tell at the otherwise-silent `seeded` band. Clean prose — never the
+// glitch system. Innocuous flavor to a newcomer; a recurring theme (a seventh,
+// uncounted presence) that veterans recognize as the planted seed.
+export const SEED_OMENS = [
+  'Something uncounted leans in to listen.',
+  'A seventh shadow settles at the table you set for six.',
+  'The reading holds its breath, as if it were read in turn.',
+];
+
+export function seedOmen(rng: () => number): string {
+  return SEED_OMENS[Math.floor(rng() * SEED_OMENS.length)];
+}
+
+// Append the omen as a closing paragraph. Pure — returns a new SynthesisResult.
+export function appendSeedOmen(s: SynthesisResult, rng: () => number): SynthesisResult {
+  return { ...s, paragraphs: [...s.paragraphs, seedOmen(rng)] };
+}

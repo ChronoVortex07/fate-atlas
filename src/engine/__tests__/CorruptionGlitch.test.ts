@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { corruptionTextLevel, interiorTypo, corruptText, corruptSynthesis } from '../CorruptionGlitch';
+import { corruptionTextLevel, interiorTypo, corruptText, corruptSynthesis, SEED_OMENS, seedOmen, appendSeedOmen } from '../CorruptionGlitch';
 
 // deterministic PRNG so corruption output is reproducible in tests
 function mulberry32(seed: number) {
@@ -64,5 +64,19 @@ describe('corruptSynthesis', () => {
       tensionNote: undefined, affinityNote: undefined };
     const out = corruptSynthesis(s, 1, mulberry32(9));
     expect(out.paragraphs[0]).not.toBe(s.paragraphs[0]);
+  });
+});
+
+describe('seed omen', () => {
+  it('selects a line from the pool by rng', () => {
+    expect(seedOmen(() => 0)).toBe(SEED_OMENS[0]);
+    expect(seedOmen(() => 0.999)).toBe(SEED_OMENS[SEED_OMENS.length - 1]);
+  });
+
+  it('appends the omen as a closing paragraph without mutating the input', () => {
+    const base = { headline: 'H', paragraphs: ['a', 'b'] };
+    const out = appendSeedOmen(base, () => 0);
+    expect(out.paragraphs).toEqual(['a', 'b', SEED_OMENS[0]]);
+    expect(base.paragraphs).toEqual(['a', 'b']); // input untouched
   });
 });
