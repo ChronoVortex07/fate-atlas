@@ -321,6 +321,90 @@ A **phantom line** — player-aware, hostile, lowercase — surfaces at **virule
 - **Delivery:** `state.intrusion = { text }` (one of five `INTRUSION_PHRASES`); the React `IntrusionOverlay` renders it and auto-clears after 2.4 s via `engine.clearIntrusion()`.
 - **Reset:** `intrusion` is cleared at the start of each new minigame (`selectMethod`). The `hasIntruded` flag on `CorruptionEngine` resets when corruption decays to 0 (starve-to-zero), so each new corruption event earns its own guaranteed intrusion near the pinnacle.
 
+### Light's warning system
+
+When Light is **Ascendant or higher**, it can perceive corruption and issues warnings. The
+system has two independent axes: the **Light band** sets the *precision* of what is perceived;
+the **corruption value** sets the *seal stage* on any pinpointed card.
+
+#### Two axes
+
+**Precision (Light's effective band):**
+
+| Light band | What Light can see |
+|---|---|
+| below Ascendant | **nothing** — corruption is an invisible predator; it seeds and grows silently |
+| **Ascendant** (vague) | ambient unease across the whole spread (`cx-ambient`, no per-card pinpointing) |
+| **Dominant** (precise) | the **ward seal** appears directly on the named tainted card(s) (`corruptionWarning` identifies them) |
+
+**Seal stage (`sealStageForValue`, a pure function of corruption value):**
+
+| Corruption value | Band | Seal state |
+|---|---|---|
+| 1–34 | seeded | `none` — popup only, no card seal |
+| 35–56 | spreading (early) | `intact` — calm barrier, gestating embryo |
+| 57–78 | spreading (late) → early virulent | `strain` — barrier flicker, red cracks, swelling embryo |
+| 79–99 | virulent | `shattered` → card snaps to `cx-card-virulent` + grasping lure |
+| ≥ 90 | near pinnacle | lure + **manic lunge** (`NEAR_PINNACLE = 90`) |
+
+Tunable constants: `SEAL_INTACT_MAX = 56`, `SEAL_STRAIN_MAX = 78` (in `src/data/corruption.ts`).
+The seal is Light-Dominant-only; the grasping lure at virulent appears for any infected card
+regardless of Light's band (it is corruption's own nature, not Light's perception).
+
+#### Escalating seed-omen (Beat 1)
+
+`CorruptionEngine` tracks a `warnedBand` high-water mark (starts `dormant`, advances but
+never retreats within an event). After each `applyCorruptionTick`, if Light is Ascendant+ and
+the current band is *higher than* `warnedBand`, Light warns: `state.omen = { text: SEED_OMEN }`
+is set and `warnedBand` advances to the current band. The omen fires once per *perceived band
+escalation* — on first perception and on each worsening — so a live warning always exists for
+corruption to interrupt. `warnedBand` is reset to `dormant` on `clear()` and when corruption
+starves to 0. The `OmenOverlay` component renders and auto-clears the omen.
+
+**Copy (`SEED_OMEN`):** *"Something has taken root in the weave that should not be. Say
+nothing — do not let it know I warned you."*
+
+#### Virulent-crossing taunt (Beat 2)
+
+When `warnedBand` advances into **virulent** (or higher) with Light ≥ Ascendant, the
+escalation is interrupted: a **guaranteed** chained sequence is set on `state.intrusion` —
+Light's furtive cut-off line (`LIGHT_LEAD_IN`) followed by corruption's taunt (`TAUNT_LIGHT`)
+— and the generic random intrusion roll is **suppressed for that pass**
+(`suppressIntrusionThisPass`). The `IntrusionOverlay` renders the chain as a two-part beat
+(lead-in → taunt). This fires once per corruption event (guarded by `warnedBand` already
+being virulent).
+
+**Taunt copy:** Light *"There is something in the —"* → ◆ *"i let it warn you. watch how
+little it matters."*
+
+**Collapse case:** if Light only reaches Ascendant *after* corruption is already virulent, Beats
+1 and 2 collapse — Light's very first warning is the virulent one, interrupted immediately.
+
+**False-reassurance banner:** the existing `deriveCorruptionWarning` virulent text (*"The light
+swells, certain and warm: there is nothing wrong here. All is well. All is well."*) is **kept
+unchanged** for dissonance — words insisting all is well while the card visibly claws at the
+player.
+
+#### Lure vs. seal ceremony
+
+- **Grasping lure** (`cx-card-virulent` + lure overlay): applies to **any** infected card at
+  virulent/pinnacle, regardless of Light's band. Includes sporadic blink-open eyes, whispers, and
+  a near-pinnacle manic lunge (`value ≥ NEAR_PINNACLE = 90`).
+- **Ward-seal + shatter ceremony** (`WardSeal` overlay): Light-**Dominant-only**, rendered on
+  pinpointed cards at spreading. The seal transitions intact → strain → shattered as the value
+  rises; the shatter is a one-shot transition (barrier bursts, runes scatter as false-gold motes)
+  after which only the lure remains.
+
+The seal is an additive overlay on top of the infected card's existing `cx-card-spreading` /
+`cx-card-virulent` base classes — it never removes the corruption telegraph underneath.
+
+> **Affinity-vs-corruption framework (follow-on, not yet built).** Light instantiates the first
+> pattern in a broader per-affinity framework: Shadow will *veil* infected cards, Fate will
+> *redirect* away from them, and Will/Order/Chaos will react in their own signatures. **None can
+> remove corruption.** Each will be specced, planned, and built separately. See
+> `docs/superpowers/specs/2026-06-29-light-corruption-warning-design.md` §10 for the full
+> framework sketch.
+
 ### Corrupted history record (Phase 3)
 
 When a turn completes at *spreading* or above (`isVisibleCorruption` = `spreading | virulent | pinnacle`), the `RunRecord` stored in `state.history` is flagged `corrupted: true`. The history UI renders these records garbled. The Rupture scrubs them entirely (`state.history.filter(r => !r.corrupted)`) — no trace remains in the carryover save.

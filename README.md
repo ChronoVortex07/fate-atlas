@@ -206,7 +206,10 @@ your strongest forces fall. Left unchecked it builds to a Rupture that tears the
 reading apart and leaves the world low and quiet again, as if nothing happened.
 As it grows, corruption begins to taint the methods you're offered — and if your
 inner Light burns bright enough, you may catch a warning of where the wrongness
-festers, though heeding it will never be enough to drive corruption out. When corruption runs deep, a watching tear opens at the edge of the world — peer through
+festers: first a hushed omen (*"Say nothing — do not let it know I warned you"*),
+then a ward-seal glowing on the tainted card itself, until at virulent Light's
+warning is cut short mid-sentence by corruption's taunt. Heeding it will never
+be enough to drive corruption out. When corruption runs deep, a watching tear opens at the edge of the world — peer through
 it and the hidden forces show themselves, though one of them is always a lie, and looking
 only feeds the thing that watches back.
 
