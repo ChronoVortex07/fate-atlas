@@ -7,7 +7,7 @@ import { TurnOrchestrator } from './TurnOrchestrator';
 import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
 import { AFFINITY_DEFINITIONS, defaultAffinityState, AFFINITY_IDS, BAND_ORDER } from '../data/affinities';
-import { RUPTURE_RESET, rollInfectedCount, INFECTION_GAIN_MULT, CORRUPTED_TAG, CORRUPTION_BANDS, SIGHT_COST, LIE_OFFSET, NEAR_PINNACLE, INTRUSION_PHRASES, intrusionChance, isVisibleCorruption, SEED_OMEN } from '../data/corruption';
+import { RUPTURE_RESET, rollInfectedCount, INFECTION_GAIN_MULT, CORRUPTED_TAG, CORRUPTION_BANDS, SIGHT_COST, LIE_OFFSET, NEAR_PINNACLE, INTRUSION_PHRASES, intrusionChance, isVisibleCorruption, SEED_OMEN, LIGHT_LEAD_IN, TAUNT_LIGHT } from '../data/corruption';
 import { corruptionTextLevel, corruptSynthesisSegments, corruptText, appendSeedOmen } from './CorruptionGlitch';
 import { selectHappening, HAPPENING_GAP_CHANCE } from '../data/happenings';
 import { dispatch } from './events/EventDispatcher';
@@ -651,10 +651,16 @@ export class GameEngine {
     if (lightPerceives && CORRUPTION_BANDS.indexOf(cband) > CORRUPTION_BANDS.indexOf(warned)) {
       const enteringVirulent =
         CORRUPTION_BANDS.indexOf(cband) >= CORRUPTION_BANDS.indexOf('virulent');
-      if (!enteringVirulent) {
+      if (enteringVirulent) {
+        // Corruption is finally strong enough to notice Light. The escalation
+        // warning is interrupted: a guaranteed chained taunt, and the generic
+        // intrusion roll is suppressed this pass so it cannot overwrite it.
+        const text = TAUNT_LIGHT[Math.floor(Math.random() * TAUNT_LIGHT.length)];
+        this.state.intrusion = { text, lead: LIGHT_LEAD_IN };
+        this.suppressIntrusionThisPass = true;
+      } else {
         this.state.omen = { text: SEED_OMEN };
       }
-      // (the virulent-crossing taunt is set in maybeIntrude — Task 4)
       this.corruptionEngine.markWarned(cband);
     }
   }
