@@ -3,7 +3,7 @@ import { AFFINITY_IDS } from '../data/affinities';
 import {
   corruptionFood, corruptionBandOf, seedChance, highAffinityCount,
   SEED_INITIAL, EROSION_RATE, SKIM_RATE, DRAIN_RATE, DECAY_RATE,
-  HIGH_THRESHOLD, PINNACLE,
+  HIGH_THRESHOLD, PINNACLE, CORRUPTION_BANDS,
 } from '../data/corruption';
 
 export interface CorruptionTickResult {
@@ -20,15 +20,19 @@ export interface CorruptionTickResult {
 export class CorruptionEngine {
   private value = 0;
   private hasIntruded = false;
+  private warnedBand: CorruptionBand = 'dormant';
 
   getValue(): number { return Math.round(this.value); }
   getBand(): CorruptionBand { return corruptionBandOf(Math.round(this.value)); }
 
   setValue(v: number): void { this.value = Math.max(0, Math.min(PINNACLE, v)); }
-  clear(): void { this.value = 0; this.hasIntruded = false; }
+  clear(): void { this.value = 0; this.hasIntruded = false; this.warnedBand = 'dormant'; }
 
   markIntruded(): void { this.hasIntruded = true; }
   getHasIntruded(): boolean { return this.hasIntruded; }
+
+  getWarnedBand(): CorruptionBand { return this.warnedBand; }
+  markWarned(band: CorruptionBand): void { this.warnedBand = band; }
 
   // Direct add (used by forbidden-sight's once-per-minigame cost). Clamped.
   add(amount: number): void { this.value = Math.max(0, Math.min(PINNACLE, this.value + amount)); }
@@ -61,7 +65,7 @@ export class CorruptionEngine {
       this.value = Math.max(0, this.value - DECAY_RATE);
       // Corruption event is over — the predator starved; reset so the next
       // event re-earns its guaranteed intrusion.
-      if (this.value === 0) this.hasIntruded = false;
+      if (this.value === 0) { this.hasIntruded = false; this.warnedBand = 'dormant'; }
     }
 
     return this.report(false, drains);
@@ -77,18 +81,23 @@ export class CorruptionEngine {
     };
   }
 
-  serialize(): string { return JSON.stringify({ value: this.value, hasIntruded: this.hasIntruded }); }
+  serialize(): string { return JSON.stringify({ value: this.value, hasIntruded: this.hasIntruded, warnedBand: this.warnedBand }); }
 
   loadFrom(json: string): void {
     try {
-      const parsed = JSON.parse(json) as { value?: unknown; hasIntruded?: unknown };
+      const parsed = JSON.parse(json) as { value?: unknown; hasIntruded?: unknown; warnedBand?: unknown };
       this.value = typeof parsed.value === 'number'
         ? Math.max(0, Math.min(PINNACLE, parsed.value))
         : 0;
       this.hasIntruded = !!parsed.hasIntruded;
+      this.warnedBand = typeof parsed.warnedBand === 'string'
+        && CORRUPTION_BANDS.includes(parsed.warnedBand as CorruptionBand)
+        ? parsed.warnedBand as CorruptionBand
+        : 'dormant';
     } catch {
       this.value = 0;
       this.hasIntruded = false;
+      this.warnedBand = 'dormant';
     }
   }
 }
