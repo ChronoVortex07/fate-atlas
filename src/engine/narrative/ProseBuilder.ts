@@ -1,7 +1,8 @@
 import type { AggregatedReading, QuestionType, SlotResult } from '../types';
-import type { Beat } from './types';
+import type { Beat, PositionSummary, PositionCard } from './types';
 import { READING_FRAGMENTS as F } from '../../data/reading-fragments';
 import { favBandOf } from './drawVoice';
+import { joinAnd } from './voices/shared';
 
 type Valence = 'pos' | 'neg' | 'neu';
 interface Segment { text: string; valence: Valence; group: 'open' | 'body' | 'tension' }
@@ -136,13 +137,8 @@ export class ProseBuilder {
       }
       case 'force':
         return { text: this.renderForce(beat), valence: 'neu', group: 'body' };
-      case 'positions': {
-        const parts = beat.entries.map((e) => {
-          const pos = e.position.charAt(0).toUpperCase() + e.position.slice(1);
-          return `the ${pos} ${F.positionLeans[e.lean]}`;
-        });
-        return { text: parts.join(', '), valence: 'neu', group: 'body' };
-      }
+      case 'positions':
+        return { text: this.renderPositions(beat), valence: 'neu', group: 'body' };
       case 'opposition': {
         // Labels stay lower-cased; capPunct fixes the sentence start as needed.
         const t = this.pick('opposition', F.opposition)
@@ -175,6 +171,38 @@ export class ProseBuilder {
       body = `${body}${conn}${lowerFirst(drawTexts[i])}`;
     }
     return lead ? `${lead} ${body}` : body;
+  }
+
+  private renderPositions(beat: Extract<Beat, { kind: 'positions' }>): string {
+    return beat.summaries
+      .map((s) => this.renderPosition(s))
+      .filter((t) => t.trim())
+      .map(capPunct)
+      .join(' ');
+  }
+
+  private renderPosition(s: PositionSummary): string {
+    const framing = this.pick(`pos_frame_${s.position}`, F.positionFraming[s.position]);
+    const named = (c: PositionCard) => `the ${c.name}${c.orientation === 'reversed' ? ' reversed' : ''}`;
+    const namedGloss = (c: PositionCard) => (c.gloss ? `${named(c)} — ${c.gloss}` : named(c));
+
+    if (s.contradiction) {
+      const favor = [...s.cards].filter((c) => c.favorability > 0).sort((a, b) => b.favorability - a.favorability)[0];
+      const adverse = [...s.cards].filter((c) => c.favorability < 0).sort((a, b) => a.favorability - b.favorability)[0];
+      return this.pick('pos_contradiction', F.positionContradiction)
+        .replace('{pos}', `the ${s.position}`)
+        .replace('{favor}', named(favor))
+        .replace('{adverse}', named(adverse));
+    }
+
+    const visible = s.cards.filter((c) => !c.veiled);
+    if (visible.length === 0) {
+      return `${framing} what is veiled ${F.positionLeans[s.lean]}`;
+    }
+    const names = visible.length === 1
+      ? namedGloss(visible[0])
+      : joinAnd(visible.map(named), F.drawFraming.group.listLast, F.drawFraming.group.mid);
+    return `${framing} ${names}, ${F.positionLeans[s.lean]}`;
   }
 
   private renderClose(beat: Extract<Beat, { kind: 'close' }>, openerIsTheme: boolean): string {

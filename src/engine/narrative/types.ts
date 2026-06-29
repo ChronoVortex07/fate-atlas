@@ -34,7 +34,7 @@ export type Beat =
   | { kind: 'fortune'; favBand: FavBand; strongestFavor: Pole | null; strongestAdverse: Pole | null }
   | { kind: 'temper'; axis: 'certainty' | 'volatility'; band: 'high' | 'low' }
   | { kind: 'force'; role: ModifierRole; draws: DrawVoice[] }
-  | { kind: 'positions'; entries: { position: string; lean: 'favor' | 'steady' | 'adverse' }[] }
+  | { kind: 'positions'; summaries: PositionSummary[] }
   | { kind: 'opposition'; favPole: Pole; advPole: Pole }
   | { kind: 'tensionPair'; pair: [ThemeTag, ThemeTag] }
   | { kind: 'close'; question: QuestionType; theme: ThemeTag; carryForce: string | null };

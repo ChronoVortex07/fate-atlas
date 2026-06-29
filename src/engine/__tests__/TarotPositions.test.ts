@@ -55,3 +55,53 @@ describe('aggregateTarotPositions', () => {
     expect(past.cards[0].gloss).toBe('');
   });
 });
+
+import { ProseBuilder } from '../narrative/ProseBuilder';
+import type { Beat, PositionSummary } from '../narrative/types';
+import type { AggregatedReading } from '../types';
+
+const aggStub: AggregatedReading = {
+  dominantTheme: 'mystery', secondaryTheme: null,
+  dimensionProfile: { favorability: 0, certainty: 0, volatility: 0 },
+  modifierAssignments: { subject: [], action: [], effect: [] },
+  hasTension: false, tensionPair: null, strongestFavor: null, strongestAdverse: null,
+};
+const closeBeat: Beat = { kind: 'close', question: 'self', theme: 'mystery', carryForce: null };
+const proseCtx = { aggregated: aggStub, question: 'self' as const, seed: 0 };
+
+describe('ProseBuilder positions rendering', () => {
+  it('single-card position names the card and weaves its gloss', () => {
+    const summaries: PositionSummary[] = [{
+      position: 'past', contradiction: false, lean: 'adverse',
+      cards: [{ name: 'Tower', orientation: 'reversed', favorability: -1, lean: 'adverse', gloss: 'the ground already broken', veiled: false }],
+    }];
+    const out = new ProseBuilder().build([{ kind: 'positions', summaries }, closeBeat], proseCtx);
+    const text = out.paragraphs.join(' ');
+    expect(text).toContain('Tower');
+    expect(text).toContain('the ground already broken');
+  });
+
+  it('contradiction position names both opposing cards', () => {
+    const summaries: PositionSummary[] = [{
+      position: 'present', contradiction: true, lean: 'steady',
+      cards: [
+        { name: 'Sun', orientation: 'upright', favorability: 1.5, lean: 'favor', gloss: 'warmth', veiled: false },
+        { name: 'Five of Swords', orientation: 'reversed', favorability: -1.5, lean: 'adverse', gloss: 'a hollow win', veiled: false },
+      ],
+    }];
+    const out = new ProseBuilder().build([{ kind: 'positions', summaries }, closeBeat], proseCtx);
+    const text = out.paragraphs.join(' ');
+    expect(text).toContain('Sun');
+    expect(text).toContain('Five of Swords');
+  });
+
+  it('all-veiled position falls back to the bare lean phrase', () => {
+    const summaries: PositionSummary[] = [{
+      position: 'future', contradiction: false, lean: 'favor',
+      cards: [{ name: '?', orientation: 'upright', favorability: 1, lean: 'favor', gloss: '', veiled: true }],
+    }];
+    const out = new ProseBuilder().build([{ kind: 'positions', summaries }, closeBeat], proseCtx);
+    const text = out.paragraphs.join(' ').toLowerCase();
+    expect(text).toContain('fortune'); // positionLeans.favor === 'leans toward fortune'
+  });
+});
