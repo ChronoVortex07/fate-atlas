@@ -10,8 +10,9 @@ export const HIGH_THRESHOLD = 81; // the ascendant boundary
 
 // ── Lifecycle tuning (playtest defaults) ──
 export const SEED_INITIAL = 5;         // value the moment corruption spawns
-export const SEED_FOOD_FACTOR = 0.004; // per-reading seed chance added per excess point
-export const SEED_MAX_CHANCE = 0.25;   // cap on the per-reading seed chance
+export const SEED_FOOD_FACTOR = 0.004; // per-reading seed chance added per excess point (the "fill")
+export const SEED_MAX_CHANCE = 0.85;   // cap on the per-reading seed chance (raised from 0.25 so a full hoard dominates; never 1.0 — a seed is never guaranteed)
+export const SEED_COUNT_GROWTH = 1.7;  // exponential multiplier per additional high affinity (the "gate")
 export const EROSION_RATE = 0.06;      // corruption gained per excess point per reading (primary growth)
 export const SKIM_RATE = 0.10;         // corruption gained per realized affinity-gain point (secondary)
 export const DRAIN_RATE = 0.04;        // fraction of each affinity's excess drained into corruption per reading
@@ -35,10 +36,18 @@ export function corruptionBandOf(value: number): CorruptionBand {
   return 'virulent';
 }
 
-// No imbalance → zero chance. Otherwise scales with food, capped.
-export function seedChance(food: number): number {
-  if (food <= 0) return 0;
-  return Math.min(SEED_MAX_CHANCE, food * SEED_FOOD_FACTOR);
+// How many affinities sit strictly above the high threshold — the breadth of imbalance.
+export function highAffinityCount(affinities: Record<AffinityId, number>): number {
+  let n = 0;
+  for (const id of AFFINITY_IDS) if (affinities[id] > HIGH_THRESHOLD) n++;
+  return n;
+}
+
+// Count gates an exponential multiplier; total excess (food) fills the magnitude.
+// No high affinity → zero chance, ever. Capped so a seed is never guaranteed.
+export function seedChance(food: number, highCount: number): number {
+  if (highCount <= 0 || food <= 0) return 0;
+  return Math.min(SEED_MAX_CHANCE, SEED_FOOD_FACTOR * food * Math.pow(SEED_COUNT_GROWTH, highCount - 1));
 }
 
 export const INFECTION_GAIN_MULT = 2; // corruption growth multiplier when an infected method is played

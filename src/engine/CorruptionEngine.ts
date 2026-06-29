@@ -1,7 +1,7 @@
 import type { AffinityId, CorruptionBand } from './types';
 import { AFFINITY_IDS } from '../data/affinities';
 import {
-  corruptionFood, corruptionBandOf, seedChance,
+  corruptionFood, corruptionBandOf, seedChance, highAffinityCount,
   SEED_INITIAL, EROSION_RATE, SKIM_RATE, DRAIN_RATE, DECAY_RATE,
   HIGH_THRESHOLD, PINNACLE,
 } from '../data/corruption';
@@ -44,7 +44,7 @@ export class CorruptionEngine {
 
     // Dormant: corruption appears ONLY as a consequence of imbalance.
     if (this.value <= 0) {
-      const seeded = food > 0 && rng() < seedChance(food);
+      const seeded = food > 0 && rng() < seedChance(food, highAffinityCount(affinities));
       if (seeded) this.value = SEED_INITIAL;
       return this.report(seeded, {}); // a fresh seed neither drains nor ruptures this tick
     }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  corruptionFood, corruptionBandOf, seedChance,
-  HIGH_THRESHOLD, SEED_MAX_CHANCE, PINNACLE,
+  corruptionFood, corruptionBandOf, seedChance, highAffinityCount,
+  HIGH_THRESHOLD, SEED_MAX_CHANCE, SEED_COUNT_GROWTH, PINNACLE,
 } from '../../data/corruption';
 import type { AffinityId } from '../types';
 
@@ -39,13 +39,30 @@ describe('corruptionBandOf', () => {
   });
 });
 
+describe('highAffinityCount', () => {
+  it('counts only affinities strictly above the high threshold', () => {
+    expect(highAffinityCount(vec({ chaos: HIGH_THRESHOLD }))).toBe(0); // exactly 81 does not count
+    expect(highAffinityCount(vec({ chaos: 82, order: 100 }))).toBe(2);
+    expect(highAffinityCount(vec({
+      chaos: 100, order: 100, fate: 100, will: 100, light: 100, shadow: 100,
+    }))).toBe(6);
+  });
+});
+
 describe('seedChance', () => {
-  it('is zero with no food (no imbalance → no corruption, ever)', () => {
-    expect(seedChance(0)).toBe(0);
+  it('is zero with no high affinities (no breadth → no corruption, ever)', () => {
+    expect(seedChance(0, 0)).toBe(0);
+    expect(seedChance(50, 0)).toBe(0); // guarded: food without count cannot seed
   });
 
   it('scales with food and is capped', () => {
-    expect(seedChance(10)).toBeGreaterThan(0);
-    expect(seedChance(100_000)).toBe(SEED_MAX_CHANCE);
+    expect(seedChance(10, 1)).toBeGreaterThan(0);
+    expect(seedChance(100_000, 6)).toBe(SEED_MAX_CHANCE);
+  });
+
+  it('gates exponentially on the count of high affinities (breadth dominates)', () => {
+    // same food, more high affinities → strictly higher chance (below the cap)
+    expect(seedChance(19, 2)).toBeCloseTo(seedChance(19, 1) * SEED_COUNT_GROWTH, 10);
+    expect(seedChance(19, 3)).toBeGreaterThan(seedChance(19, 2));
   });
 });

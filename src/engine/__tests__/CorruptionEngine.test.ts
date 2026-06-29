@@ -20,7 +20,7 @@ describe('CorruptionEngine.tick — dormant', () => {
 
   it('seeds from imbalance when the roll passes', () => {
     const e = new CorruptionEngine();
-    const r = e.tick(hoarded, 0, () => 0); // 0 < seedChance(38)
+    const r = e.tick(hoarded, 0, () => 0); // 0 < seedChance(38, 2) ≈ 0.258
     expect(r.seeded).toBe(true);
     expect(r.value).toBe(SEED_INITIAL);
     expect(r.band).toBe('seeded');
