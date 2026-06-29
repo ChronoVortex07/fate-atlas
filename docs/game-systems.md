@@ -221,8 +221,14 @@ is exempt from coupling, diminishing returns, pairing, and baseline-drift.
   upheaval cannot misdirect what corruption feeds on or drains; the real hoard is
   always the target. Two maxed affinities feed it as hard as several merely-high
   ones — concentration is punished.
-- **Seed.** Each completed reading, if there is any food, a chance (scaling with
-  food, capped) spawns corruption. No imbalance → it can never appear.
+- **Seed.** Each completed reading, if there is any food, a chance spawns corruption.
+  No imbalance → it can never appear. The chance is **count-gated, excess-filled**:
+  `seedChance = min(0.85, 0.004 × food × 1.7^(highCount − 1))`, where `highCount` is the
+  number of affinities above the high threshold (81). The *count* of high affinities
+  gates an exponential multiplier (`SEED_COUNT_GROWTH = 1.7`) while total *food* fills
+  the magnitude, so **breadth of imbalance dominates**: one spike at 100 stays rare
+  (~8%/reading), whereas all six high is near-certain (capped at `SEED_MAX_CHANCE = 0.85`).
+  A seed is never guaranteed (cap < 1).
 - **Grow.** While fed, corruption rises by erosion (per excess point) plus a skim
   on the reading's realized affinity gains, and drains the hoarded affinities back
   down into itself.
@@ -280,12 +286,17 @@ synthesis result (headline, paragraphs, tensionNote, affinityNote) before writin
 
 | Level | Band(s) | Falsification character |
 |-------|---------|------------------------|
-| 0 | dormant / seeded | Clean — no alteration |
+| 0 | dormant | Clean — no alteration |
+| 0 | seeded | Clean prose, **plus the seed omen** (see below) — no glitch-system falsification |
 | 1 | spreading | Subtle: tone drift (e.g. `promise → warning`, `clarity → static`) + interior letter transpositions; each word has ~25% chance of one effect |
 | 2 | virulent (67–98) | Heavy ramp: same drift/typo pass (28%), plus redaction (`█`-blocks, ~18%), Unicode combining-character garble (~40%), stutter repeats (~10%), and **one** injected contradiction sentence appended |
 | 3 | virulent near-pinnacle (ramp from 67→99) | As level 2 but **two** contradictions injected; the continuous ramp `2 + min(1, (value−67)/(99−67))` means falsification deepens as the Rupture approaches |
 
 The synthesis is falsified in-place on `state.synthesis`; the underlying result objects (`turnResults`) are **not** altered. The LLM prompt (`generateLLMPrompt`) is independently passed through `corruptText` at the same level, so sharing a reading at virulent+ exports a corrupted transcript.
+
+### Seed omen (the seeded-band tell)
+
+The `seeded` band (value 1–34) is otherwise silent — no infection, no glitching, and the Light warning only fires if Light is already Ascendant+. To give a **deliberate, reliable** signal, `synthesizeAll` weaves a single clean omen line into the synthesis on **every reading while seeded**, via `appendSeedOmen` (`CorruptionGlitch.ts`). One of three thematically-unified lines (`SEED_OMENS`, themed on a *seventh, uncounted presence*) is appended as a closing paragraph. It is **clean prose**, never the glitch system — innocuous flavor to a newcomer, a recurring theme a veteran recognizes as the planted seed. It is mutually exclusive with the falsification path (`corruptionTextLevel` is 0 at seeded), and stops automatically when corruption decays to dormant or escalates to spreading (where text falsification takes over).
 
 ### Intrusion (Phase 3)
 
