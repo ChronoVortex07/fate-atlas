@@ -20,6 +20,9 @@ the **meta-interactions** between divination results, and the **happenings**.
 > | Happenings — effect model, dominant-axis selection, cadence tuning | [`src/data/happenings.ts`](../src/data/happenings.ts) |
 > | Happening effect resolution + `pendingReadingEffects` consumption + cadence + opt-in + emergent upheaval triggers | [`src/engine/GameEngine.ts`](../src/engine/GameEngine.ts) |
 > | Debug scenarios | [`src/engine/events/scenarios.ts`](../src/engine/events/scenarios.ts) |
+> | Game-length depth selector (tier names, counts, default) | [`src/components/screens/QuestionSelect.tsx`](../src/components/screens/QuestionSelect.tsx) |
+> | Results presentation (tainted tiles, sigil aberration, word-swaps) | [`src/components/cards/ResultTile.tsx`](../src/components/cards/ResultTile.tsx), [`src/components/screens/ResultReading.tsx`](../src/components/screens/ResultReading.tsx), [`src/styles/corruption.css`](../src/styles/corruption.css) |
+> | Share image (4:5 export, clean + frozen corrupted variant) | [`src/components/share/ShareCard.tsx`](../src/components/share/ShareCard.tsx), [`src/utils/shareExport.ts`](../src/utils/shareExport.ts) |
 > | Astromancy data tables (planets, signs, houses, aspects, dignity) | [`src/data/astromancy.ts`](../src/data/astromancy.ts) |
 > | Astromancy cast modes and affinity modifiers | [`src/engine/astral.ts`](../src/engine/astral.ts) |
 > | Astromancy symbolic-resonance + omen responders | [`src/engine/responders/astral.ts`](../src/engine/responders/astral.ts) |
@@ -447,6 +450,37 @@ When `CorruptionEngine.tick()` sets `ruptured = true`, `applyCorruptionTick` onl
 - **Final-reading rupture** (`completed >= minigamesPerTurn`): the Rupture is **held back** so the player gets one last look at how bad it got. `advanceAfterCommit` leaves `pendingRupture` armed, synthesizes and builds the run record at **peak corruption** (so the result page renders fully defiled, at the pinnacle), and routes to `'result'`. The wipe is deferred until the player leaves via **DRAW AGAIN** (`returnToQuestionSelect`), which runs `performRupture()` and routes to `'rupture'` then. The corrupted final-reading record is scrubbed by that deferred wipe.
 
 The `RuptureInterstitial` screen plays an unskippable ~8 s sequence, then calls `engine.completeRupture()` → `returnToTitle()`. `state.screen` becomes `'title'`. The save written at rupture time reflects the reset state so a hard reload does not re-enter the rupture screen. A rupturing turn never also intrudes: `advanceAfterCommit` gates `maybeIntrude` on `!pendingRupture`.
+
+### Results presentation (corruption layer on the Result screen)
+
+The Result screen overlays additional corruption state onto the compact tile grid and share image. These are purely presentational — the underlying `turnResults` and `synthesis` objects are never mutated.
+
+#### Tainted result tiles
+
+A `ResultTile` is a tap-to-expand button in the tile grid. If the result carries the `CORRUPTED_TAG` (set by `corruption-extra-result` or `corruption-false-orientation` at virulent+, §4 automatic effects), the tile gains the `cx-tile-tainted` class: a red border, a red box-shadow halo, and a dark-crimson background. The tile's name label turns white with a red glow and pulses (`cx-tile-name`). The underlying card detail — and the tags that carry `corrupted` — are unchanged; only the tile's visual frame signals that something is wrong.
+
+#### Sigil chromatic aberration (Virulent+)
+
+At `virulent` or `pinnacle` band, a subset of tile sigils receive the `.cx-sig` animation class (cycling through staggered delay variants `.d1`, `.d2`, `.d3`). The animation is a **red↔void** chromatic aberration — the sigil splits into a red text-shadow displaced to one side and a transparent "void" gap on the other, oscillating on a loop. The class is never cyan. Which tiles are affected is deterministic-ish by tile index (`[index % 6]` lookup), so the pattern feels random without changing on every render.
+
+> Source: `ResultTile.tsx` (`sigCa` derivation) + `corruption.css` (`.cx-sig`, `@keyframes cx-sig-ca`).
+
+#### Live word-swaps on "loud" synthesis words (Virulent+)
+
+The `GlitchText` renderer (in `ResultReading.tsx`) consumes `state.synthesisSegments` (the `CorruptedSynthesis` built by `corruptSynthesisSegments` — see §4 "Reading falsification"). Segments styled `hot` or `ca-fast` are the "loudest" corruption words (white-hot glow / fast chromatic pulse, see the §4 level table). At virulent+ these segments additionally receive live **word-swap** animation: the word alternates between the original text (`.cx-v0`) and a garbled variant (`.cx-v1`, produced by `garbleWord` — injecting Unicode combining-strikethrough characters at every third character). Three phase lanes (`a`, `b`, `c`, cycling `swapN % 3`) stagger the swaps so they don't all flip in sync. The word is always readable between swaps; the dread comes from catching it mid-change.
+
+> This word-swap layer is applied **only in the live UI** — the LLM prompt (`generateLLMPrompt`) receives the pre-garble `segmentsToText` version, and the share image (below) is a static frozen snapshot taken before any swap animation.
+
+#### 4:5 share image (clean + frozen corrupted variant)
+
+**Share as Image** exports a `ShareCard` component to a PNG via `html2canvas`. The logical card is **380 × 475 px**; `exportShareCard` captures it at `scale = 1080 / 380`, producing a **1080 × 1350 px** raster (a standard 4:5 social-media portrait ratio). `shareCard()` wraps the export into a `Blob` and calls `navigator.share` (with a clipboard-copy fallback).
+
+The `ShareCard` component renders **two variants** depending on `corruption.band`:
+
+- **Clean** (`dormant`, `seeded`, `spreading`): dark-celestial card with the reading headline, first tension-note sentence, result list, and top affinity badge. Footer tagline: *"the stars await your question"*.
+- **Frozen corrupted** (`virulent` or `pinnacle`): same layout, but with a red scan-line overlay + vignette (inline `cardCxOverlay` styles), chromatic headline (red/void text-shadow shift on the heading), and the footer tagline replaced by the corruption entity's affinity note (or *"It watches. It is pleased."* if no note is present). This is a **static frozen** snapshot — no live animations, no word-swap cycling. The result list rows are clean (not tainted-styled) so the image reads as ominously quiet rather than unreadably glitched.
+
+> Source: `ShareCard.tsx` + `src/utils/shareExport.ts`. The `ShareCard` is rendered off-screen in a fixed `left: -9999px` container so it never flashes during normal play.
 
 ### Phase 4 gain-pipeline rebalance
 
@@ -1538,3 +1572,25 @@ the bowl simultaneously; the unfavored die is visually suppressed after settling
 **choice** mode the player selects via on-screen value buttons (no raycasting). The
 combine reducer in `reducers.ts` is unchanged: `choice` wins and suppresses `offer-reroll`;
 advantage/disadvantage net by count (a tie cancels to a single roll).
+
+---
+
+## 16. Game length
+
+Each reading session has a **depth** chosen by the player on the question-select screen before the turn begins. Depth determines how many minigames (divination draws) are played in that session. Three tiers are offered:
+
+| Tier | Count | Flavor text on the selector |
+|------|:-----:|-----------------------------|
+| **Glimpse** | 3 | "A brief glance through the veil." |
+| **Reading** *(default)* | 5 | "A measured consultation." |
+| **Deep Divination** | 7 | "A long descent into deeper waters." |
+
+The selected count is passed to `GameEngine.startTurn(question, count)`, which sets `this.minigamesPerTurn` and `state.minigamesPerTurn` for the turn. The default (if no count is passed) is **5**, matching the Reading tier. All turn-lifecycle logic (`advanceAfterCommit`, `shouldOfferHappening`, happenings cadence, emergent upheaval suppression on the last reading) reads `minigamesPerTurn` dynamically and needs no per-tier adjustments.
+
+**Happenings are offered at most once per turn regardless of depth.** The cadence (`HAPPENING_GAP_CHANCE = 0.5`) still applies per gap; the "last eligible gap guaranteed" rule fires when `remaining === 1` — with 7 minigames this can be gap 5 or 6 depending on prior offers (§8a).
+
+**Pool refill:** the method pool is refilled between readings. The planner's bias toward gap-filling (`ReadingPlanner.getBiasForRefill`) operates identically at all depths; a 7-reading session simply runs the refill cycle more times, allowing themes and dimensions to converge further.
+
+**Question-select screen shows no corruption wording.** The depth selector is framed purely in terms of reading richness ("brief glance" / "measured consultation" / "long descent"). Corruption is never mentioned. This is intentional: the game UI surfaces no hint of the mechanic below.
+
+> **Dev note — corruption growth consequence:** longer readings expose the player to more value-based corruption accrual. Each minigame that plays an infected method (`INFECTION_GAIN_MULT` — §4 automatic effects) adds a corruption tick; each committed result with imbalanced affinities also seeds the tick. A 7-reading session can therefore accumulate meaningfully more corruption than a 3-reading session in the same affinity state, even with identical affinities at session start — not because the per-reading math changes, but simply because there are more readings. This is a deliberate design consequence (deeper reading = deeper exposure to the world's imbalance), not a balance flaw. It is intentionally left undocumented in the game UI.

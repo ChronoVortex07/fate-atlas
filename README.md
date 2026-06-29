@@ -25,10 +25,10 @@ npm run dev        # → http://localhost:5173
 ## Gameplay Flow
 
 1. **Title** — click **CONSULT THE STARS**
-2. **Question** — pick one of four question types *(Decision, Relationship, Future/Forecast, Self-Analysis)*
+2. **Question** — pick one of four question types *(Decision, Relationship, Future/Forecast, Self-Analysis)*, then choose your **reading depth**: **Glimpse** (3 draws), **Reading** (5 draws, default), or **Deep Divination** (7 draws). Depth sets how many divination minigames the session contains; longer sessions offer richer synthesis and more chances for affinities and happenings to interact.
 3. **Method Select** — the stars deal 3 cards face-down. Affinity effects animate in with a banner before the reveal (Will *widens* the spread with a fourth card, Fate *thins* it, Shadow *shrouds* a card behind a veil), then the cards flip face-up. Draw one to begin — though at high Fate the weave may force your hand, an unseen hand descending to choose a different card for you.
 4. **Minigame** — play a short interactive experience (pick a tarot card, roll the dice, cast coins). After it commits, the result is held on a **review beat** showing the face-up outcome; play advances only when you click **Continue**.
-5. **Result** — read the interpretation. The reading is **woven organically**: the actual cards, numbers, and hexagrams are named inside flowing sentences (not listed), the opening and closing vary so the dominant theme no longer bookends every reading, and balanced readings **name their opposing forces** (the strongest favorable and adverse signals) in a tension note. Multi-card spreads read **per position** rather than re-listing the cards. Happenings may appear as cryptic events between turns. **Share as Image** or **Copy LLM Prompt**
+5. **Result** — read the interpretation. The reading is **woven organically**: the actual cards, numbers, and hexagrams are named inside flowing sentences (not listed), the opening and closing vary so the dominant theme no longer bookends every reading, and balanced readings **name their opposing forces** (the strongest favorable and adverse signals) in a tension note. Multi-card spreads read **per position** rather than re-listing the cards. Results appear as a compact **tile grid** — tap any tile to expand the full card detail. Happenings may appear as cryptic events between turns. **Share as Image** (4:5 PNG, clean or corrupted variant) or **Copy LLM Prompt**
 
 ---
 
