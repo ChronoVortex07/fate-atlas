@@ -2,6 +2,7 @@ import { Fragment, useLayoutEffect, useRef, useState } from 'react';
 import type { GameState, SlotResult, TarotResult, SpreadPosition } from '../../engine/types';
 import { bandOf } from '../../data/affinities';
 import { fitList, type FitResult } from './fitList';
+import ShareBackdrop from './ShareBackdrop';
 
 const W = 380, H = 475;
 const ROW_GAP = 3;          // px gap between rows (must match listInnerStyle.gap)
@@ -144,16 +145,11 @@ export default function ShareCard({ state }: { state: GameState }) {
   const shown = cap ? reading.slice(0, fit.visibleRows) : reading;
   const hidden = total - shown.length;
 
-  const cardCxOverlay: React.CSSProperties = {
-    position: 'absolute', inset: 0, pointerEvents: 'none', borderRadius: 14,
-    boxShadow: 'inset 0 0 70px rgba(255,45,74,0.16), inset 0 0 0 1px rgba(255,45,74,0.4)',
-    background: 'repeating-linear-gradient(0deg, rgba(255,45,74,0.06) 0 1px, transparent 1px 4px)',
-  };
   const headlineCx: React.CSSProperties = { color: '#fff', textShadow: '-1.4px 0 #ff2d4a, 1.4px 0 #1a0006' };
 
   return (
     <div style={cardStyle}>
-      {corrupted && <div style={cardCxOverlay} />}
+      <ShareBackdrop corrupted={corrupted} />
       <div style={padStyle}>
         <div style={qStyle}>{questionLabel(questionType)}</div>
         <div style={ornStyle}><span style={ornStarStyle}>✦</span></div>
@@ -184,9 +180,9 @@ export default function ShareCard({ state }: { state: GameState }) {
 
 const cardStyle: React.CSSProperties = {
   position: 'relative', overflow: 'hidden', width: W, height: H, borderRadius: 14, border: '1px solid #1a2440',
-  background: 'radial-gradient(120% 55% at 50% -6%, rgba(40,60,110,0.28), transparent 55%), radial-gradient(90% 50% at 50% 112%, rgba(150,110,50,0.14), transparent 60%), linear-gradient(180deg,#080c16,#05070e)',
+  background: '#05070e',
 };
-const padStyle: React.CSSProperties = { padding: '22px 22px 16px', width: '100%', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem' };
+const padStyle: React.CSSProperties = { position: 'relative', zIndex: 1, padding: '22px 22px 16px', width: '100%', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem' };
 const qStyle: React.CSSProperties = { flex: 'none', fontFamily: "'Cormorant Garamond', serif", fontStyle: 'italic', color: '#d4a854', fontSize: '0.74rem', letterSpacing: '0.14em', textTransform: 'uppercase' };
 const ornStyle: React.CSSProperties = { flex: 'none', display: 'flex', alignItems: 'center', gap: '0.6rem', width: '64%', color: '#d4a854', opacity: 0.6, margin: '2px 0', justifyContent: 'center' };
 const ornStarStyle: React.CSSProperties = { fontSize: '0.5rem' };
