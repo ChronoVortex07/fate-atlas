@@ -343,9 +343,9 @@ the **corruption value** sets the *seal stage* on any pinpointed card.
 |---|---|---|
 | 1–34 | seeded | `none` — popup only, no card seal |
 | 35–56 | spreading (early) | `intact` — calm barrier, gestating embryo |
-| 57–78 | spreading (late) → early virulent | `strain` — barrier flicker, red cracks, swelling embryo |
-| 79–99 | virulent | `shattered` → card snaps to `cx-card-virulent` + grasping lure |
-| ≥ 90 | near pinnacle | lure + **manic lunge** (`NEAR_PINNACLE = 90`) |
+| 57–78 | spreading (late) → early virulent | `strain` — barrier flicker, red cracks, swelling embryo *(57–66 is spreading; 67–78 is virulent — the corruption band boundary is at 67, but the seal-value boundary is at 56/78)* |
+| 79–99 | virulent (shattered) | `shattered` → card snaps to `cx-card-virulent` + grasping lure |
+| ≥ 90 | near pinnacle | lure + **manic lunge** (`NEAR_PINNACLE = 90`) — **additive**: layers on top of the shattered-lure at value ≥ 90, not a replacement |
 
 Tunable constants: `SEAL_INTACT_MAX = 56`, `SEAL_STRAIN_MAX = 78` (in `src/data/corruption.ts`).
 The seal is Light-Dominant-only; the grasping lure at virulent appears for any infected card
@@ -366,13 +366,13 @@ nothing — do not let it know I warned you."*
 
 #### Virulent-crossing taunt (Beat 2)
 
-When `warnedBand` advances into **virulent** (or higher) with Light ≥ Ascendant, the
+When `warnedBand` first advances into **virulent** with Light ≥ Ascendant, the
 escalation is interrupted: a **guaranteed** chained sequence is set on `state.intrusion` —
 Light's furtive cut-off line (`LIGHT_LEAD_IN`) followed by corruption's taunt (`TAUNT_LIGHT`)
 — and the generic random intrusion roll is **suppressed for that pass**
 (`suppressIntrusionThisPass`). The `IntrusionOverlay` renders the chain as a two-part beat
-(lead-in → taunt). This fires once per corruption event (guarded by `warnedBand` already
-being virulent).
+(lead-in → taunt). This fires **exactly once** per corruption event — the `warnedBand`
+high-water mark prevents re-firing if corruption later climbs further (e.g. into pinnacle).
 
 **Taunt copy:** Light *"There is something in the —"* → ◆ *"i let it warn you. watch how
 little it matters."*

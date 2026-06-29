@@ -642,7 +642,8 @@ export class GameEngine {
     if (tick.ruptured) this.pendingRupture = true;
     // Light's escalating warning: each time Light perceives corruption entering a
     // worse band, it warns. Below virulent it is a furtive omen popup; the virulent
-    // crossing is the interrupted taunt (handled in maybeIntrude via the flag below).
+    // crossing sets the taunt directly here (enteringVirulent branch below) and
+    // suppresses the generic intrusion roll for this pass via suppressIntrusionThisPass.
     this.suppressIntrusionThisPass = false;
     const cband = this.corruptionEngine.getBand();
     const warned = this.corruptionEngine.getWarnedBand();
