@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useGameEngine } from '../../hooks/useGameEngine';
-import { shareAsImage } from '../../utils/shareExport';
+import { shareCard } from '../../utils/shareExport';
+import ShareCard from '../share/ShareCard';
 import RunicBand from '../shared/RunicBand';
 import OrnamentalBorder from '../shared/OrnamentalBorder';
 import MysticButton from '../shared/MysticButton';
@@ -63,7 +64,7 @@ function formatQuestionType(qt: string): string {
 
 export default function ResultReading() {
   const { state, engine } = useGameEngine();
-  const shareRef = useRef<HTMLDivElement>(null);
+  const shareCardRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [openResult, setOpenResult] = useState<SlotResult | null>(null);
@@ -75,8 +76,8 @@ export default function ResultReading() {
 
   const handleDrawAgain = useCallback(() => engine.returnToQuestionSelect(), [engine]);
   const handleShare = useCallback(async () => {
-    if (shareRef.current) {
-      try { await shareAsImage(shareRef.current); } catch { /* silent */ }
+    if (shareCardRef.current) {
+      try { await shareCard(shareCardRef.current.firstElementChild as HTMLElement); } catch { /* silent */ }
     }
   }, []);
   const handleCopy = useCallback(async () => {
@@ -91,7 +92,7 @@ export default function ResultReading() {
 
   return (
     <motion.div style={containerStyle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }}>
-      <div ref={shareRef} data-share-container style={corrupted ? { ...cardStyle, position: 'relative', overflow: 'hidden' } : cardStyle} className={corrupted ? 'cx-results' : undefined}>
+      <div style={corrupted ? { ...cardStyle, position: 'relative', overflow: 'hidden' } : cardStyle} className={corrupted ? 'cx-results' : undefined}>
         {corrupted && <>
           <div className="cx-scan"/>
           <div className="cx-vignette"/>
@@ -175,6 +176,9 @@ export default function ResultReading() {
           </div>
           <MysticButton variant="secondary" onClick={handleCopy}>{copied ? 'Copied!' : 'Copy LLM Prompt'}</MysticButton>
         </div>
+      </div>
+      <div ref={shareCardRef} aria-hidden style={{ position: 'fixed', left: '-9999px', top: 0, pointerEvents: 'none' }}>
+        <ShareCard state={state} />
       </div>
       {historyOpen && <HistoryModal onClose={() => setHistoryOpen(false)} />}
       {openResult && <CardDetailModal result={openResult} onClose={() => setOpenResult(null)} />}
