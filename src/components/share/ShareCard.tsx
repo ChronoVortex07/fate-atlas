@@ -47,17 +47,26 @@ function affinityBadge(aff: Record<string, number>): string | null {
 }
 
 export default function ShareCard({ state }: { state: GameState }) {
-  const { turnResults, synthesis, questionType, affinities } = state;
+  const { turnResults, synthesis, questionType, affinities, corruption } = state;
   const reading = turnResults.filter((r) => r.type !== 'happening');
   const interp = synthesis?.tensionNote ?? firstSentence(synthesis?.paragraphs?.[0]);
   const badge = affinityBadge(affinities);
+  const corrupted = corruption.band === 'virulent' || corruption.band === 'pinnacle';
+  const footTag = corrupted ? (synthesis?.affinityNote ?? 'It watches. It is pleased.') : 'the stars await your question';
+  const cardCxOverlay: React.CSSProperties = {
+    position: 'absolute', inset: 0, pointerEvents: 'none', borderRadius: 14,
+    boxShadow: 'inset 0 0 70px rgba(255,45,74,0.16), inset 0 0 0 1px rgba(255,45,74,0.4)',
+    background: 'repeating-linear-gradient(0deg, rgba(255,45,74,0.06) 0 1px, transparent 1px 4px)',
+  };
+  const headlineCx: React.CSSProperties = { color: '#fff', textShadow: '-1.4px 0 #ff2d4a, 1.4px 0 #1a0006' };
 
   return (
     <div style={cardStyle}>
+      {corrupted && <div style={cardCxOverlay} />}
       <div style={padStyle}>
         <div style={qStyle}>{questionLabel(questionType)}</div>
         <div style={ornStyle}><span style={ornStarStyle}>✦</span></div>
-        <div style={headlineStyle}>{synthesis?.headline ?? 'Your Reading'}</div>
+        <div style={{ ...headlineStyle, ...(corrupted ? headlineCx : null) }}>{synthesis?.headline ?? 'Your Reading'}</div>
         {interp && <div style={tensionStyle}><p style={tensionTextStyle}>{interp}</p></div>}
         <div style={cardsHdrStyle}>The Cards · {reading.length}</div>
         <div style={listStyle}>
@@ -78,7 +87,7 @@ export default function ShareCard({ state }: { state: GameState }) {
           <div style={wmStyle}>
             <span style={wmAtlasStyle}>ATLAS</span><span style={wmOfStyle}>of</span><span style={wmFateStyle}>FATE</span>
           </div>
-          <div style={footTagStyle}>the stars await your question</div>
+          <div style={footTagStyle}>{footTag}</div>
         </div>
       </div>
     </div>
