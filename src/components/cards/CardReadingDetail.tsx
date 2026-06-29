@@ -79,6 +79,8 @@ function getResultDisplay(result: SlotResult): {
   }
 }
 
+const POS_ACCENT: Record<string, string> = { Past: '#7b9ec7', Present: '#d4a854', Future: '#9b6bb0' };
+
 /**
  * Full per-card reading breakdown — symbol/sigil, name, subtitle (or astral
  * house/aspect), and the three-position sub-spread when present. Shared by the
@@ -145,7 +147,7 @@ export default function CardReadingDetail({ result, index }: { result: SlotResul
                 fontFamily: "'Cormorant Garamond', serif",
                 fontWeight: 600,
                 fontSize: '0.6rem',
-                color: '#d4a854',
+                color: POS_ACCENT[sc.position] ?? '#d4a854',
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
               }}>
@@ -154,7 +156,7 @@ export default function CardReadingDetail({ result, index }: { result: SlotResul
               <CardSigil
                 card={sc.face}
                 size={26}
-                color={sc.orientation === '▲ Upright' ? '#7b9ec7' : '#d4a854'}
+                color={POS_ACCENT[sc.position] ?? '#d4a854'}
               />
               <span style={{
                 fontFamily: "'Cormorant Garamond', serif",

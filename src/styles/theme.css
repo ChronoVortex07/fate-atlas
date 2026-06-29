@@ -39,3 +39,5 @@ h1, h2, h3 {
 @media (max-height: 560px) {
   .runic-band { --rune-lines: 1; }
 }
+
+.result-tile:hover { border-color: #d4a854 !important; box-shadow: 0 0 18px rgba(212,168,84,0.22); transform: translateY(-2px); }

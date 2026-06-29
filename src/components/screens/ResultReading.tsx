@@ -6,8 +6,9 @@ import RunicBand from '../shared/RunicBand';
 import OrnamentalBorder from '../shared/OrnamentalBorder';
 import MysticButton from '../shared/MysticButton';
 import HistoryModal from '../overlays/HistoryModal';
-import CardReadingDetail from '../cards/CardReadingDetail';
-import type { GlitchSegment } from '../../engine/types';
+import ResultTile from '../cards/ResultTile';
+import CardDetailModal from '../overlays/CardDetailModal';
+import type { GlitchSegment, SlotResult } from '../../engine/types';
 
 // Corruption treatment → CSS class. The word stays in the DOM and legible (except
 // `redact`, which is covered); the styling is what reads as ominous.
@@ -51,6 +52,7 @@ export default function ResultReading() {
   const shareRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [openResult, setOpenResult] = useState<SlotResult | null>(null);
 
   const { turnResults, synthesis, synthesisSegments, happening, selectedHappeningChoice, questionType, corruption } = state;
 
@@ -94,18 +96,21 @@ export default function ResultReading() {
         )}
         <OrnamentalBorder margin="0.25rem 0" />
 
-        {/* Divination Results */}
+        {/* THE CARDS — compact, tap-to-expand tiles */}
         {turnResults.length > 0 && (
-          <div style={resultsGridStyle}>
-            {turnResults.map((r, i) => (
-              <CardReadingDetail key={i} result={r} index={i} />
-            ))}
+          <div style={cardsBlockStyle}>
+            <div style={cardsHeaderStyle}>The Cards · {turnResults.length}</div>
+            <div style={tileGridStyle}>
+              {turnResults.map((r, i) => (
+                <ResultTile key={i} result={r} index={i} onOpen={() => setOpenResult(r)} />
+              ))}
+            </div>
           </div>
         )}
 
         {/* Synthesis */}
         {synthesis && (
-          <div style={synthesisSectionStyle}>
+          <div style={synthesisHeroStyle}>
             <h2 style={sectionTitleStyle}>Interpretation</h2>
             <h3 style={headlineStyle}>
               {seg ? <GlitchText segments={seg.headline} /> : synthesis.headline}
@@ -158,6 +163,7 @@ export default function ResultReading() {
         </div>
       </div>
       {historyOpen && <HistoryModal onClose={() => setHistoryOpen(false)} />}
+      {openResult && <CardDetailModal result={openResult} onClose={() => setOpenResult(null)} />}
     </motion.div>
   );
 }
@@ -193,13 +199,22 @@ const questionStyle: React.CSSProperties = {
   fontStyle: 'italic', letterSpacing: '0.08em',
 };
 
-const resultsGridStyle: React.CSSProperties = {
-  display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%',
+const cardsBlockStyle: React.CSSProperties = {
+  width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem',
 };
-
-const synthesisSectionStyle: React.CSSProperties = {
-  display: 'flex', flexDirection: 'column', alignItems: 'center',
-  gap: '0.5rem', width: '100%',
+const cardsHeaderStyle: React.CSSProperties = {
+  fontFamily: "'Inter', sans-serif", fontSize: '0.55rem', letterSpacing: '0.26em',
+  textTransform: 'uppercase', color: '#5b7290',
+};
+const tileGridStyle: React.CSSProperties = {
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(112px, 1fr))',
+  gap: '0.55rem', width: '100%',
+};
+const synthesisHeroStyle: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', width: '100%',
+  background: 'linear-gradient(180deg, rgba(20,28,52,0.45), rgba(13,18,32,0.15))',
+  border: '1px solid rgba(40,54,92,0.7)', borderRadius: '8px',
+  padding: '1.1rem 1.05rem 1.15rem', boxSizing: 'border-box',
 };
 
 const sectionTitleStyle: React.CSSProperties = {
