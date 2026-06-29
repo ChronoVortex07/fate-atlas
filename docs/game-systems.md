@@ -222,6 +222,14 @@ When `NarrativeAssembler.assemble` builds the final reading, it emits a short **
 
 **Light's `hintClarity` reframe (preserved from earlier behaviour):** if `hintClarity ≥ 2` (Light strongly dominant), the note is prefixed with "The forces name themselves plainly: …" regardless of which affinity won; if `hintClarity ≤ −2` (Shadow strongly dominant), the note is replaced entirely with "Something stirs beneath the surface, but its name will not come." If no affinity is elevated, no note is emitted.
 
+**Entity voice at Virulent/Pinnacle:** when corruption band is `virulent` or `pinnacle` and an affinity note exists (i.e. some affinity is elevated), the affinity note is **replaced** by the corruption entity's own voice — a short declaration drawn at random from the `ENTITY_VOICE` pool in `CorruptionGlitch.ts`. This happens before the per-word glitch segmentation runs, so the entity line lands in `synthesis.affinityNote` as clean text and is then styled (drifted, redacted, whispered into) along with the rest of the corrupted reading. The replacement only fires when a note was already present; if no affinity is elevated there is no note to overwrite, and the entity line does not appear.
+
+Entity voice pool:
+- "It watches. It is pleased."
+- "Expect us."
+- "The card you did not draw speaks the loudest."
+- "This reading was never yours."
+
 ---
 
 ## 4. Corruption (engine foundation)

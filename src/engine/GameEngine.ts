@@ -8,7 +8,7 @@ import { ReadingPlanner } from './ReadingPlanner';
 import { NarrativeAssembler } from './NarrativeAssembler';
 import { AFFINITY_DEFINITIONS, defaultAffinityState, AFFINITY_IDS, BAND_ORDER } from '../data/affinities';
 import { RUPTURE_RESET, rollInfectedCount, INFECTION_GAIN_MULT, CORRUPTED_TAG, CORRUPTION_BANDS, SIGHT_COST, LIE_OFFSET, NEAR_PINNACLE, INTRUSION_PHRASES, intrusionChance, isVisibleCorruption, SEED_OMEN, LIGHT_LEAD_IN, TAUNT_LIGHT } from '../data/corruption';
-import { corruptionTextLevel, corruptSynthesisSegments, corruptText, appendSeedOmen } from './CorruptionGlitch';
+import { corruptionTextLevel, corruptSynthesisSegments, corruptText, appendSeedOmen, entityVoiceNote } from './CorruptionGlitch';
 import { selectHappening, HAPPENING_GAP_CHANCE } from '../data/happenings';
 import { dispatch } from './events/EventDispatcher';
 import { buildAffinityResponders } from './responders/affinity';
@@ -783,6 +783,10 @@ export class GameEngine {
       // Seeded is otherwise silent — the omen is the deliberate, innocuous tell.
       this.state.synthesis = appendSeedOmen(this.state.synthesis, Math.random);
     } else {
+      // Virulent+: the entity speaks over the affinity note before glitch segmentation.
+      if ((band === 'virulent' || band === 'pinnacle') && this.state.synthesis.affinityNote !== undefined) {
+        this.state.synthesis = { ...this.state.synthesis, affinityNote: entityVoiceNote(Math.random) };
+      }
       const cLevel = corruptionTextLevel(band, this.corruptionEngine.getValue());
       if (cLevel > 0) {
         // The true reading stays on `synthesis`; corruption is a display-only overlay

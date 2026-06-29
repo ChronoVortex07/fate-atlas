@@ -26,6 +26,18 @@ const WHISPERS = [
   'Expect us.',
 ];
 
+// The entity speaking in its own voice — replaces the affinity note at Virulent+.
+const ENTITY_VOICE = [
+  'It watches. It is pleased.',
+  'Expect us.',
+  'The card you did not draw speaks the loudest.',
+  'This reading was never yours.',
+];
+
+export function entityVoiceNote(rng: () => number): string {
+  return ENTITY_VOICE[Math.floor(rng() * ENTITY_VOICE.length)];
+}
+
 // Swap two adjacent interior letters; first + last preserved so the eye skips it.
 export function interiorTypo(word: string, rng: () => number): string {
   if (word.length < 4) return word;

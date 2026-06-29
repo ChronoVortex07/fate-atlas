@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { corruptionTextLevel, interiorTypo, corruptText, corruptSegments, segmentsToText, corruptSynthesisSegments, SEED_OMENS, seedOmen, appendSeedOmen } from '../CorruptionGlitch';
+import { corruptionTextLevel, interiorTypo, corruptText, corruptSegments, segmentsToText, corruptSynthesisSegments, SEED_OMENS, seedOmen, appendSeedOmen, entityVoiceNote } from '../CorruptionGlitch';
 import type { GlitchSegment } from '../types';
 
 const countStyle = (segs: GlitchSegment[], style: string) => segs.filter((s) => s.style === style).length;
@@ -134,6 +134,19 @@ describe('corruptSynthesisSegments', () => {
     const out = corruptSynthesisSegments(s, 2, mulberry32(5));
     expect(out.tensionNote).toBeTruthy();
     expect(out.affinityNote).toBeUndefined();
+  });
+});
+
+describe('entity voice', () => {
+  it('returns one of the entity declarations', () => {
+    const pool = [
+      'It watches. It is pleased.',
+      'Expect us.',
+      'The card you did not draw speaks the loudest.',
+      'This reading was never yours.',
+    ];
+    expect(pool).toContain(entityVoiceNote(() => 0));
+    expect(pool).toContain(entityVoiceNote(() => 0.99));
   });
 });
 
