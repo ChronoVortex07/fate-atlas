@@ -365,25 +365,44 @@ describe('tarot draft state', () => {
 });
 
 describe('commitDraft deal-swap pipeline', () => {
+  // Deterministic PRNG: an unstubbed deal can hand fate-deal-swap a replacement card
+  // that collides with one already in the hand, making the forced responder bail
+  // (`return null`) and leaving revealSwap undefined — the source of the flake. A
+  // seeded RNG makes the deal and the replacement draw reproducible and collision-free.
+  function mulberry32(seed: number) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
   it('records revealSwap on a non-fated face when fate-deal-swap is forced', () => {
-    const e = new GameEngine();
-    e.startTurn('self');
-    // Ensure tarot is in the pool and fate is at ascendant for fate-deal-swap.
-    e.loadState({ availableMethods: ['tarot', 'd20', 'iching'], affinities: { chaos: 50, order: 50, fate: 75, will: 50, light: 50, shadow: 50 } });
-    const tIdx = e.getState().availableMethods.indexOf('tarot');
-    e.selectMethod(tIdx);
-    // Fill the 3-slot hand from the table.
-    for (let h = 0; h < 3; h++) {
+    const orig = Math.random;
+    Math.random = mulberry32(1);
+    try {
+      const e = new GameEngine();
+      e.startTurn('self');
+      // Ensure tarot is in the pool and fate is at ascendant for fate-deal-swap.
+      e.loadState({ availableMethods: ['tarot', 'd20', 'iching'], affinities: { chaos: 50, order: 50, fate: 75, will: 50, light: 50, shadow: 50 } });
+      const tIdx = e.getState().availableMethods.indexOf('tarot');
+      e.selectMethod(tIdx);
+      // Fill the 3-slot hand from the table.
+      for (let h = 0; h < 3; h++) {
+        const draft = e.getState().minigameState as any;
+        const tableIdx = draft.table.findIndex((t: any) => t !== null);
+        e.pickForHand(h, tableIdx);
+      }
+      e.forceEffects(['fate-deal-swap'], false);
+      e.commitDraft(false);
       const draft = e.getState().minigameState as any;
-      const tableIdx = draft.table.findIndex((t: any) => t !== null);
-      e.pickForHand(h, tableIdx);
+      expect(draft.revealSwap).toBeTruthy();
+      expect(typeof draft.revealSwap.index).toBe('number');
+      expect(typeof draft.revealSwap.fromCardId).toBe('string');
+    } finally {
+      Math.random = orig;
     }
-    e.forceEffects(['fate-deal-swap'], false);
-    e.commitDraft(false);
-    const draft = e.getState().minigameState as any;
-    expect(draft.revealSwap).toBeTruthy();
-    expect(typeof draft.revealSwap.index).toBe('number');
-    expect(typeof draft.revealSwap.fromCardId).toBe('string');
   });
 });
 

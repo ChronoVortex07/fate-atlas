@@ -27,24 +27,35 @@ describe('emergent upheaval (integration)', () => {
   }
 
   it('forced at an extreme: inverts the next reading, leaves base intact, and does not re-fire while active', () => {
-    const engine = new GameEngine();
-    engine.startTurn('self');
-    engine.loadState({ affinities: { chaos: 96, order: 30, fate: 50, will: 50, light: 50, shadow: 50 } });
-    engine.forceEffects(['emergent-upheaval'], false); // bypass the rare roll; condition still required
+    // Stub Math.random so the reading is deterministic: the emergent condition reads
+    // the EFFECTIVE chaos at commit, and an unstubbed d20 draw can feed chaos below
+    // EMERGENT_THRESHOLD (95) before the condition is evaluated, intermittently
+    // disqualifying the forced upheaval. 0.99 also suppresses corruption seeding and
+    // the happening-gap so neither perturbs the reading.
+    const orig = Math.random;
+    Math.random = () => 0.99;
+    try {
+      const engine = new GameEngine();
+      engine.startTurn('self');
+      engine.loadState({ affinities: { chaos: 96, order: 30, fate: 50, will: 50, light: 50, shadow: 50 } });
+      engine.forceEffects(['emergent-upheaval'], false); // bypass the rare roll; condition still required
 
-    playOneReading(engine); // reading 1 commits → requests upheaval → granted after tick
-    const afterFirst = engine.getState();
-    // Assert the invariant (effective is the inverted base), not a literal — a d20
-    // commit must not move base chaos, but relational assertions are robust either way.
-    expect(afterFirst.affinityBase.chaos).toBeGreaterThanOrEqual(90); // base stays high (transform never touches base)
-    expect(afterFirst.affinities.chaos).toBe(100 - afterFirst.affinityBase.chaos); // effective = inverted base
-    expect(afterFirst.affinities.chaos).toBeLessThan(15); // visibly inverted for reading 2
+      playOneReading(engine); // reading 1 commits → requests upheaval → granted after tick
+      const afterFirst = engine.getState();
+      // Assert the invariant (effective is the inverted base), not a literal — a d20
+      // commit must not move base chaos, but relational assertions are robust either way.
+      expect(afterFirst.affinityBase.chaos).toBeGreaterThanOrEqual(90); // base stays high (transform never touches base)
+      expect(afterFirst.affinities.chaos).toBe(100 - afterFirst.affinityBase.chaos); // effective = inverted base
+      expect(afterFirst.affinities.chaos).toBeLessThan(15); // visibly inverted for reading 2
 
-    engine.forceEffects(['emergent-upheaval'], false); // try to force a second upheaval
-    playOneReading(engine); // reading 2: the no-active-upheaval guard blocks it
-    // Still a SINGLE inversion (low). A stacked second invert-pair would have flipped
-    // chaos back near its base (~96); the guard prevents that.
-    expect(engine.getState().affinities.chaos).toBeLessThan(15);
+      engine.forceEffects(['emergent-upheaval'], false); // try to force a second upheaval
+      playOneReading(engine); // reading 2: the no-active-upheaval guard blocks it
+      // Still a SINGLE inversion (low). A stacked second invert-pair would have flipped
+      // chaos back near its base (~96); the guard prevents that.
+      expect(engine.getState().affinities.chaos).toBeLessThan(15);
+    } finally {
+      Math.random = orig;
+    }
   });
 });
 
