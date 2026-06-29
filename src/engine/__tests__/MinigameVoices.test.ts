@@ -70,7 +70,7 @@ describe('MinigameVoice — aggregation', () => {
     expect(g.subject).toContain('5');
     expect(g.subject).toContain('12');
     expect(g.subject).toContain('18');
-    expect(g.subject).toContain('the dice fall in turn');
+    expect(g.subject).toContain('the dice climbing'); // 5,12,18 is strictly rising
     // exactly one scaffold, not three
     expect(g.subject.match(/the dice/g)?.length).toBe(1);
     expect(g.clause.trim().length).toBeGreaterThan(0);
@@ -81,6 +81,18 @@ describe('MinigameVoice — aggregation', () => {
     expect(g.subject).toContain('Tower');
     expect(g.subject).toContain('Star');
     expect(g.clause.trim().length).toBeGreaterThan(0);
+  });
+});
+
+describe('MinigameVoice — d20 trend aggregation', () => {
+  it('a strictly falling sequence reads as falling', () => {
+    const g = voiceFor('d20').describeGroup([d20(18), d20(12), d20(5)], 'effect', 0);
+    expect(g.subject).toContain('the dice falling');
+    expect(g.subject.match(/the dice/g)?.length).toBe(1);
+  });
+  it('a non-monotonic sequence reads as scattered', () => {
+    const g = voiceFor('d20').describeGroup([d20(5), d20(18), d20(11)], 'effect', 0);
+    expect(g.subject).toContain('the dice scattering');
   });
 });
 

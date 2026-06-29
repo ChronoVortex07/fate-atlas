@@ -8,6 +8,16 @@ import {
 
 const DF = F.drawFraming;
 
+/** Classify a sequence of d20 values as rising, falling, or scattered. */
+function trendOf(values: number[]): 'rising' | 'falling' | 'scattered' {
+  let rising = true, falling = true;
+  for (let i = 1; i < values.length; i++) {
+    if (values[i] <= values[i - 1]) rising = false;
+    if (values[i] >= values[i - 1]) falling = false;
+  }
+  return rising ? 'rising' : falling ? 'falling' : 'scattered';
+}
+
 /** Pick a variant scaffold for a 2nd+ draw; falls back to null when none defined. */
 function variantScaffold(type: string, value: string | number, occ: DrawOccurrence): string | null {
   const pool = DF.variantScaffolds[type];
@@ -121,9 +131,10 @@ const d20Voice: MinigameVoice = {
   },
   describeGroup(slots, role, _occBase) {
     const dice = slots.filter((s): s is Extract<SlotResult, { type: 'd20' }> => s.type === 'd20');
-    const items = dice.map((d) => String(d.result));
-    const subject = `${DF.group.lead.d20} ${joinSeq(items, DF.group.seqLast, DF.group.mid)}`;
-    const clause = verbPhrase(role, groupDims(slots), 'd20-group' + items.join('|'));
+    const values = dice.map((d) => d.result);
+    const lead = DF.group.d20Trend[trendOf(values)];
+    const subject = `${lead} ${joinSeq(values.map(String), DF.group.seqLast, DF.group.mid)}`;
+    const clause = verbPhrase(role, groupDims(slots), 'd20-group' + values.join('|'));
     return { subject, clause };
   },
 };

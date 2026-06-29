@@ -309,7 +309,7 @@ describe('NarrativeAssembler', () => {
     const body = result.paragraphs.join('\n');
     // one combined scaffold, not three "settling on" repeats
     expect((body.match(/the dice/g) ?? []).length).toBe(1);
-    expect(body).toContain('the dice fall in turn');
+    expect(body).toContain('the dice climbing'); // 5,12,18 is strictly rising
     expect(body).toContain('5');
     expect(body).toContain('12');
     expect(body).toContain('18');
